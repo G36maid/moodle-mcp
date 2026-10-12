@@ -1,12 +1,19 @@
-use serde_json::{json, Value};
+//! Messaging & notifications.
+//!
+//! NTNU 3.7 specifics handled internally:
+//! - `core_message_get_notifications` is absent on 3.7 → falls back to
+//!   `core_message_get_messages?type=notifications` (caller resolves via
+//!   `pick_function`)
+//! - conversations: `unreadcount` is null on 3.7 → falls back to `isread`;
+//!   private chats have an empty `name` → display name taken from `members`
+
+use serde_json::{Value, json};
 
 use crate::client::MoodleClient;
 use crate::error::MoodleError;
-use crate::util::{strip_html, truncate_chars, unix_to_iso};
+use crate::util::{html_to_markdown, truncate_chars, unix_to_iso};
 
-/// Get recent notifications. `wsfunction` varies by Moodle version:
-/// `core_message_get_notifications` (3.9+ mobile service) or
-/// `core_message_get_messages` with type=notifications (Moodle 3.x).
+/// Recent notifications for the user.
 pub async fn get_notifications(
     client: &MoodleClient,
     wsfunction: &str,
@@ -15,14 +22,10 @@ pub async fn get_notifications(
     limit: u32,
 ) -> Result<Value, MoodleError> {
     let legacy = wsfunction == "core_message_get_messages";
-    let mut params = json!({
-        "useridto": user_id,
-        "limitnum": limit
-    });
+    let mut params = json!({ "useridto": user_id, "limitnum": limit });
     if legacy {
         params["type"] = json!("notifications");
         params["newestfirst"] = json!(true);
-        // legacy API filters by read state 0/1; only send when requested
         if let Some(r) = read {
             params["read"] = json!(if r { 1 } else { 0 });
         }
@@ -33,6 +36,7 @@ pub async fn get_notifications(
         }
     }
     let v: Value = client.call(wsfunction, &params).await?;
+
     let items: Vec<Value> = v
         .get("list")
         .or_else(|| v.get("messages"))
@@ -46,9 +50,9 @@ pub async fn get_notifications(
                 "subject": n.get("subject").cloned().unwrap_or(Value::Null),
                 "from": n.get("userfromfullname").cloned().unwrap_or(Value::Null),
                 "from_user_id": n.get("useridfrom").cloned().unwrap_or(Value::Null),
-                "text": n.get("text").or_else(|| n.get("smallmessage")).or_else(|| n.get("fullmessage"))
-                    .and_then(Value::as_str)
-                    .map(|t| truncate_chars(&strip_html(t), 500)),
+                "text": n.get("text").or_else(|| n.get("smallmessage"))
+                    .or_else(|| n.get("fullmessage")).and_then(Value::as_str)
+                    .map(|t| truncate_chars(&html_to_markdown(t), 500)),
                 "timecreated": unix_to_iso(n.get("timecreated").cloned().unwrap_or(Value::Null)),
                 "read": n.get("read").cloned().unwrap_or(Value::Null),
             })
@@ -57,7 +61,10 @@ pub async fn get_notifications(
     Ok(json!({ "count": items.len(), "notifications": items }))
 }
 
-/// `core_message_get_conversations` — messaging conversations for the user.
+/// `core_message_get_conversations` — the user's conversations.
+///
+/// Private chats (empty `name`) get their display name from the other
+/// member; unread falls back to `isread` when `unreadcount` is null (3.7).
 pub async fn get_conversations(
     client: &MoodleClient,
     user_id: i64,
@@ -69,6 +76,7 @@ pub async fn get_conversations(
             &json!({ "userid": user_id, "limitnum": limit }),
         )
         .await?;
+
     let conversations: Vec<Value> = v
         .get("conversations")
         .and_then(Value::as_array)
@@ -76,9 +84,41 @@ pub async fn get_conversations(
         .unwrap_or_default()
         .into_iter()
         .map(|c| {
-            // Modern Moodle: `lastmessage` (array or object) + `timemodified`.
-            // Moodle 3.7: no lastmessage/timemodified; last entries live in
-            // the `messages` array, and the conversation kind is `type`.
+            let members: Vec<Value> = c
+                .get("members")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default()
+                .into_iter()
+                .map(|m| {
+                    json!({
+                        "id": m.get("id").cloned().unwrap_or(Value::Null),
+                        "fullname": m.get("fullname").cloned().unwrap_or(Value::Null),
+                    })
+                })
+                .collect();
+
+            // Display name: explicit name, else the other member(s) of a
+            // private chat (3.7 leaves `name` empty there).
+            let name = match c.get("name").and_then(Value::as_str) {
+                Some(n) if !n.is_empty() => Value::String(n.to_string()),
+                _ => {
+                    let others: Vec<String> = members
+                        .iter()
+                        .filter(|m| m.get("id").and_then(Value::as_i64) != Some(user_id))
+                        .filter_map(|m| m.get("fullname").and_then(Value::as_str))
+                        .map(str::to_string)
+                        .collect();
+                    if others.is_empty() {
+                        Value::Null
+                    } else {
+                        Value::String(others.join(", "))
+                    }
+                }
+            };
+
+            // Modern versions expose `lastmessage`; 3.7 puts the last entries
+            // in `messages`. Unread: `unreadcount`, falling back to `isread`.
             let last_msg = c
                 .get("lastmessage")
                 .and_then(Value::as_array)
@@ -95,25 +135,30 @@ pub async fn get_conversations(
             } else {
                 unix_to_iso(last_msg.get("timecreated").cloned().unwrap_or(Value::Null))
             };
+
             json!({
                 "id": c.get("id").cloned().unwrap_or(Value::Null),
-                "name": c.get("name").cloned().unwrap_or(Value::Null),
-                "type": c.get("subtype").cloned().unwrap_or_else(|| c.get("type").cloned().unwrap_or(Value::Null)),
+                "name": name,
+                "type": c.get("subtype").cloned()
+                    .unwrap_or_else(|| c.get("type").cloned().unwrap_or(Value::Null)),
                 "member_count": c.get("membercount").cloned().unwrap_or(Value::Null),
-                "unread": c.get("unreadcount").cloned().unwrap_or(Value::Null),
+                "unread": c.get("unreadcount").cloned()
+                    .unwrap_or_else(|| c.get("isread").cloned()
+                        .map(|r| json!(if r.as_bool() == Some(false) { 1 } else { 0 }))
+                        .unwrap_or(Value::Null)),
                 "last_message": if last_msg.is_null() { Value::Null } else { json!({
-                    "text": last_msg.get("text").or_else(|| last_msg.get("smallmessage")).or_else(|| last_msg.get("fullmessage"))
+                    "text": last_msg.get("text").or_else(|| last_msg.get("smallmessage"))
                         .and_then(Value::as_str)
-                        .map(|t| truncate_chars(&strip_html(t), 300)),
+                        .map(|t| truncate_chars(&html_to_markdown(t), 300)),
                     "from_user_id": last_msg.get("useridfrom").cloned().unwrap_or(Value::Null),
                 }) },
                 "last_activity": last_activity,
+                "members": members,
             })
         })
         .collect();
     Ok(json!({
         "count": conversations.len(),
-        "unread_total": v.get("unreadcount").cloned().unwrap_or(Value::Null),
         "conversations": conversations
     }))
 }
@@ -130,7 +175,11 @@ pub async fn send_message(
             &json!({ "messages": [ { "touserid": to_user_id, "text": text, "textformat": 1 } ] }),
         )
         .await?;
-    let first = v.as_array().and_then(|a| a.first()).cloned().unwrap_or(Value::Null);
+    let first = v
+        .as_array()
+        .and_then(|a| a.first())
+        .cloned()
+        .unwrap_or(Value::Null);
     if let Some(err) = first.get("errormessage").and_then(Value::as_str) {
         return Err(MoodleError::InvalidBody(format!(
             "Moodle rejected the message: {err}"
@@ -140,18 +189,5 @@ pub async fn send_message(
         "sent": true,
         "to_user_id": to_user_id,
         "message_id": first.get("msgid").cloned().unwrap_or(Value::Null),
-        "sent_at": unix_to_iso(first.get("timecreated").cloned().unwrap_or(Value::Null)),
     }))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn rejects_errormessage() {
-        let first = json!({"msgid": null, "errormessage": "User 1 is not reachable"});
-        let err = first.get("errormessage").and_then(Value::as_str).unwrap();
-        assert!(err.contains("not reachable"));
-    }
 }
