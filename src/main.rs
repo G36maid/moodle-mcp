@@ -1,11 +1,7 @@
-//! moodle-mcp binary — wires config + client + MCP server onto stdio.
+//! moodle-mcp binary — MCP stdio server by default, plus the `token` CLI.
 //!
-//! Environment:
-//! - `MOODLE_URL`   — base URL, e.g. `https://moodle.example.com`
-//! - `MOODLE_TOKEN` — web service token
-//! - `MOODLE_TIMEOUT_SECS` — optional request timeout (default 60)
-//! - `RUST_LOG`     — optional tracing filter (default `info`); logs go to
-//!   stderr because stdout is the MCP stdio transport.
+//! - `moodle-mcp`                    → serve MCP over stdio (env: MOODLE_URL, MOODLE_TOKEN)
+//! - `moodle-mcp token --url ...`    → obtain a web service token (see token.rs)
 
 use std::sync::Arc;
 
@@ -30,7 +26,9 @@ fn load_config() -> Config {
         Ok(cfg) => cfg,
         Err(e) => {
             eprintln!("moodle-mcp: configuration error: {e}");
-            eprintln!("required env: MOODLE_URL=https://<moodle-host> MOODLE_TOKEN=<webservice token>");
+            eprintln!(
+                "required env: MOODLE_URL=https://<moodle-host> MOODLE_TOKEN=<webservice token>"
+            );
             std::process::exit(2);
         }
     }
@@ -38,9 +36,27 @@ fn load_config() -> Config {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut args = std::env::args().skip(1);
+
+    // Subcommand dispatch. `token` is the only one; anything else (or nothing)
+    // is the MCP server.
+    match args.next().as_deref() {
+        Some("token") => return moodle_mcp::token::run(&args.collect::<Vec<_>>()).await,
+        Some(other) => {
+            eprintln!("moodle-mcp: unknown subcommand '{other}'");
+            eprintln!("usage: moodle-mcp [serve] | moodle-mcp token --url <site> ...");
+            std::process::exit(2);
+        }
+        _ => {}
+    }
+
     init_tracing();
     let cfg = load_config();
-    tracing::info!("starting moodle-mcp v{} for {}", env!("CARGO_PKG_VERSION"), cfg.base_url);
+    tracing::info!(
+        "starting moodle-mcp v{} for {}",
+        env!("CARGO_PKG_VERSION"),
+        cfg.base_url
+    );
 
     let client = Arc::new(MoodleClient::new(cfg)?);
     let server = MoodleMcp::new(client);
