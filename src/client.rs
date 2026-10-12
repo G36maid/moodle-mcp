@@ -1,0 +1,203 @@
+use std::time::Duration;
+
+use serde::de::DeserializeOwned;
+use serde_json::Value;
+
+use crate::config::Config;
+use crate::error::{MoodleError, MoodleException};
+
+/// Client for the Moodle Web Services REST protocol.
+///
+/// All calls go through the single RPC-style endpoint:
+/// `POST {base}/webservice/rest/server.php` with form-urlencoded parameters
+/// (`wstoken`, `wsfunction`, `moodlewsrestformat=json`, plus the function's
+/// own parameters in PHP array notation).
+#[derive(Clone)]
+pub struct MoodleClient {
+    http: reqwest::Client,
+    base_url: String,
+    token: String,
+}
+
+impl MoodleClient {
+    pub fn new(cfg: Config) -> Result<Self, MoodleError> {
+        let http = reqwest::Client::builder()
+            .timeout(Duration::from_secs(cfg.timeout_secs))
+            .user_agent(concat!("moodle-mcp/", env!("CARGO_PKG_VERSION")))
+            .build()
+            .map_err(|e| MoodleError::Config(format!("failed to build HTTP client: {e}")))?;
+        Ok(Self { http, base_url: cfg.base_url, token: cfg.token })
+    }
+
+    /// Call a web service function.
+    ///
+    /// `params` is a JSON object whose values may contain nested
+    /// objects/arrays; they are flattened into Moodle's PHP bracket notation,
+    /// e.g. `{"courseids": [2, 5]}` → `courseids[0]=2&courseids[1]=5`.
+    pub async fn call<T: DeserializeOwned>(
+        &self,
+        wsfunction: &str,
+        params: &Value,
+    ) -> Result<T, MoodleError> {
+        let value = self.call_raw(wsfunction, params).await?;
+        serde_json::from_value(value).map_err(MoodleError::from)
+    }
+
+    /// Call a web service function and return the raw JSON response.
+    pub async fn call_raw(&self, wsfunction: &str, params: &Value) -> Result<Value, MoodleError> {
+        let url = format!(
+            "{}/webservice/rest/server.php",
+            self.base_url.trim_end_matches('/')
+        );
+
+        let mut form: Vec<(String, String)> = vec![
+            ("wstoken".into(), self.token.clone()),
+            ("wsfunction".into(), wsfunction.to_string()),
+            ("moodlewsrestformat".into(), "json".into()),
+        ];
+        flatten_json(params, "", &mut form);
+
+        let resp = self
+            .http
+            .post(&url)
+            .form(&form)
+            .send()
+            .await
+            .map_err(MoodleError::from)?;
+
+        let status = resp.status();
+        let text = resp.text().await.map_err(MoodleError::from)?;
+        tracing::debug!(
+            wsfunction,
+            %status,
+            bytes = text.len(),
+            "moodle ws response"
+        );
+        tracing::trace!(body = truncate(&text, 1000), "moodle ws body");
+        let value: Value = serde_json::from_str(&text)
+            .map_err(|_| MoodleError::InvalidBody(format!(
+                "expected JSON, got HTTP {status}: {}",
+                truncate(&text, 300)
+            )))?;
+
+        // Moodle reports API errors with HTTP 200 and an exception payload.
+        if let Some(obj) = value.as_object()
+            && obj.contains_key("exception") && obj.contains_key("errorcode") {
+                let exc: MoodleException = serde_json::from_value(value)
+                    .map_err(MoodleError::from)?;
+                return Err(MoodleError::from_exception(exc));
+            }
+        Ok(value)
+    }
+
+    /// Download bytes from a Moodle file URL, injecting the web service token
+    /// if the URL points at `pluginfile.php` and carries no token.
+    pub async fn download_file(&self, file_url: &str) -> Result<reqwest::Response, MoodleError> {
+        let mut url = url::Url::parse(file_url)
+            .map_err(|e| MoodleError::Config(format!("invalid file URL: {e}")))?;
+        if !url.query_pairs().any(|(k, _)| k == "token")
+            && url.path().contains("pluginfile.php")
+        {
+            url.query_pairs_mut().append_pair("token", &self.token);
+        }
+        self.http
+            .get(url)
+            .send()
+            .await
+            .map_err(MoodleError::from)
+    }
+
+    /// Upload a file to the user's draft file area via `webservice/upload.php`.
+    ///
+    /// Returns the raw JSON array response (contains `itemid` to reference
+    /// the uploaded file in subsequent function calls).
+    pub async fn upload_to_draft(
+        &self,
+        filename: &str,
+        bytes: Vec<u8>,
+        itemid: i64,
+    ) -> Result<Value, MoodleError> {
+        let url = format!(
+            "{}/webservice/upload.php",
+            self.base_url.trim_end_matches('/')
+        );
+        let part = reqwest::multipart::Part::bytes(bytes).file_name(filename.to_string());
+        let form = reqwest::multipart::Form::new()
+            .text("token", self.token.clone())
+            .text("filearea", "draft")
+            .text("itemid", itemid.to_string())
+            .part("file_1", part); // Moodle accepts any part name for the first file
+
+        let resp = self
+            .http
+            .post(&url)
+            .multipart(form)
+            .send()
+            .await
+            .map_err(MoodleError::from)?;
+        let text = resp.text().await.map_err(MoodleError::from)?;
+        let value: Value = serde_json::from_str(&text)
+            .map_err(|_| MoodleError::InvalidBody(format!(
+                "upload.php returned non-JSON: {}",
+                truncate(&text, 300)
+            )))?;
+        if let Some(obj) = value.as_object()
+            && obj.contains_key("exception") && obj.contains_key("errorcode") {
+                let exc: MoodleException =
+                    serde_json::from_value(value).map_err(MoodleError::from)?;
+                return Err(MoodleError::from_exception(exc));
+            }
+        Ok(value)
+    }
+}
+
+/// Flatten a JSON object into `key=value` pairs using PHP bracket notation,
+/// e.g. `{"courseids":[2,5],"filter":{"k":"v"}}` →
+/// `courseids[0]=2`, `courseids[1]=5`, `filter[k]=v`.
+pub fn flatten_json(value: &Value, prefix: &str, out: &mut Vec<(String, String)>) {
+    match value {
+        Value::Object(map) => {
+            for (k, v) in map {
+                let p = if prefix.is_empty() { k.clone() } else { format!("{prefix}[{k}]") };
+                flatten_json(v, &p, out);
+            }
+        }
+        Value::Array(items) => {
+            for (i, v) in items.iter().enumerate() {
+                let p = format!("{prefix}[{i}]");
+                flatten_json(v, &p, out);
+            }
+        }
+        Value::Null => {}
+        Value::Bool(b) => out.push((prefix.to_string(), if *b { "1".into() } else { "0".into() })),
+        Value::Number(n) => out.push((prefix.to_string(), n.to_string())),
+        Value::String(s) => out.push((prefix.to_string(), s.clone())),
+    }
+}
+
+fn truncate(s: &str, max: usize) -> &str {
+    match s.char_indices().nth(max) {
+        Some((idx, _)) => &s[..idx],
+        None => s,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn flattens_php_notation() {
+        let mut out = Vec::new();
+        flatten_json(
+            &json!({"courseids": [2, 5], "criteria": [{"key": "search", "value": "math"}]}),
+            "",
+            &mut out,
+        );
+        assert!(out.contains(&("courseids[0]".to_string(), "2".to_string())));
+        assert!(out.contains(&("courseids[1]".to_string(), "5".to_string())));
+        assert!(out.contains(&("criteria[0][key]".to_string(), "search".to_string())));
+        assert!(out.contains(&("criteria[0][value]".to_string(), "math".to_string())));
+    }
+}
