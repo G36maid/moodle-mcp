@@ -56,7 +56,7 @@ async fn lists_all_tools_over_mcp() {
         "get_assignments",
         "get_assignment_status",
         "submit_assignment_text",
-        "upload_draft_file",
+        "upload_file",
         "submit_assignment_files",
         "submit_assignment_for_grading",
         "get_grades",
@@ -75,7 +75,6 @@ async fn lists_all_tools_over_mcp() {
         "get_quizzes",
         "get_quiz_attempts",
         "download_file",
-        "upload_file",
         "call_ws_function",
     ] {
         assert!(names.contains(&expected), "missing tool: {expected}");

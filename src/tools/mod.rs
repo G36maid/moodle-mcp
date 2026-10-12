@@ -88,7 +88,7 @@ pub struct SubmitTextParams {
 }
 
 #[derive(Deserialize, schemars::JsonSchema)]
-pub struct UploadDraftParams {
+pub struct UploadFileParams {
     /// File name to store in the draft area
     filename: String,
     /// File content, base64-encoded
@@ -101,7 +101,7 @@ pub struct UploadDraftParams {
 pub struct SubmitFilesParams {
     /// The assignment id
     assignment_id: i64,
-    /// Draft item id returned by upload_draft_file
+    /// Draft item id returned by upload_file
     item_id: i64,
 }
 
@@ -264,16 +264,6 @@ pub struct DownloadFileParams {
     /// Moodle file URL (e.g. the fileurl from get_course_contents; the token
     /// is injected automatically for pluginfile.php URLs)
     url: String,
-}
-
-#[derive(Deserialize, schemars::JsonSchema)]
-pub struct UploadFileParams {
-    /// File name to store in the draft area
-    filename: String,
-    /// File content, base64-encoded
-    content_base64: String,
-    /// Draft item id; omit to create a new draft area (recommended)
-    item_id: Option<i64>,
 }
 
 #[derive(Deserialize, schemars::JsonSchema)]
@@ -476,18 +466,7 @@ impl MoodleMcp {
         )
     }
 
-    #[tool(description = "Upload one file to the user's draft file area; returns the draft item_id needed by submit_assignment_files.")]
-    async fn upload_draft_file(
-        &self,
-        Parameters(p): Parameters<UploadDraftParams>,
-    ) -> Result<CallToolResult, McpError> {
-        let item_id = p.item_id.unwrap_or_else(crate::util::unique_item_id);
-        finish(
-            files::upload_draft_file(&self.client, &p.filename, &p.content_base64, item_id).await,
-        )
-    }
-
-    #[tool(description = "Submit uploaded draft file(s) (by draft item_id from upload_draft_file) as the file submission for an assignment. Follow up with submit_assignment_for_grading if the assignment uses draft submissions.")]
+    #[tool(description = "Submit uploaded draft file(s) (by draft item_id from upload_file) as the file submission for an assignment. Follow up with submit_assignment_for_grading if the assignment uses draft submissions.")]
     async fn submit_assignment_files(
         &self,
         Parameters(p): Parameters<SubmitFilesParams>,
@@ -756,7 +735,7 @@ impl MoodleMcp {
         finish(files::download_file(&self.client, &p.url).await)
     }
 
-    #[tool(description = "Upload a base64-encoded file to the user's draft area; returns the draft item_id for submit_assignment_files.")]
+    #[tool(description = "Upload a base64-encoded file to the user's draft file area; returns the draft item_id needed by submit_assignment_files.")]
     async fn upload_file(
         &self,
         Parameters(p): Parameters<UploadFileParams>,
