@@ -6,6 +6,25 @@ use crate::util::{strip_html, truncate_chars, unix_to_iso};
 
 /// Shape an assignment record from `mod_assign_get_assignments`.
 fn shape_assignment(a: &Value, course: &Value) -> Value {
+    // Assignment brief attachments (the task PDF etc.). Moodle exposes them
+    // as `introattachments`; without this the agent cannot discover what to
+    // download. Pure data — no workflow hints.
+    let attachments: Vec<Value> = a
+        .get("introattachments")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|f| {
+            json!({
+                "filename": f.get("filename").cloned().unwrap_or(Value::Null),
+                "fileurl": f.get("fileurl").cloned().unwrap_or(Value::Null),
+                "filesize": f.get("filesize").cloned().unwrap_or(Value::Null),
+                "mimetype": f.get("mimetype").cloned().unwrap_or(Value::Null),
+            })
+        })
+        .collect();
+
     json!({
         "assignment_id": a.get("id").cloned().unwrap_or(Value::Null),
         "cmid": a.get("cmid").cloned().unwrap_or(Value::Null),
@@ -23,6 +42,7 @@ fn shape_assignment(a: &Value, course: &Value) -> Value {
         "max_attempts": a.get("maxattempts").cloned().unwrap_or(Value::Null),
         "requiresubmissionstatement": a.get("requiresubmissionstatement").cloned().unwrap_or(Value::Null),
         "description": a.get("intro").and_then(Value::as_str).map(|t| truncate_chars(&strip_html(t), 1200)),
+        "attachments": attachments,
     })
 }
 
@@ -133,7 +153,6 @@ pub async fn submit_assignment_text(
         "saved": true,
         "assignment_id": assignment_id,
         "format": format,
-        "note": "Text submission saved. If the assignment uses draft submissions, also call submit_assignment_for_grading.",
         "warnings": v.get("warnings").cloned().unwrap_or(json!([]))
     }))
 }
@@ -156,7 +175,6 @@ pub async fn submit_assignment_files(
         "saved": true,
         "assignment_id": assignment_id,
         "file_item_id": item_id,
-        "note": "File submission saved. If the assignment uses draft submissions, also call submit_assignment_for_grading.",
         "warnings": v.get("warnings").cloned().unwrap_or(json!([]))
     }))
 }
@@ -191,7 +209,9 @@ mod tests {
     fn shapes_assignment() {
         let a = json!({
             "id": 5, "cmid": 9, "course": 2, "name": "HW1",
-            "duedate": 1_700_000_000, "intro": "<p>Read ch.1</p>"
+            "duedate": 1_700_000_000, "intro": "<p>Read ch.1</p>",
+            "submissiondraft": 1, "nosubmissions": 0,
+            "introattachments": [{"filename": "hw1.pdf", "fileurl": "https://x/pluginfile.php/1", "filesize": 1024}]
         });
         let course = json!({"fullname": "Math 101"});
         let s = shape_assignment(&a, &course);
@@ -199,5 +219,15 @@ mod tests {
         assert_eq!(s["course"], json!("Math 101"));
         assert_eq!(s["due"], json!("2023-11-14T22:13:20Z"));
         assert_eq!(s["description"], json!("Read ch.1"));
+        // attachment discovery: the entry point of download→solve→upload
+        assert_eq!(s["attachments"][0]["filename"], json!("hw1.pdf"));
+        assert!(s["attachments"][0]["fileurl"].as_str().unwrap().contains("pluginfile.php"));
+    }
+
+    #[test]
+    fn shapes_no_attachments() {
+        let a = json!({"id": 7});
+        let s = shape_assignment(&a, &json!({}));
+        assert_eq!(s["attachments"], json!([]));
     }
 }
