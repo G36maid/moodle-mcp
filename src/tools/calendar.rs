@@ -34,16 +34,14 @@ pub async fn get_calendar_events(
         // client-side time filter: Moodle < 4.1 silently ignores timefrom/timeto
         .filter(|e| {
             let ts = e.get("timestart").and_then(Value::as_i64).unwrap_or(i64::MAX);
-            if let Some(from) = time_from {
-                if ts < from {
+            if let Some(from) = time_from
+                && ts < from {
                     return false;
                 }
-            }
-            if let Some(to) = time_to {
-                if ts > to {
+            if let Some(to) = time_to
+                && ts > to {
                     return false;
                 }
-            }
             true
         })
         .map(|e| {
