@@ -1,15 +1,174 @@
-use serde_json::{json, Value};
+//! Assignments: one read tool (`get_assignment` — everything about a single
+//! assignment) and one write tool (`submit_assignment` — text, files,
+//! finalize; the whole submission chain in one call).
+
+use serde_json::{Value, json};
 
 use crate::client::MoodleClient;
 use crate::error::MoodleError;
-use crate::util::{strip_html, truncate_chars, unix_to_iso};
+use crate::util::{decode_entities, html_to_markdown, truncate_chars, unique_item_id, unix_to_iso};
 
-/// Shape an assignment record from `mod_assign_get_assignments`.
-fn shape_assignment(a: &Value, course: &Value) -> Value {
-    // Assignment brief attachments (the task PDF etc.). Moodle exposes them
-    // as `introattachments`; without this the agent cannot discover what to
-    // download. Pure data — no workflow hints.
-    let attachments: Vec<Value> = a
+/// Extract file references from an assign plugin's `fileareas`.
+fn files_from_plugin(plugin: &Value) -> Vec<Value> {
+    plugin
+        .get("fileareas")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .flat_map(|area| {
+            area.get("files")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default()
+        })
+        .map(|f| {
+            json!({
+                "filename": f.get("filename").cloned().unwrap_or(Value::Null),
+                "fileurl": f.get("fileurl").cloned().unwrap_or(Value::Null),
+            })
+        })
+        .collect()
+}
+
+/// Pull the text of the first editor field of a plugin (onlinetext answer,
+/// teacher's feedback comment…).
+fn text_from_plugin(plugin: &Value) -> Option<String> {
+    plugin
+        .get("editorfields")
+        .and_then(Value::as_array)
+        .and_then(|fields| fields.first())
+        .and_then(|f| f.get("text"))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+}
+
+/// `get_assignment` — everything about a single assignment in one call:
+/// metadata, full description, attachments, current submission (incl. its
+/// onlinetext and files), grade and feedback. Rendered as a markdown
+/// document; the structured channel mirrors the same data.
+pub async fn get_assignment(
+    client: &MoodleClient,
+    assignment_id: i64,
+) -> Result<(String, Value), MoodleError> {
+    // One broad call, filtered server-side here: mod_assign has no
+    // "get one assignment by id" function on 3.7.
+    let all: Value = client
+        .call("mod_assign_get_assignments", &json!({}))
+        .await?;
+    let (assignment, course): (Value, Value) = all
+        .get("courses")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .flat_map(|course| {
+            course
+                .get("assignments")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default()
+                .into_iter()
+                .map(move |a| (a, course.clone()))
+        })
+        .find(|(a, _)| a.get("id").and_then(Value::as_i64) == Some(assignment_id))
+        .ok_or_else(|| {
+            MoodleError::InvalidBody(format!(
+                "assignment {assignment_id} not found among your enrolled courses' assignments"
+            ))
+        })?;
+
+    let status: Value = client
+        .call(
+            "mod_assign_get_submission_status",
+            &json!({ "assignid": assignment_id }),
+        )
+        .await?;
+
+    // Two response shapes exist: modern Moodle returns an `assignments` array
+    // (with submissions/feedback nested); 3.7 returns `lastattempt{}` and a
+    // top-level `feedback`. Normalize both into (submission, feedback,
+    // gradingstatus).
+    let (submission, feedback, gradingstatus) =
+        if let Some(a) = crate::util::first_of(&status, "assignments") {
+            (
+                crate::util::first_of(a, "submissions")
+                    .cloned()
+                    .unwrap_or(Value::Null),
+                a.get("feedback").cloned().unwrap_or(Value::Null),
+                a.get("gradingstatus").cloned().unwrap_or(Value::Null),
+            )
+        } else {
+            let la = status.get("lastattempt").cloned().unwrap_or(Value::Null);
+            (
+                la.get("submission").cloned().unwrap_or(Value::Null),
+                status.get("feedback").cloned().unwrap_or(Value::Null),
+                la.get("gradingstatus").cloned().unwrap_or(Value::Null),
+            )
+        };
+    if submission.is_null() && feedback.is_null() {
+        return Err(MoodleError::InvalidBody("empty submission status".into()));
+    }
+    let _graded = matches!(
+        gradingstatus.as_str(),
+        Some("graded") | Some("graded_followup_submitted") | Some("graded_followup_edit")
+    );
+
+    // --- submission ---
+    let mut sub_files: Vec<Value> = Vec::new();
+    let mut onlinetext: Option<String> = None;
+    for plugin in submission
+        .get("plugins")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default()
+    {
+        let ptype = plugin
+            .get("type")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
+        if ptype == "onlinetext" {
+            onlinetext = text_from_plugin(&plugin).map(|t| decode_entities(&t));
+        } else {
+            sub_files.extend(files_from_plugin(&plugin));
+        }
+    }
+
+    // --- feedback ---
+    let grade = feedback
+        .get("grade")
+        .and_then(|g| g.get("grade"))
+        .cloned()
+        .unwrap_or(Value::Null);
+    let mut fb_comment: Option<String> = None;
+    let mut fb_files: Vec<Value> = Vec::new();
+    for plugin in feedback
+        .get("plugins")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default()
+    {
+        let ptype = plugin
+            .get("type")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
+        if ptype.contains("comment") {
+            fb_comment = text_from_plugin(&plugin).map(|t| decode_entities(&t));
+        } else if ptype.contains("file") {
+            fb_files.extend(files_from_plugin(&plugin));
+        }
+    }
+    let graded = !grade.is_null();
+
+    // --- description & attachments ---
+    let intro_md = assignment
+        .get("intro")
+        .and_then(Value::as_str)
+        .map(html_to_markdown)
+        .unwrap_or_default();
+    let attachments: Vec<Value> = assignment
         .get("introattachments")
         .and_then(Value::as_array)
         .cloned()
@@ -20,185 +179,190 @@ fn shape_assignment(a: &Value, course: &Value) -> Value {
                 "filename": f.get("filename").cloned().unwrap_or(Value::Null),
                 "fileurl": f.get("fileurl").cloned().unwrap_or(Value::Null),
                 "filesize": f.get("filesize").cloned().unwrap_or(Value::Null),
-                "mimetype": f.get("mimetype").cloned().unwrap_or(Value::Null),
             })
         })
         .collect();
 
-    json!({
-        "assignment_id": a.get("id").cloned().unwrap_or(Value::Null),
-        "cmid": a.get("cmid").cloned().unwrap_or(Value::Null),
-        "course_id": a.get("course").cloned().unwrap_or(Value::Null),
-        "course": course.get("fullname").cloned().unwrap_or(Value::Null),
-        "name": a.get("name").cloned().unwrap_or(Value::Null),
-        "due": unix_to_iso(a.get("duedate").cloned().unwrap_or(Value::Null)),
-        "due_ts": a.get("duedate").cloned().unwrap_or(Value::Null),
-        "opens": unix_to_iso(a.get("allowsubmissionsfromdate").cloned().unwrap_or(Value::Null)),
-        "cutoff": unix_to_iso(a.get("cutoffdate").cloned().unwrap_or(Value::Null)),
-        "grading_due": unix_to_iso(a.get("gradingduedate").cloned().unwrap_or(Value::Null)),
-        "draft_submissions_enabled": a.get("submissiondraft").cloned().unwrap_or(Value::Null),
-        "nosubmissions": a.get("nosubmissions").cloned().unwrap_or(Value::Null),
-        "team_submission": a.get("teamsubmission").cloned().unwrap_or(Value::Null),
-        "max_attempts": a.get("maxattempts").cloned().unwrap_or(Value::Null),
-        "requiresubmissionstatement": a.get("requiresubmissionstatement").cloned().unwrap_or(Value::Null),
-        "description": a.get("intro").and_then(Value::as_str).map(|t| truncate_chars(&strip_html(t), 1200)),
-        "attachments": attachments,
-    })
-}
-
-/// `mod_assign_get_assignments` — assignments, optionally restricted to
-/// specific courses. When `course_ids` is empty, all enrolled courses are used.
-pub async fn get_assignments(
-    client: &MoodleClient,
-    course_ids: &[i64],
-) -> Result<Value, MoodleError> {
-    let params = if course_ids.is_empty() {
-        json!({})
-    } else {
-        json!({ "courseids": course_ids })
-    };
-    let v: Value = client.call("mod_assign_get_assignments", &params).await?;
-    let mut flat: Vec<Value> = Vec::new();
-    if let Some(courses) = v.get("courses").and_then(Value::as_array) {
-        for course in courses {
-            if let Some(assignments) = course.get("assignments").and_then(Value::as_array) {
-                for a in assignments {
-                    flat.push(shape_assignment(a, course));
-                }
-            }
-        }
-    }
-    flat.sort_by_key(|a| {
-        a.get("due")
-            .and_then(Value::as_str)
-            .map(str::to_string)
-            .unwrap_or_else(|| "9999".into())
-    });
-    Ok(json!({ "count": flat.len(), "assignments": flat }))
-}
-
-/// `mod_assign_get_submission_status` — current submission + feedback state.
-pub async fn get_assignment_status(
-    client: &MoodleClient,
-    assignment_id: i64,
-) -> Result<Value, MoodleError> {
-    let v: Value = client
-        .call("mod_assign_get_submission_status", &json!({ "assignid": assignment_id }))
-        .await?;
-    let a = crate::util::first_of(&v, "assignments")
-        .ok_or_else(|| MoodleError::InvalidBody("empty submission status".into()))?;
-
-    let submission = a
-        .get("submissions")
-        .and_then(Value::as_array)
-        .and_then(|s| s.first())
-        .map(|s| {
-            json!({
-                "submission_id": s.get("id").cloned().unwrap_or(Value::Null),
-                "status": s.get("status").cloned().unwrap_or(Value::Null),
-                "created": unix_to_iso(s.get("timecreated").cloned().unwrap_or(Value::Null)),
-                "modified": unix_to_iso(s.get("timemodified").cloned().unwrap_or(Value::Null)),
-                "attemptnumber": s.get("attemptnumber").cloned().unwrap_or(Value::Null),
-                "plugins": s.get("plugins").cloned().unwrap_or(Value::Null),
-            })
+    let draft_required = assignment.get("submissiondraft").and_then(Value::as_i64) == Some(1);
+    let submission_status = submission
+        .get("status")
+        .and_then(Value::as_str)
+        .unwrap_or(if draft_required {
+            "not started"
+        } else {
+            "no submission yet"
         })
+        .to_string();
+
+    let course_name = course.get("fullname").cloned().unwrap_or(Value::Null);
+    let course_id = assignment.get("course").cloned().unwrap_or(Value::Null);
+    let attempt_number = submission
+        .get("attemptnumber")
+        .cloned()
         .unwrap_or(Value::Null);
+    let prev_count = 0; // 3.7 的 submission_status 不含 previousattempts
 
-    let feedback = a.get("feedback").map(|f| {
-        json!({
-            "grade": f.get("grade").map(|g| json!({
-                "grade": g.get("grade").cloned().unwrap_or(Value::Null),
-                "graded_by": g.get("grader").cloned().unwrap_or(Value::Null),
-                "graded_at": unix_to_iso(g.get("gradeddatecreated").cloned().unwrap_or(Value::Null)),
-                "attemptnumber": g.get("attemptnumber").cloned().unwrap_or(Value::Null),
-            })).unwrap_or(Value::Null),
-            "plugins": f.get("plugins").cloned().unwrap_or(Value::Null),
-        })
+    // --- structured ---
+    let structured = json!({
+        "assignment_id": assignment_id,
+        "cmid": assignment.get("cmid").cloned().unwrap_or(Value::Null),
+        "course_id": course_id,
+        "course": course_name,
+        "name": assignment.get("name").cloned().unwrap_or(Value::Null),
+        "times": {
+            "opens": unix_to_iso(assignment.get("allowsubmissionsfromdate").cloned().unwrap_or(Value::Null)),
+            "due": unix_to_iso(assignment.get("duedate").cloned().unwrap_or(Value::Null)),
+            "cutoff": unix_to_iso(assignment.get("cutoffdate").cloned().unwrap_or(Value::Null)),
+        },
+        "draft_required": draft_required,
+        "description_markdown": intro_md,
+        "attachments": attachments,
+        "submission": {
+            "status": submission_status,
+            "attempt_number": attempt_number,
+            "previous_attempts": prev_count,
+            "onlinetext": onlinetext,
+            "files": sub_files,
+        },
+        "graded": graded,
+        "grade": grade,
+        "feedback_comment": fb_comment,
+        "feedback_files": fb_files,
     });
 
-    Ok(json!({
-        "assignment_id": assignment_id,
-        "submission": submission,
-        "gradingstatus": a.get("gradingstatus").cloned().unwrap_or(Value::Null),
-        "feedback": feedback,
-    }))
-}
+    // --- markdown ---
+    let iso = |v: &Value| v.as_str().unwrap_or("—").to_string();
+    let mut md = String::new();
+    md.push_str(&format!(
+        "# {} — assignment_id: {assignment_id}\n\n",
+        assignment
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or("?")
+    ));
+    md.push_str(&format!(
+        "**Course**: {} (course_id: {course_id})\n\n",
+        course_name.as_str().unwrap_or("?")
+    ));
+    md.push_str(&format!(
+        "**Opens**: {} · **Due**: {} · **Cutoff**: {}\n\n",
+        iso(&structured["times"]["opens"]),
+        iso(&structured["times"]["due"]),
+        iso(&structured["times"]["cutoff"]),
+    ));
+    md.push_str(&format!(
+        "**Submission**: {} · **Draft required**: {} · **Attempts**: {} (previous: {prev_count}) · **Graded**: {}\n\n",
+        submission_status,
+        if draft_required { "yes — call submit_assignment with finalize=true to turn in" } else { "no" },
+        attempt_number,
+        graded,
+    ));
 
-/// `mod_assign_save_submission` — save an onlinetext submission.
-pub async fn submit_assignment_text(
-    client: &MoodleClient,
-    assignment_id: i64,
-    text: &str,
-    format: &str,
-) -> Result<Value, MoodleError> {
-    let fmt = match format {
-        "html" => 1,
-        "plain" => 2,
-        "markdown" => 4,
-        _ => 1,
-    };
-    let itemid = crate::util::unique_item_id();
-    let params = json!({
-        "assignmentid": assignment_id,
-        "plugindata": {
-            "onlinetext_editor": {
-                "text": text,
-                "format": fmt,
-                "itemid": itemid
+    if !intro_md.is_empty() {
+        md.push_str("## Description\n\n");
+        md.push_str(&truncate_chars(&intro_md, 4000));
+        md.push_str("\n\n");
+    }
+    if !attachments.is_empty() {
+        md.push_str("## Attachments (fetch with fetch_file)\n");
+        for a in &attachments {
+            md.push_str(&format!(
+                "- {} — {}\n",
+                a["filename"].as_str().unwrap_or("?"),
+                a["fileurl"].as_str().unwrap_or("?"),
+            ));
+        }
+        md.push('\n');
+    }
+    md.push_str("## My submission\n\n");
+    if let Some(text) = &onlinetext {
+        md.push_str(&format!("**Online text**:\n\n{text}\n\n"))
+    }
+    if !sub_files.is_empty() {
+        md.push_str("**Files**:\n");
+        for f in &sub_files {
+            md.push_str(&format!(
+                "- {} — {}\n",
+                f["filename"].as_str().unwrap_or("?"),
+                f["fileurl"].as_str().unwrap_or("")
+            ));
+        }
+        md.push('\n');
+    }
+    if graded {
+        md.push_str("## Grade & feedback\n\n");
+        md.push_str(&format!("**Grade**: {}\n\n", grade));
+        if let Some(c) = &fb_comment {
+            md.push_str(&format!("**Teacher's comment**: {c}\n\n"));
+        }
+        if !fb_files.is_empty() {
+            md.push_str("**Feedback files**:\n");
+            for f in &fb_files {
+                md.push_str(&format!(
+                    "- {} — {}\n",
+                    f["filename"].as_str().unwrap_or("?"),
+                    f["fileurl"].as_str().unwrap_or("")
+                ));
             }
         }
-    });
-    let v: Value = client.call("mod_assign_save_submission", &params).await?;
-    Ok(json!({
-        "saved": true,
-        "assignment_id": assignment_id,
-        "format": format,
-        "warnings": v.get("warnings").cloned().unwrap_or(json!([]))
-    }))
+    } else if submission.is_null() {
+        md.push_str("_Not submitted yet._\n");
+    }
+
+    Ok((md, structured))
 }
 
-/// `mod_assign_save_submission` — submit files previously uploaded to a draft
-/// area (`upload_file` returns the item id).
-pub async fn submit_assignment_files(
+/// `submit_assignment` — the single write: save an onlinetext and/or draft
+/// files as the submission, optionally finalizing it for grading.
+/// Returns pure results (read back with `get_assignment`).
+pub async fn submit_assignment(
     client: &MoodleClient,
     assignment_id: i64,
-    item_id: i64,
+    text: Option<&str>,
+    item_id: Option<i64>,
+    finalize: bool,
 ) -> Result<Value, MoodleError> {
-    let params = json!({
-        "assignmentid": assignment_id,
-        "plugindata": {
-            "files_filemanager": item_id
-        }
-    });
-    let v: Value = client.call("mod_assign_save_submission", &params).await?;
-    Ok(json!({
-        "saved": true,
-        "assignment_id": assignment_id,
-        "file_item_id": item_id,
-        "warnings": v.get("warnings").cloned().unwrap_or(json!([]))
-    }))
-}
-
-/// `mod_assign_submit_for_grading` — finalize a (draft) submission for grading.
-pub async fn submit_for_grading(
-    client: &MoodleClient,
-    assignment_id: i64,
-    accept_submission_statement: bool,
-) -> Result<Value, MoodleError> {
-    let v: Value = client
+    if text.is_none() && item_id.is_none() {
+        return Err(MoodleError::Config(
+            "provide text (online text) and/or item_id (draft files) to submit".into(),
+        ));
+    }
+    let mut plugindata = json!({});
+    if let Some(t) = text {
+        plugindata["onlinetext_editor"] = json!({
+            "text": t,
+            "format": 1, // FORMAT_HTML
+            "itemid": unique_item_id(),
+        });
+    }
+    if let Some(id) = item_id {
+        plugindata["files_filemanager"] = json!(id);
+    }
+    let _: Value = client
         .call(
-            "mod_assign_submit_for_grading",
-            &json!({
-                "assignmentid": assignment_id,
-                "acceptsubmissionstatement": accept_submission_statement
-            }),
+            "mod_assign_save_submission",
+            &json!({ "assignmentid": assignment_id, "plugindata": plugindata }),
         )
         .await?;
-    Ok(json!({
-        "submitted_for_grading": true,
+
+    let mut out = json!({
+        "saved": true,
         "assignment_id": assignment_id,
-        "warnings": v.get("warnings").cloned().unwrap_or(json!([]))
-    }))
+        "submitted_for_grading": false,
+    });
+    if finalize {
+        let _: Value = client
+            .call(
+                "mod_assign_submit_for_grading",
+                &json!({
+                    "assignmentid": assignment_id,
+                    "acceptsubmissionstatement": true
+                }),
+            )
+            .await?;
+        out["submitted_for_grading"] = json!(true);
+    }
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -206,28 +370,61 @@ mod tests {
     use super::*;
 
     #[test]
-    fn shapes_assignment() {
-        let a = json!({
-            "id": 5, "cmid": 9, "course": 2, "name": "HW1",
-            "duedate": 1_700_000_000, "intro": "<p>Read ch.1</p>",
-            "submissiondraft": 1, "nosubmissions": 0,
-            "introattachments": [{"filename": "hw1.pdf", "fileurl": "https://x/pluginfile.php/1", "filesize": 1024}]
+    fn extracts_files_and_text_from_plugins() {
+        let st = json!({
+            "submissions": [{
+                "plugins": [
+                    {"type": "onlinetext", "editorfields": [{"name": "onlinetext", "text": "<p>my answer</p>"}]},
+                    {"type": "file", "fileareas": [{"area": "submission_files", "files": [
+                        {"filename": "a.pdf", "fileurl": "https://x/pluginfile.php/1"}
+                    ]}]}
+                ]
+            }]
         });
-        let course = json!({"fullname": "Math 101"});
-        let s = shape_assignment(&a, &course);
-        assert_eq!(s["assignment_id"], json!(5));
-        assert_eq!(s["course"], json!("Math 101"));
-        assert_eq!(s["due"], json!("2023-11-14T22:13:20Z"));
-        assert_eq!(s["description"], json!("Read ch.1"));
-        // attachment discovery: the entry point of download→solve→upload
-        assert_eq!(s["attachments"][0]["filename"], json!("hw1.pdf"));
-        assert!(s["attachments"][0]["fileurl"].as_str().unwrap().contains("pluginfile.php"));
+        let sub = crate::util::first_of(&st, "submissions").unwrap();
+        let mut files = Vec::new();
+        let mut text = None;
+        for plugin in sub
+            .get("plugins")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default()
+        {
+            let ptype = plugin
+                .get("type")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string();
+            if ptype == "onlinetext" {
+                text = text_from_plugin(&plugin);
+            } else {
+                files.extend(files_from_plugin(&plugin));
+            }
+        }
+        assert_eq!(text.as_deref(), Some("<p>my answer</p>"));
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0]["filename"], json!("a.pdf"));
     }
 
     #[test]
-    fn shapes_no_attachments() {
-        let a = json!({"id": 7});
-        let s = shape_assignment(&a, &json!({}));
-        assert_eq!(s["attachments"], json!([]));
+    fn finds_assignment_across_courses() {
+        let all = json!({"courses": [
+            {"fullname": "A", "assignments": [{"id": 1, "name": "HW1"}]},
+            {"fullname": "B", "assignments": [{"id": 2, "name": "HW2"}]}
+        ]});
+        let found = all
+            .get("courses")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .flat_map(|c| {
+                c.get("assignments")
+                    .and_then(Value::as_array)
+                    .cloned()
+                    .unwrap_or_default()
+            })
+            .find(|a| a.get("id").and_then(Value::as_i64) == Some(2));
+        assert_eq!(found.unwrap()["name"], json!("HW2"));
     }
 }
