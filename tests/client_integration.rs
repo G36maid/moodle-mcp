@@ -22,7 +22,9 @@ async fn call_parses_success_payload() {
     Mock::given(method("POST"))
         .and(path("/webservice/rest/server.php"))
         .and(body_string_contains("wstoken=testtoken"))
-        .and(body_string_contains("wsfunction=core_enrol_get_users_courses"))
+        .and(body_string_contains(
+            "wsfunction=core_enrol_get_users_courses",
+        ))
         .and(body_string_contains("moodlewsrestformat=json"))
         .and(body_string_contains("userid=42"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!([
@@ -79,7 +81,11 @@ async fn call_maps_exception_payload() {
         .await
         .expect_err("must fail");
     match err {
-        MoodleError::Api { ref errorcode, ref message, .. } => {
+        MoodleError::Api {
+            ref errorcode,
+            ref message,
+            ..
+        } => {
             assert_eq!(errorcode, "invalidtoken");
             assert!(message.contains("Invalid token"));
         }
@@ -111,7 +117,9 @@ async fn non_json_body_is_reported() {
 async fn download_injects_token_into_pluginfile_url() {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
-        .and(path("/webservice/pluginfile.php/12/course/section/notes.txt"))
+        .and(path(
+            "/webservice/pluginfile.php/12/course/section/notes.txt",
+        ))
         .and(wiremock::matchers::query_param("token", "testtoken"))
         .respond_with(
             ResponseTemplate::new(200)
