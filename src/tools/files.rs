@@ -1,25 +1,124 @@
-use base64::Engine as _;
-use serde_json::{json, Value};
+//! File tools: fetch (read documents as markdown), download (bytes to disk),
+//! upload (disk to draft area).
+
+use serde_json::{Value, json};
 
 use crate::client::MoodleClient;
 use crate::error::MoodleError;
+use crate::util::truncate_chars;
 
-const MAX_TEXT_BYTES: usize = 1_000_000; // 1 MB
-/// Inline content must stay under the server's output cap (250k chars) with
-/// headroom for the surrounding JSON — larger files must go through save_to.
-const MAX_INLINE_CHARS: usize = 200_000;
+/// Inline cap for `fetch_file`: aligned with pi-web-access's
+/// MAX_INLINE_FILE_CHARS (100k chars). Beyond this, head-truncate with a
+/// marker and point at `download_file`.
+const MAX_FETCH_CHARS: usize = 100_000;
+/// Fetch a Moodle file and return its content as **markdown** for the agent
+/// to read. PDF/DOCX/PPTX/XLSX/ODT/RTF/EPUB/CSV are converted with anydoc;
+/// plain text passes through; anything else (zip, images…) cannot be
+/// converted — download it instead. The web-service token is injected into
+/// `pluginfile.php` URLs automatically.
+pub async fn fetch_file(client: &MoodleClient, url: &str) -> Result<Value, MoodleError> {
+    let resp = client.download_file(url).await?;
+    let status = resp.status().as_u16();
+    let content_type = resp
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("application/octet-stream")
+        .split(';')
+        .next()
+        .unwrap_or("application/octet-stream")
+        .trim()
+        .to_string();
 
-/// Download a Moodle file. Uses the web-service token (injected into
-/// `pluginfile.php` URLs when missing).
-///
-/// With `save_to`, the raw bytes are written to that local path and only
-/// metadata is returned — binary payloads never enter the conversation.
-/// Without it, small/decodable content is returned inline as text and other
-/// content as base64.
+    if !(200..300).contains(&status) {
+        return Err(MoodleError::InvalidBody(format!(
+            "file fetch returned HTTP {status}; the URL may be expired or the file inaccessible"
+        )));
+    }
+    let bytes = resp.bytes().await.map_err(MoodleError::from)?;
+    let size = bytes.len();
+
+    // Documents → markdown via anydoc. Errors are transparent (encrypted /
+    // needs OCR / unsupported), telling the agent to download instead.
+    let convertable = [
+        "pdf", "doc", "docx", "docm", "odt", "rtf", "epub", "ppt", "pps", "pot", "pptx", "pptm",
+        "ppsx", "ppsm", "odp", "xls", "xlsx", "xlsm", "xlsb", "ods", "csv",
+    ];
+    let ext = url
+        .split(['?', '#'])
+        .next()
+        .unwrap_or(url)
+        .rsplit('.')
+        .next()
+        .unwrap_or_default()
+        .to_lowercase();
+
+    if convertable.contains(&ext.as_str()) {
+        let tmp = format!(
+            "{}/moodle-fetch-{}.{}",
+            std::env::temp_dir().display(),
+            crate::util::unique_item_id(),
+            ext
+        );
+        std::fs::write(&tmp, &bytes)
+            .map_err(|e| MoodleError::Config(format!("failed to buffer download: {e}")))?;
+        let result = anydoc::to_markdown(&tmp);
+        let _ = std::fs::remove_file(&tmp);
+        match result {
+            Ok(md) => {
+                let total = md.chars().count();
+                let text = if total > MAX_FETCH_CHARS {
+                    let head: String = md.chars().take(MAX_FETCH_CHARS).collect();
+                    format!(
+                        "{head}\n\n…[truncated: {MAX_FETCH_CHARS} of {total} chars — use download_file to save the full document]"
+                    )
+                } else {
+                    md
+                };
+                return Ok(json!({
+                    "url": url,
+                    "content_type": content_type,
+                    "size_bytes": size,
+                    "format": ext,
+                    "chars": text.chars().count(),
+                    "markdown": text,
+                }));
+            }
+            Err(e) => {
+                return Err(MoodleError::InvalidBody(format!(
+                    "document conversion failed ({e}) — use download_file to save the original"
+                )));
+            }
+        }
+    }
+
+    // Plain text (or decodable small payloads) → inline.
+    if size <= 1_000_000
+        && let Ok(text) = std::str::from_utf8(&bytes)
+    {
+        let text = truncate_chars(text, MAX_FETCH_CHARS);
+        return Ok(json!({
+            "url": url,
+            "content_type": content_type,
+            "size_bytes": size,
+            "encoding": "utf-8",
+            "content": text,
+        }));
+    }
+
+    Err(MoodleError::InvalidBody(format!(
+        "{content_type} content ({size} bytes) is not a convertible document — \
+         use download_file to save the raw bytes to disk"
+    )))
+}
+
+/// `download_file` — write a Moodle file to a local path. Uses the
+/// web-service token (injected into `pluginfile.php` URLs when missing).
+/// Returns metadata only; binary payloads never enter the conversation.
 pub async fn download_file(
     client: &MoodleClient,
     url: &str,
-    save_to: Option<&str>,
+    save_to: &str,
 ) -> Result<Value, MoodleError> {
     let resp = client.download_file(url).await?;
     let status = resp.status().as_u16();
@@ -36,63 +135,25 @@ pub async fn download_file(
 
     if !(200..300).contains(&status) {
         return Err(MoodleError::InvalidBody(format!(
-            "file download returned HTTP {status}; the URL may be expired or the file inaccessible"
+            "download returned HTTP {status}; the URL may be expired or the file inaccessible"
         )));
     }
-
     let bytes = resp.bytes().await.map_err(MoodleError::from)?;
     let size = bytes.len();
-
-    if let Some(dest) = save_to {
-        tokio::fs::write(dest, &bytes)
-            .await
-            .map_err(|e| MoodleError::Config(format!("failed to write {dest}: {e}")))?;
-        return Ok(json!({
-            "url": url,
-            "status": status,
-            "content_type": content_type,
-            "size_bytes": size,
-            "saved_to": dest,
-        }));
-    }
-
-    // Prefer inline text for small, decodable payloads regardless of mime type;
-    // otherwise base64-encode. Content that would overflow the output cap gets
-    // a clean error pointing at save_to (never truncated JSON).
-    let (encoding, content) = if size <= MAX_TEXT_BYTES {
-        match std::str::from_utf8(&bytes) {
-            Ok(text) => ("utf-8".to_string(), text.to_string()),
-            Err(_) => (
-                "base64".to_string(),
-                base64::engine::general_purpose::STANDARD.encode(&bytes),
-            ),
-        }
-    } else {
-        (
-            "base64".to_string(),
-            base64::engine::general_purpose::STANDARD.encode(&bytes),
-        )
-    };
-    if content.chars().count() > MAX_INLINE_CHARS {
-        return Err(MoodleError::InvalidBody(format!(
-            "file is {size} bytes ({} chars encoded) — too large to return inline; \
-             call again with save_to to write it to a local path",
-            content.chars().count()
-        )));
-    }
-
+    tokio::fs::write(save_to, &bytes)
+        .await
+        .map_err(|e| MoodleError::Config(format!("failed to write {save_to}: {e}")))?;
     Ok(json!({
         "url": url,
         "status": status,
         "content_type": content_type,
         "size_bytes": size,
-        "encoding": encoding,
-        "content": content
+        "saved_to": save_to,
     }))
 }
 
-/// `webservice/upload.php` — upload bytes into the user's draft file area.
-/// Returns the draft `item_id` referencing the uploaded file.
+/// Upload bytes into the user's draft file area. Returns the draft `item_id`
+/// referencing the uploaded file.
 async fn upload_bytes(
     client: &MoodleClient,
     filename: &str,
@@ -113,19 +174,6 @@ async fn upload_bytes(
         "filename": first.get("filename").cloned().unwrap_or(json!(filename)),
         "filesize": first.get("filesize").cloned().unwrap_or(Value::Null),
     }))
-}
-
-/// Upload base64-encoded content to the user's draft file area.
-pub async fn upload_file_inline(
-    client: &MoodleClient,
-    filename: &str,
-    content_base64: &str,
-    item_id: i64,
-) -> Result<Value, MoodleError> {
-    let bytes = base64::engine::general_purpose::STANDARD
-        .decode(content_base64.trim())
-        .map_err(|e| MoodleError::Config(format!("content is not valid base64: {e}")))?;
-    upload_bytes(client, filename, bytes, item_id).await
 }
 
 /// Upload a local file (read from disk — binary data never enters the
@@ -151,22 +199,4 @@ fn basename(path: &str) -> String {
         .and_then(|s| s.to_str())
         .unwrap_or(path)
         .to_string()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn rejects_bad_base64() {
-        let bad = "not-base64!!!";
-        let decoded = base64::engine::general_purpose::STANDARD.decode(bad.trim());
-        assert!(decoded.is_err());
-    }
-
-    #[test]
-    fn extracts_basename() {
-        assert_eq!(basename("/tmp/a/b/homework.pdf"), "homework.pdf");
-        assert_eq!(basename("plain.txt"), "plain.txt");
-    }
 }
