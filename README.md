@@ -18,7 +18,7 @@ ecosystem survey behind the design decisions: see
 |---|---|
 | Site | `site_info` — identity/connection check + list of functions your token may call |
 | Courses | `list_courses` · `get_course_contents` · `search_courses` |
-| Assignments | `get_assignments` · `get_assignment_status` · `submit_assignment_text` · `upload_draft_file` · `submit_assignment_files` · `submit_assignment_for_grading` |
+| Assignments | `get_assignments` · `get_assignment_status` · `submit_assignment_text` · `submit_assignment_files` · `submit_assignment_for_grading` |
 | Grades | `get_grades` |
 | Calendar | `get_calendar_events` · `get_upcoming_deadlines` (facade: assignments due within N days) |
 | Forums | `get_forums` · `get_forum_discussions` · `get_discussion_posts` · `create_forum_discussion` ✍️ · `reply_to_discussion` ✍️ |

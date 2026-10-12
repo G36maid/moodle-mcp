@@ -139,7 +139,7 @@ pub async fn submit_assignment_text(
 }
 
 /// `mod_assign_save_submission` — submit files previously uploaded to a draft
-/// area (`upload_draft_file` returns the item id).
+/// area (`upload_file` returns the item id).
 pub async fn submit_assignment_files(
     client: &MoodleClient,
     assignment_id: i64,
