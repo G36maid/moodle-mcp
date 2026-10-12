@@ -25,7 +25,7 @@ ecosystem survey behind the design decisions: see
 | Messaging | `get_notifications` · `get_conversations` · `send_message` ✍️ |
 | Users | `search_users` · `get_user` |
 | Quizzes | `get_quizzes` · `get_quiz_attempts` |
-| Files | `download_file` (auto token injection) · `upload_file` ✍️ |
+| Files | `download_file` (token auto-injection, optional `save_to` for disk write) · `upload_file` ✍️ (`path` or base64) |
 | Escape hatch | `call_ws_function` — call *any* function enabled for your token, with free-form JSON params (validated against `site_info.functions`) |
 
 ✍️ = write operation. Output is compact, LLM-oriented JSON (HTML stripped,
@@ -156,6 +156,14 @@ Version differences are handled dynamically from `site_info.functions`:
 
 `pick_function()` chooses the right WS function per call from the token's
 enabled list, so no rebuild is needed when switching sites.
+
+### File handling
+
+`download_file` and `upload_file` work directly with local paths: `save_to`
+writes downloaded bytes to disk (metadata only — binary payloads never enter
+the conversation), and `path` uploads a local file. Inline mode (no `save_to`)
+returns small/decodable content as text, other content as base64, and rejects
+content that would exceed the output cap with a hint to use `save_to`.
 
 ## Security notes
 
