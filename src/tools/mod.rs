@@ -89,11 +89,13 @@ pub struct SubmitTextParams {
 
 #[derive(Deserialize, schemars::JsonSchema)]
 pub struct UploadFileParams {
-    /// File name to store in the draft area
-    filename: String,
-    /// File content, base64-encoded
-    content_base64: String,
-    /// Draft item id; omit to create a new draft area (recommended)
+    /// File name to store in the draft area; defaults to the file name in `path`
+    filename: Option<String>,
+    /// Local file path to read and upload (binary data stays on disk)
+    path: Option<String>,
+    /// File content, base64-encoded (alternative to `path`)
+    content_base64: Option<String>,
+    /// Draft item id; omit to create a new draft area
     item_id: Option<i64>,
 }
 
@@ -261,9 +263,12 @@ pub enum QuizStatus {
 
 #[derive(Deserialize, schemars::JsonSchema)]
 pub struct DownloadFileParams {
-    /// Moodle file URL (e.g. the fileurl from get_course_contents; the token
-    /// is injected automatically for pluginfile.php URLs)
+    /// Moodle file URL (e.g. the fileurl from get_course_contents or assignment
+    /// attachments; the token is injected automatically for pluginfile.php URLs)
     url: String,
+    /// Local path to write the content to (keeps binary payloads off the
+    /// conversation); omit to receive content inline
+    save_to: Option<String>,
 }
 
 #[derive(Deserialize, schemars::JsonSchema)]
@@ -431,7 +436,7 @@ impl MoodleMcp {
 
     // ---------- assignments ----------
 
-    #[tool(description = "List assignments (name, due date, description, submission rules) across enrolled courses or specific course ids, sorted by due date.")]
+    #[tool(description = "List assignments (name, due date, description, attachment files, submission rules) across enrolled courses or specific course ids, sorted by due date.")]
     async fn get_assignments(
         &self,
         Parameters(p): Parameters<AssignmentsParams>,
@@ -450,7 +455,7 @@ impl MoodleMcp {
         finish(assignments::get_assignment_status(&self.client, p.assignment_id).await)
     }
 
-    #[tool(description = "Submit an online-text submission for an assignment. Note: if the assignment uses draft submissions, follow up with submit_assignment_for_grading.")]
+    #[tool(description = "Submit an online-text submission for an assignment.")]
     async fn submit_assignment_text(
         &self,
         Parameters(p): Parameters<SubmitTextParams>,
@@ -466,7 +471,7 @@ impl MoodleMcp {
         )
     }
 
-    #[tool(description = "Submit uploaded draft file(s) (by draft item_id from upload_file) as the file submission for an assignment. Follow up with submit_assignment_for_grading if the assignment uses draft submissions.")]
+    #[tool(description = "Submit uploaded draft file(s) (draft item id) as the file submission for an assignment.")]
     async fn submit_assignment_files(
         &self,
         Parameters(p): Parameters<SubmitFilesParams>,
@@ -727,23 +732,33 @@ impl MoodleMcp {
 
     // ---------- files ----------
 
-    #[tool(description = "Download a Moodle file (URL from get_course_contents or submission feedback). Small/decodable content is returned inline as text; other content as base64. The web service token is injected automatically.")]
+    #[tool(description = "Download a Moodle file (URL from get_course_contents, assignment attachments, or submission feedback). With save_to, writes the bytes to a local path and returns metadata only; otherwise small/decodable content is returned inline as text and other content as base64. The web service token is injected automatically for pluginfile.php URLs.")]
     async fn download_file(
         &self,
         Parameters(p): Parameters<DownloadFileParams>,
     ) -> Result<CallToolResult, McpError> {
-        finish(files::download_file(&self.client, &p.url).await)
+        finish(
+            files::download_file(&self.client, &p.url, p.save_to.as_deref()).await,
+        )
     }
 
-    #[tool(description = "Upload a base64-encoded file to the user's draft file area; returns the draft item_id needed by submit_assignment_files.")]
+    #[tool(description = "Upload a file to the user's draft file area; returns the draft item_id referencing the uploaded file. Reads from a local path (path) or from inline base64 content (content_base64).")]
     async fn upload_file(
         &self,
         Parameters(p): Parameters<UploadFileParams>,
     ) -> Result<CallToolResult, McpError> {
         let item_id = p.item_id.unwrap_or_else(crate::util::unique_item_id);
-        finish(
-            files::upload_draft_file(&self.client, &p.filename, &p.content_base64, item_id).await,
-        )
+        let result = if let Some(path) = p.path.as_deref() {
+            files::upload_file_from_path(&self.client, path, p.filename.as_deref(), item_id).await
+        } else if let Some(content) = p.content_base64.as_deref() {
+            let filename = p.filename.as_deref().unwrap_or("upload.bin");
+            files::upload_file_inline(&self.client, filename, content, item_id).await
+        } else {
+            Err(MoodleError::Config(
+                "provide either path or content_base64".into(),
+            ))
+        };
+        finish(result)
     }
 
     // ---------- escape hatch ----------
@@ -765,12 +780,10 @@ impl ServerHandler for MoodleMcp {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new("moodle-mcp", env!("CARGO_PKG_VERSION")))
             .with_instructions(
-                "Moodle MCP server (student-first). Recommended flow: site_info to verify the \
-                 connection, list_courses to find course ids, then get_course_contents / \
-                 get_assignments / get_upcoming_deadlines for coursework, get_grades for marks, \
-                 forum and messaging tools for communication. Writing tools (submit_assignment_*, \
-                 create_forum_discussion, reply_to_discussion, send_message) act as the token \
-                 owner — always confirm intent before submitting or sending.",
+                "Moodle MCP server: read and operate a Moodle site through its web services \
+                 as the token owner. All write operations (assignment submissions, forum \
+                 posts, messages) act as the token owner — confirm intent before \
+                 submitting or sending.",
             )
     }
 }
