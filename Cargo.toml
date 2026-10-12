@@ -6,8 +6,8 @@ rust-version = "1.88"
 description = "Moodle MCP server in Rust — expose Moodle Web Services to MCP clients (student-first, stdio)"
 license = "MIT"
 repository = "https://github.com/G36maid/moodle-mcp"
-keywords = ["mcp", "moodle", "llm", "modelcontextprotocol"]
-categories = ["api-bindings"]
+keywords = ["mcp", "moodle", "llm", "modelcontextprotocol", "lms", "education"]
+categories = ["api-bindings", "command-line-utilities"]
 
 [dependencies]
 rmcp = { version = "3.5", features = ["server", "macros", "transport-io"] }
@@ -16,6 +16,10 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 schemars = "1"
 reqwest = { version = "0.13", features = ["json", "multipart", "form"] }
+anydoc = "0.2"
+htmd = "0.5"
+rpassword = "7"
+open = "5"
 thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

@@ -26,7 +26,55 @@ impl MoodleClient {
             .user_agent(concat!("moodle-mcp/", env!("CARGO_PKG_VERSION")))
             .build()
             .map_err(|e| MoodleError::Config(format!("failed to build HTTP client: {e}")))?;
-        Ok(Self { http, base_url: cfg.base_url, token: cfg.token })
+        Ok(Self {
+            http,
+            base_url: cfg.base_url,
+            token: cfg.token,
+        })
+    }
+
+    /// Generate a web service token via `POST /login/token.php`.
+    ///
+    /// This is the standard credential flow (`service` usually
+    /// `moodle_mobile_app`). On success returns the raw JSON payload
+    /// (`token` / `privatetoken`); on failure Moodle replies with
+    /// `{error, errorcode}` which is mapped to a clear message.
+    pub async fn fetch_token(
+        base_url: &str,
+        username: &str,
+        password: &str,
+        service: &str,
+    ) -> Result<Value, MoodleError> {
+        let http = reqwest::Client::builder()
+            .timeout(Duration::from_secs(30))
+            .user_agent(concat!("moodle-mcp/", env!("CARGO_PKG_VERSION")))
+            .build()
+            .map_err(|e| MoodleError::Config(format!("failed to build HTTP client: {e}")))?;
+        let url = format!("{}/login/token.php", base_url.trim_end_matches('/'));
+        let resp = http
+            .post(&url)
+            .form(&[
+                ("username", username),
+                ("password", password),
+                ("service", service),
+            ])
+            .send()
+            .await
+            .map_err(MoodleError::from)?;
+        let text = resp.text().await.map_err(MoodleError::from)?;
+        let value: Value = serde_json::from_str(&text).map_err(|_| {
+            MoodleError::InvalidBody(format!(
+                "login/token.php returned non-JSON: {}",
+                truncate(&text, 200)
+            ))
+        })?;
+        if let Some(err) = value.get("error").and_then(Value::as_str) {
+            return Err(MoodleError::Config(format!(
+                "login failed: {err} (check username/password and that the \
+                 service '{service}' is enabled for your account)"
+            )));
+        }
+        Ok(value)
     }
 
     /// Call a web service function.
@@ -74,19 +122,21 @@ impl MoodleClient {
             "moodle ws response"
         );
         tracing::trace!(body = truncate(&text, 1000), "moodle ws body");
-        let value: Value = serde_json::from_str(&text)
-            .map_err(|_| MoodleError::InvalidBody(format!(
+        let value: Value = serde_json::from_str(&text).map_err(|_| {
+            MoodleError::NonJsonResponse(format!(
                 "expected JSON, got HTTP {status}: {}",
                 truncate(&text, 300)
-            )))?;
+            ))
+        })?;
 
         // Moodle reports API errors with HTTP 200 and an exception payload.
         if let Some(obj) = value.as_object()
-            && obj.contains_key("exception") && obj.contains_key("errorcode") {
-                let exc: MoodleException = serde_json::from_value(value)
-                    .map_err(MoodleError::from)?;
-                return Err(MoodleError::from_exception(exc));
-            }
+            && obj.contains_key("exception")
+            && obj.contains_key("errorcode")
+        {
+            let exc: MoodleException = serde_json::from_value(value).map_err(MoodleError::from)?;
+            return Err(MoodleError::from_exception(exc));
+        }
         Ok(value)
     }
 
@@ -95,16 +145,10 @@ impl MoodleClient {
     pub async fn download_file(&self, file_url: &str) -> Result<reqwest::Response, MoodleError> {
         let mut url = url::Url::parse(file_url)
             .map_err(|e| MoodleError::Config(format!("invalid file URL: {e}")))?;
-        if !url.query_pairs().any(|(k, _)| k == "token")
-            && url.path().contains("pluginfile.php")
-        {
+        if !url.query_pairs().any(|(k, _)| k == "token") && url.path().contains("pluginfile.php") {
             url.query_pairs_mut().append_pair("token", &self.token);
         }
-        self.http
-            .get(url)
-            .send()
-            .await
-            .map_err(MoodleError::from)
+        self.http.get(url).send().await.map_err(MoodleError::from)
     }
 
     /// Upload a file to the user's draft file area via `webservice/upload.php`.
@@ -136,17 +180,19 @@ impl MoodleClient {
             .await
             .map_err(MoodleError::from)?;
         let text = resp.text().await.map_err(MoodleError::from)?;
-        let value: Value = serde_json::from_str(&text)
-            .map_err(|_| MoodleError::InvalidBody(format!(
+        let value: Value = serde_json::from_str(&text).map_err(|_| {
+            MoodleError::InvalidBody(format!(
                 "upload.php returned non-JSON: {}",
                 truncate(&text, 300)
-            )))?;
+            ))
+        })?;
         if let Some(obj) = value.as_object()
-            && obj.contains_key("exception") && obj.contains_key("errorcode") {
-                let exc: MoodleException =
-                    serde_json::from_value(value).map_err(MoodleError::from)?;
-                return Err(MoodleError::from_exception(exc));
-            }
+            && obj.contains_key("exception")
+            && obj.contains_key("errorcode")
+        {
+            let exc: MoodleException = serde_json::from_value(value).map_err(MoodleError::from)?;
+            return Err(MoodleError::from_exception(exc));
+        }
         Ok(value)
     }
 }
@@ -158,7 +204,11 @@ pub fn flatten_json(value: &Value, prefix: &str, out: &mut Vec<(String, String)>
     match value {
         Value::Object(map) => {
             for (k, v) in map {
-                let p = if prefix.is_empty() { k.clone() } else { format!("{prefix}[{k}]") };
+                let p = if prefix.is_empty() {
+                    k.clone()
+                } else {
+                    format!("{prefix}[{k}]")
+                };
                 flatten_json(v, &p, out);
             }
         }

@@ -18,8 +18,12 @@ pub enum MoodleError {
     Json(#[from] serde_json::Error),
 
     /// Response body was valid JSON but not the expected shape.
-    #[error("Unexpected response from Moodle: {0}")]
+    #[error("{0}")]
     InvalidBody(String),
+
+    /// Response body was not JSON at all (e.g. HTML login page).
+    #[error("Non-JSON response from Moodle (web services may be disabled): {0}")]
+    NonJsonResponse(String),
 
     /// Client-side configuration error.
     #[error("Configuration error: {0}")]
@@ -46,7 +50,11 @@ impl MoodleError {
     /// Render a tool-level error message that the LLM can read and act on.
     pub fn to_tool_message(&self) -> String {
         match self {
-            MoodleError::Api { exception, errorcode, message } => format!(
+            MoodleError::Api {
+                exception,
+                errorcode,
+                message,
+            } => format!(
                 "Moodle API error {errorcode}: {message} (exception: {exception})\n\n\
                  Hints: `invalidtoken` → check MOODLE_TOKEN; `accesscontrolexception`/`nopermission` → \
                  the function is not in the token's external service or you lack the capability; \
@@ -56,9 +64,10 @@ impl MoodleError {
             MoodleError::Json(e) => format!(
                 "Moodle returned a non-JSON response: {e}. Web services may be disabled on the site."
             ),
-            MoodleError::InvalidBody(e) => format!(
-                "Moodle returned an unexpected response: {e}. Web services may be disabled on the site."
-            ),
+            MoodleError::InvalidBody(e) => format!("Moodle returned an unexpected response: {e}"),
+            MoodleError::NonJsonResponse(e) => {
+                format!("Non-JSON response from Moodle (web services may be disabled): {e}")
+            }
             MoodleError::Config(e) => format!("Configuration error: {e}"),
         }
     }
