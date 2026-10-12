@@ -7,9 +7,8 @@ Codex, Claude Desktop, …) as a set of typed, student-first tools. Ships as a
 single static binary over the `stdio` transport.
 
 Built on the official Rust MCP SDK [`rmcp`](https://crates.io/crates/rmcp)
-3.5 and [`reqwest`](https://crates.io/crates/reqwest). Design rationale and
-NTNU live-validation notes: [`docs/design-decisions.md`](docs/design-decisions.md)
-and [`docs/design-review.md`](docs/design-review.md).
+3.5 and [`reqwest`](https://crates.io/crates/reqwest). Validated live against
+Moodle 3.7 (NTNU); see the compatibility matrix below.
 
 ## Tools (22)
 
@@ -111,8 +110,7 @@ moodle-mcp token --url https://<site> --open
 ```
 
 Site-side requirements: Web services enabled + REST protocol + the
-`moodle_mobile_app` service allowed for the user (standard Moodle setup; see
-`docs/design-decisions.md` §Setup notes in research docs).
+`moodle_mobile_app` service allowed for the user (standard Moodle setup).
 
 ### 2. Run
 
@@ -157,8 +155,9 @@ cargo build --release
 ```
 
 Architecture, per-tool behavior decisions, the Moodle privacy model observed
-on NTNU, and the version-compatibility matrix live in
-[`docs/design-decisions.md`](docs/design-decisions.md). ID flow reference:
+on NTNU, and the version-compatibility matrix are summarized in the
+sections above (full discussion history lives in the git log and the
+project's issue tracker). ID flow reference:
 
 | ID | Produced by | Consumed by |
 |---|---|---|
