@@ -13,7 +13,9 @@ pub fn html_to_markdown(html: &str) -> String {
         return String::new();
     }
     match htmd::convert(trimmed) {
-        Ok(md) => decode_entities(&md),
+        // htmd output can retain (sometimes double-encoded) entities and turns
+        // &nbsp; into U+00A0; normalize both away.
+        Ok(md) => decode_entities(&md).replace('\u{00A0}', " "),
         Err(_) => strip_html_fallback(trimmed),
     }
 }
@@ -39,8 +41,21 @@ fn strip_html_fallback(html: &str) -> String {
         .join(" ")
 }
 
-/// Decode the most common HTML entities.
+/// Decode HTML entities. Runs up to 3 passes — Moodle fields are sometimes
+/// double-encoded (`&amp;nbsp;`), and a single pass would leave residue.
 pub fn decode_entities(s: &str) -> String {
+    let mut cur = s.to_string();
+    for _ in 0..3 {
+        let next = decode_entities_once(&cur);
+        if next == cur {
+            break;
+        }
+        cur = next;
+    }
+    cur
+}
+
+fn decode_entities_once(s: &str) -> String {
     s.replace("&nbsp;", " ")
         .replace("&amp;", "&")
         .replace("&lt;", "<")
@@ -93,6 +108,12 @@ pub fn first_of<'a>(v: &'a Value, key: &str) -> Option<&'a Value> {
 /// First non-null string field among `keys` (explicit `null` counts as absent).
 pub fn first_str<'a>(v: &'a Value, keys: &[&str]) -> Option<&'a str> {
     keys.iter().find_map(|k| v.get(*k).and_then(Value::as_str))
+}
+
+/// Read a human-facing name field (course/section/forum/assignment names):
+/// decode HTML entities (Moodle encodes `&` as `&amp;` even in plain names).
+pub fn name_field(v: &Value, keys: &[&str]) -> Option<String> {
+    first_str(v, keys).map(decode_entities)
 }
 
 /// Remove `warnings` arrays that are empty, to reduce output noise.

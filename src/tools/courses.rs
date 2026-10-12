@@ -53,7 +53,7 @@ fn shape_module(m: &Value, assignments_by_cmid: &std::collections::HashMap<i64, 
     let mut entry = json!({
         "module_id": cmid,
         "type": modname,
-        "name": m.get("name").cloned().unwrap_or(Value::Null),
+        "name": decode_entities(m.get("name").and_then(Value::as_str).unwrap_or_default()),
         "description": m.get("description").and_then(Value::as_str)
             .map(|t| truncate_chars(&html_to_markdown(t), 300)),
     });
@@ -130,7 +130,8 @@ pub async fn get_course_overview(
                     .cloned()
             })
         })
-        .unwrap_or(json!(format!("course {course_id}")));
+        .map(|v| decode_entities(v.as_str().unwrap_or("?")))
+        .unwrap_or(format!("course {course_id}"));
 
     // --- assignments ---
     let mut assignments: Vec<Value> = Vec::new();
@@ -154,7 +155,7 @@ pub async fn get_course_overview(
                 assignments.push(json!({
                     "assignment_id": asg.get("id").cloned().unwrap_or(Value::Null),
                     "cmid": asg.get("cmid").cloned().unwrap_or(Value::Null),
-                    "name": asg.get("name").cloned().unwrap_or(Value::Null),
+                    "name": decode_entities(asg.get("name").and_then(Value::as_str).unwrap_or_default()),
                     "due": unix_to_iso(asg.get("duedate").cloned().unwrap_or(Value::Null)),
                     "draft_required": asg.get("submissiondraft").cloned().unwrap_or(Value::Null),
                     "attachments": asg.get("introattachments").and_then(Value::as_array)
@@ -188,7 +189,7 @@ pub async fn get_course_overview(
             json!({
                 "quiz_id": q.get("id").cloned().unwrap_or(Value::Null),
                 "cmid": q.get("cmid").cloned().unwrap_or(Value::Null),
-                "name": q.get("name").cloned().unwrap_or(Value::Null),
+                "name": decode_entities(q.get("name").and_then(Value::as_str).unwrap_or_default()),
                 "opens": unix_to_iso(q.get("timeopen").cloned().unwrap_or(Value::Null)),
                 "closes": unix_to_iso(q.get("timeclose").cloned().unwrap_or(Value::Null)),
             })
@@ -204,7 +205,7 @@ pub async fn get_course_overview(
         .map(|f| {
             json!({
                 "forum_id": f.get("id").cloned().unwrap_or(Value::Null),
-                "name": f.get("name").cloned().unwrap_or(Value::Null),
+                "name": decode_entities(f.get("name").and_then(Value::as_str).unwrap_or_default()),
                 "type": f.get("type").cloned().unwrap_or(Value::Null),
             })
         })
@@ -268,7 +269,7 @@ pub async fn get_course_overview(
         .map(|s| {
             json!({
                 "section_id": s.get("id").cloned().unwrap_or(Value::Null),
-                "name": s.get("name").cloned().unwrap_or(Value::Null),
+                "name": decode_entities(s.get("name").and_then(Value::as_str).unwrap_or_default()),
                 "summary": s.get("summary").and_then(Value::as_str)
                     .map(|t| truncate_chars(&html_to_markdown(t), 300)),
                 "modules": s.get("modules").and_then(Value::as_array)
@@ -292,10 +293,7 @@ pub async fn get_course_overview(
 
     // --- markdown rendering ---
     let mut md = String::new();
-    md.push_str(&format!(
-        "# {} (course_id: {course_id})\n\n",
-        fullname.as_str().unwrap_or("?")
-    ));
+    md.push_str(&format!("# {fullname} (course_id: {course_id})\n\n"));
 
     md.push_str("## Assignments\n");
     if assignments.is_empty() {
@@ -358,8 +356,13 @@ pub async fn get_course_overview(
                     .unwrap_or_else(|| ")".into()),
             ));
             for c in m["contents"].as_array().unwrap_or(&Vec::new()) {
+                let kind = if c["type"].as_str() == Some("file") {
+                    "file"
+                } else {
+                    "link"
+                };
                 md.push_str(&format!(
-                    "    - file: {} ({} bytes) — {}\n",
+                    "    - {kind}: {} ({} bytes) — {}\n",
                     c["filename"].as_str().unwrap_or("?"),
                     c["filesize"],
                     c["fileurl"].as_str().unwrap_or("no url"),
