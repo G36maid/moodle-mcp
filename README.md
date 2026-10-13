@@ -104,7 +104,10 @@ Site-side requirements: web services enabled, REST protocol, and the
 
 ### Connect a client
 
-**pi** — project-local `.pi/mcp.json`:
+All four clients read the same stdio server: launch `/path/to/moodle-mcp` with
+`MOODLE_URL` / `MOODLE_TOKEN` in its environment.
+
+**Claude Code** — `.mcp.json` (project) or `~/.claude.json` (global):
 
 ```json
 {
@@ -120,14 +123,7 @@ Site-side requirements: web services enabled, REST protocol, and the
 }
 ```
 
-**Claude Code:**
-
-```bash
-claude mcp add moodle --env MOODLE_URL=https://moodle.example.com \
-  --env MOODLE_TOKEN=your-token -- /path/to/moodle-mcp
-```
-
-**Codex** — `~/.codex/config.toml`:
+**Codex** — `~/.codex/config.toml` (global):
 
 ```toml
 [mcp_servers.moodle]
@@ -135,7 +131,7 @@ command = "/path/to/moodle-mcp"
 env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "your-token" }
 ```
 
-**OpenCode** — `opencode.json`:
+**OpenCode** — `opencode.json` (project) or `~/.config/opencode/opencode.json` (global):
 
 ```json
 {
@@ -144,6 +140,22 @@ env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "your-toke
       "type": "local",
       "command": ["/path/to/moodle-mcp"],
       "environment": {
+        "MOODLE_URL": "https://moodle.example.com",
+        "MOODLE_TOKEN": "your-token"
+      }
+    }
+  }
+}
+```
+
+**pi** — `.pi/mcp.json` (project) or `~/.pi/agent/mcp.json` (global):
+
+```json
+{
+  "mcpServers": {
+    "moodle": {
+      "command": "/path/to/moodle-mcp",
+      "env": {
         "MOODLE_URL": "https://moodle.example.com",
         "MOODLE_TOKEN": "your-token"
       }
