@@ -35,11 +35,19 @@ async fn overview(client: &MoodleClient) -> Result<Value, MoodleError> {
 }
 
 /// Full grade items of one course via `gradereport_user_get_grade_items`.
-async fn course_items(client: &MoodleClient, course_id: i64) -> Result<Value, MoodleError> {
+/// NOTE: `userid` MUST be sent — on 3.7, omitting it makes the function fetch
+/// ALL users' grades, which requires a capability students lack
+/// (required_capability_exception). With userid it returns the caller's own
+/// items on every version.
+async fn course_items(
+    client: &MoodleClient,
+    course_id: i64,
+    user_id: i64,
+) -> Result<Value, MoodleError> {
     let v: Value = client
         .call(
             "gradereport_user_get_grade_items",
-            &json!({ "courseid": course_id }),
+            &json!({ "courseid": course_id, "userid": user_id }),
         )
         .await?;
     let ug = crate::util::first_of(&v, "usergrades")
@@ -90,9 +98,10 @@ async fn course_items(client: &MoodleClient, course_id: i64) -> Result<Value, Mo
 pub async fn get_grades(
     client: &MoodleClient,
     course_id: Option<i64>,
+    user_id: i64,
 ) -> Result<Value, MoodleError> {
     match course_id {
-        Some(id) => course_items(client, id).await,
+        Some(id) => course_items(client, id, user_id).await,
         None => overview(client).await,
     }
 }

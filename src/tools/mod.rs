@@ -483,7 +483,12 @@ impl MoodleMcp {
         &self,
         Parameters(p): Parameters<GradesParams>,
     ) -> Result<CallToolResult, McpError> {
-        finish(grades::get_grades(&self.client, p.course_id).await)
+        finish(
+            match self.current_user_id().await {
+                Ok(uid) => grades::get_grades(&self.client, p.course_id, uid).await,
+                Err(e) => Err(e),
+            },
+        )
     }
 
     // ---------- schedule ----------
