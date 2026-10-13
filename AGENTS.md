@@ -18,7 +18,7 @@ cargo test
 
 ## Architecture
 
-- `src/main.rs` — thin bin: no args = serve MCP over stdio; `token` subcommand (src/token.rs) fetches a web-service token.
+- `src/main.rs` — thin bin: no args = serve MCP over stdio; `auth` subcommand (src/auth.rs) fetches a web-service token (interactive prompts; `--url`/`--username`/`--password` flags skip them).
 - `src/client.rs` (`MoodleClient`) — all Moodle calls go through one endpoint: `POST {base}/webservice/rest/server.php`. JSON params are flattened to PHP bracket notation (`courseids[0]=2`). Two reqwest clients: API calls have a total timeout; file downloads have none (streaming) but a read timeout. Redirect policy is host-locked for site-originated redirects because the token is injected into `pluginfile.php` URLs — don't loosen it.
 - `src/tools/` — rmcp requires all `#[tool]` methods to live in the single `#[tool_router]` impl block in `mod.rs`. When adding a tool: declare the `#[tool]` method in `mod.rs`, put business logic in the per-domain module (`assignments.rs`, `forums.rs`, `files.rs`, …).
 - `src/output.rs` — dual-channel result policy: every tool returns structured JSON in `structuredContent`; document tools (`get_course_overview`, `get_assignment`) additionally put markdown in `text`. Nulls are stripped recursively (Moodle 3.7 omits many fields). Only markdown text is truncated (`MAX_DOC_CHARS`), never the JSON.
