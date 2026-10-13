@@ -14,20 +14,11 @@ Validated live against **Moodle 3.7 → 5.x**.
 
 ---
 
-## ❌ Without moodle-mcp
-
-An agent asked about your coursework can only guess:
-
-- ❌ "I don't have access to your Moodle" — even with the token in hand
-- ❌ Hallucinated API endpoints and field names
-- ❌ Copy-pasting raw JSON by hand, guessing PHP array notation
-- ❌ Reading assignment PDFs is impossible for a text-only pipeline
-
 ## ✅ With moodle-mcp
 
-22 typed tools covering the full student journey — from a quick deadline
-check to a **fully autonomous assignment cycle**, without ever opening a
-browser:
+22 typed tools that cover the full student journey just like a real human — from a quick
+deadline check to fully automated assignment assistance, without ever opening
+a browser:
 
 ```txt
 What's due in the next two weeks? Plan my studying around it.
