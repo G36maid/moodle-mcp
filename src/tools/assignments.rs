@@ -89,26 +89,33 @@ pub async fn get_assignment(
     // (with submissions/feedback nested); 3.7 returns `lastattempt{}` and a
     // top-level `feedback`. Normalize both into (submission, feedback,
     // gradingstatus).
-    let (submission, feedback, gradingstatus) =
-        if let Some(a) = crate::util::first_of(&status, "assignments") {
-            (
-                crate::util::first_of(a, "submissions")
-                    .cloned()
-                    .unwrap_or(Value::Null),
-                a.get("feedback").cloned().unwrap_or(Value::Null),
-                a.get("gradingstatus").cloned().unwrap_or(Value::Null),
-            )
-        } else {
-            let la = status.get("lastattempt").cloned().unwrap_or(Value::Null);
-            (
-                la.get("submission").cloned().unwrap_or(Value::Null),
-                status.get("feedback").cloned().unwrap_or(Value::Null),
-                la.get("gradingstatus").cloned().unwrap_or(Value::Null),
-            )
-        };
-    if submission.is_null() && feedback.is_null() {
-        return Err(MoodleError::InvalidBody("empty submission status".into()));
-    }
+    let (submission, feedback, gradingstatus) = if status.get("assignments").is_some() {
+        // Modern shape: assignments[0].{submissions, feedback, gradingstatus}
+        let a = crate::util::first_of(&status, "assignments")
+            .ok_or_else(|| MoodleError::InvalidBody("empty submission status payload".into()))?;
+        (
+            crate::util::first_of(a, "submissions")
+                .cloned()
+                .unwrap_or(Value::Null),
+            a.get("feedback").cloned().unwrap_or(Value::Null),
+            a.get("gradingstatus").cloned().unwrap_or(Value::Null),
+        )
+    } else if status.get("lastattempt").is_some() {
+        // 3.7 shape: lastattempt{submission, gradingstatus} + top feedback.
+        let la = status.get("lastattempt").cloned().unwrap_or(Value::Null);
+        (
+            la.get("submission").cloned().unwrap_or(Value::Null),
+            status.get("feedback").cloned().unwrap_or(Value::Null),
+            la.get("gradingstatus").cloned().unwrap_or(Value::Null),
+        )
+    } else {
+        // Truly unexpected response (neither structure present).
+        return Err(MoodleError::InvalidBody(
+            "unexpected submission status response".into(),
+        ));
+    };
+    // A null submission is a legitimate state (never submitted yet) — rendered
+    // as "not submitted", NOT an error.
     let _graded = matches!(
         gradingstatus.as_str(),
         Some("graded") | Some("graded_followup_submitted") | Some("graded_followup_edit")

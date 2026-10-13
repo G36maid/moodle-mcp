@@ -73,10 +73,13 @@ pub async fn get_schedule(
             .unwrap_or_default()
     });
 
-    Ok((strip_empty_warnings(json!({
-        "count": events.len(),
-        "from": crate::util::unix_to_iso(json!(from)),
-        "to": crate::util::unix_to_iso(json!(to)),
-        "schedule": events,
-    })), hints))
+    Ok((
+        strip_empty_warnings(json!({
+            "count": events.len(),
+            "from": crate::util::unix_to_iso(json!(from)),
+            "to": crate::util::unix_to_iso(json!(to)),
+            "schedule": events,
+        })),
+        hints,
+    ))
 }
