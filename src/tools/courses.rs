@@ -110,11 +110,11 @@ pub async fn get_course_overview(
 
     // Five sources, fetched concurrently.
     let (contents_r, assign_r, quiz_r, forum_r, grade_r) = tokio::join!(
-        client.call::<Value>("core_course_get_contents", &contents_params),
-        client.call::<Value>("mod_assign_get_assignments", &assign_params),
-        client.call::<Value>("mod_quiz_get_quizzes_by_courses", &quiz_params),
-        client.call::<Value>("mod_forum_get_forums_by_courses", &forum_params),
-        client.call::<Value>("gradereport_user_get_grade_items", &grade_params),
+        client.call("core_course_get_contents", &contents_params),
+        client.call("mod_assign_get_assignments", &assign_params),
+        client.call("mod_quiz_get_quizzes_by_courses", &quiz_params),
+        client.call("mod_forum_get_forums_by_courses", &forum_params),
+        client.call("gradereport_user_get_grade_items", &grade_params),
     );
 
     // A failed contents fetch means the course is invalid/inaccessible —

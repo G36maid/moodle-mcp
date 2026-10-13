@@ -43,6 +43,20 @@ fn text_from_plugin(plugin: &Value) -> Option<String> {
         .map(str::to_string)
 }
 
+fn plugins_of(v: &Value) -> Vec<Value> {
+    v.get("plugins")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default()
+}
+
+fn plugin_type(plugin: &Value) -> &str {
+    plugin
+        .get("type")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+}
+
 /// `get_assignment` — everything about a single assignment in one call:
 /// metadata, full description, attachments, current submission (incl. its
 /// onlinetext and files), grade and feedback. Rendered as a markdown
@@ -51,8 +65,8 @@ pub async fn get_assignment(
     client: &MoodleClient,
     assignment_id: i64,
 ) -> Result<(String, Value), MoodleError> {
-    // One broad call, filtered server-side here: mod_assign has no
-    // "get one assignment by id" function on 3.7.
+    // 3.7 has no "get one assignment by id" function — fetch all and filter
+    // locally.
     let all: Value = client
         .call("mod_assign_get_assignments", &json!({}))
         .await?;
@@ -85,54 +99,35 @@ pub async fn get_assignment(
         )
         .await?;
 
-    // Two response shapes exist: modern Moodle returns an `assignments` array
-    // (with submissions/feedback nested); 3.7 returns `lastattempt{}` and a
-    // top-level `feedback`. Normalize both into (submission, feedback,
-    // gradingstatus).
-    let (submission, feedback, gradingstatus) = if status.get("assignments").is_some() {
-        // Modern shape: assignments[0].{submissions, feedback, gradingstatus}
-        let a = crate::util::first_of(&status, "assignments")
-            .ok_or_else(|| MoodleError::InvalidBody("empty submission status payload".into()))?;
-        (
-            crate::util::first_of(a, "submissions")
-                .cloned()
-                .unwrap_or(Value::Null),
-            a.get("feedback").cloned().unwrap_or(Value::Null),
-            a.get("gradingstatus").cloned().unwrap_or(Value::Null),
-        )
-    } else if status.get("lastattempt").is_some() {
-        // 3.7 shape: lastattempt{submission, gradingstatus} + top feedback.
-        let la = status.get("lastattempt").cloned().unwrap_or(Value::Null);
-        (
-            la.get("submission").cloned().unwrap_or(Value::Null),
-            status.get("feedback").cloned().unwrap_or(Value::Null),
-            la.get("gradingstatus").cloned().unwrap_or(Value::Null),
-        )
-    } else {
-        // Truly unexpected response (neither structure present).
-        return Err(MoodleError::InvalidBody(
-            "unexpected submission status response".into(),
-        ));
-    };
-    // A null submission is a legitimate state (never submitted yet) — rendered
-    // as "not submitted", NOT an error. The upstream `gradingstatus` is
-    // exposed verbatim in the structured output.
+    // Modern Moodle nests everything under assignments[0]; 3.7 returns
+    // lastattempt{submission} + top-level feedback. Normalize both. A null
+    // submission (never submitted) is legitimate, not an error.
+    let (submission, feedback, gradingstatus) =
+        if let Some(a) = crate::util::first_of(&status, "assignments") {
+            (
+                crate::util::first_of(a, "submissions")
+                    .cloned()
+                    .unwrap_or(Value::Null),
+                a.get("feedback").cloned().unwrap_or(Value::Null),
+                a.get("gradingstatus").cloned().unwrap_or(Value::Null),
+            )
+        } else if let Some(la) = status.get("lastattempt") {
+            (
+                la.get("submission").cloned().unwrap_or(Value::Null),
+                status.get("feedback").cloned().unwrap_or(Value::Null),
+                la.get("gradingstatus").cloned().unwrap_or(Value::Null),
+            )
+        } else {
+            return Err(MoodleError::InvalidBody(
+                "unexpected submission status response".into(),
+            ));
+        };
 
     // --- submission ---
     let mut sub_files: Vec<Value> = Vec::new();
     let mut onlinetext: Option<String> = None;
-    for plugin in submission
-        .get("plugins")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default()
-    {
-        let ptype = plugin
-            .get("type")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_string();
-        if ptype == "onlinetext" {
+    for plugin in plugins_of(&submission) {
+        if plugin_type(&plugin) == "onlinetext" {
             onlinetext = text_from_plugin(&plugin).map(|t| decode_entities(&t));
         } else {
             sub_files.extend(files_from_plugin(&plugin));
@@ -147,20 +142,10 @@ pub async fn get_assignment(
         .unwrap_or(Value::Null);
     let mut fb_comment: Option<String> = None;
     let mut fb_files: Vec<Value> = Vec::new();
-    for plugin in feedback
-        .get("plugins")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default()
-    {
-        let ptype = plugin
-            .get("type")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_string();
-        if ptype.contains("comment") {
+    for plugin in plugins_of(&feedback) {
+        if plugin_type(&plugin).contains("comment") {
             fb_comment = text_from_plugin(&plugin).map(|t| decode_entities(&t));
-        } else if ptype.contains("file") {
+        } else if plugin_type(&plugin).contains("file") {
             fb_files.extend(files_from_plugin(&plugin));
         }
     }
@@ -390,31 +375,18 @@ mod tests {
 
     #[test]
     fn extracts_files_and_text_from_plugins() {
-        let st = json!({
-            "submissions": [{
-                "plugins": [
-                    {"type": "onlinetext", "editorfields": [{"name": "onlinetext", "text": "<p>my answer</p>"}]},
-                    {"type": "file", "fileareas": [{"area": "submission_files", "files": [
-                        {"filename": "a.pdf", "fileurl": "https://x/pluginfile.php/1"}
-                    ]}]}
-                ]
-            }]
+        let submission = json!({
+            "plugins": [
+                {"type": "onlinetext", "editorfields": [{"name": "onlinetext", "text": "<p>my answer</p>"}]},
+                {"type": "file", "fileareas": [{"area": "submission_files", "files": [
+                    {"filename": "a.pdf", "fileurl": "https://x/pluginfile.php/1"}
+                ]}]}
+            ]
         });
-        let sub = crate::util::first_of(&st, "submissions").unwrap();
         let mut files = Vec::new();
         let mut text = None;
-        for plugin in sub
-            .get("plugins")
-            .and_then(Value::as_array)
-            .cloned()
-            .unwrap_or_default()
-        {
-            let ptype = plugin
-                .get("type")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string();
-            if ptype == "onlinetext" {
+        for plugin in plugins_of(&submission) {
+            if plugin_type(&plugin) == "onlinetext" {
                 text = text_from_plugin(&plugin);
             } else {
                 files.extend(files_from_plugin(&plugin));
@@ -423,27 +395,5 @@ mod tests {
         assert_eq!(text.as_deref(), Some("<p>my answer</p>"));
         assert_eq!(files.len(), 1);
         assert_eq!(files[0]["filename"], json!("a.pdf"));
-    }
-
-    #[test]
-    fn finds_assignment_across_courses() {
-        let all = json!({"courses": [
-            {"fullname": "A", "assignments": [{"id": 1, "name": "HW1"}]},
-            {"fullname": "B", "assignments": [{"id": 2, "name": "HW2"}]}
-        ]});
-        let found = all
-            .get("courses")
-            .and_then(Value::as_array)
-            .cloned()
-            .unwrap_or_default()
-            .into_iter()
-            .flat_map(|c| {
-                c.get("assignments")
-                    .and_then(Value::as_array)
-                    .cloned()
-                    .unwrap_or_default()
-            })
-            .find(|a| a.get("id").and_then(Value::as_i64) == Some(2));
-        assert_eq!(found.unwrap()["name"], json!("HW2"));
     }
 }

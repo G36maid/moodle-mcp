@@ -24,10 +24,11 @@ pub async fn call_ws_function(
             suggest_functions(wsfunction, allowed)
         )));
     }
-    client.call_raw(wsfunction, params).await
+    client.call(wsfunction, params).await
 }
 
-/// Render the allowed-list summary: closest matches first, then count.
+/// Suggest close function names when an exact match is missing: closest
+/// matches first, then the total count.
 pub fn suggest_functions(requested: &str, allowed: &[String]) -> String {
     let req = requested.to_lowercase();
     let close: Vec<&str> = allowed

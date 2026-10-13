@@ -233,32 +233,9 @@ pub async fn download_file(
     }))
 }
 
-/// Upload bytes into the user's draft file area. Returns the draft `item_id`
-/// referencing the uploaded file.
-async fn upload_bytes(
-    client: &MoodleClient,
-    filename: &str,
-    bytes: Vec<u8>,
-    item_id: i64,
-) -> Result<Value, MoodleError> {
-    let v = client.upload_to_draft(filename, bytes, item_id).await?;
-    let files = v.as_array().cloned().unwrap_or_default();
-    if files.is_empty() {
-        return Err(MoodleError::InvalidBody(
-            "upload.php returned no file records".into(),
-        ));
-    }
-    let first = &files[0];
-    Ok(json!({
-        "uploaded": true,
-        "item_id": first.get("itemid").and_then(Value::as_i64).unwrap_or(item_id),
-        "filename": first.get("filename").cloned().unwrap_or(json!(filename)),
-        "filesize": first.get("filesize").cloned().unwrap_or(Value::Null),
-    }))
-}
-
-/// Upload a local file (read from disk — binary data never enters the
-/// conversation). `filename` defaults to the path's file name.
+/// Upload a local file into the user's draft file area (read from disk —
+/// binary data never enters the conversation). `filename` defaults to the
+/// path's file name. Returns the draft `item_id` referencing the upload.
 pub async fn upload_file_from_path(
     client: &MoodleClient,
     path: &str,
@@ -282,7 +259,18 @@ pub async fn upload_file_from_path(
     let name = filename
         .map(str::to_string)
         .unwrap_or_else(|| basename(path));
-    upload_bytes(client, &name, bytes, item_id).await
+
+    let files: Value = client.upload_to_draft(&name, bytes, item_id).await?;
+    let first = files
+        .as_array()
+        .and_then(|a| a.first())
+        .ok_or_else(|| MoodleError::InvalidBody("upload.php returned no file records".into()))?;
+    Ok(json!({
+        "uploaded": true,
+        "item_id": first.get("itemid").and_then(Value::as_i64).unwrap_or(item_id),
+        "filename": first.get("filename").cloned().unwrap_or(json!(name)),
+        "filesize": first.get("filesize").cloned().unwrap_or(Value::Null),
+    }))
 }
 
 fn basename(path: &str) -> String {

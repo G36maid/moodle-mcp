@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::config::Config;
@@ -119,22 +118,14 @@ impl MoodleClient {
         Ok(value)
     }
 
-    /// Call a web service function.
+    /// Call a web service function and return the parsed JSON response.
     ///
     /// `params` is a JSON object whose values may contain nested
     /// objects/arrays; they are flattened into Moodle's PHP bracket notation,
     /// e.g. `{"courseids": [2, 5]}` → `courseids[0]=2&courseids[1]=5`.
-    pub async fn call<T: DeserializeOwned>(
-        &self,
-        wsfunction: &str,
-        params: &Value,
-    ) -> Result<T, MoodleError> {
-        let value = self.call_raw(wsfunction, params).await?;
-        serde_json::from_value(value).map_err(MoodleError::from)
-    }
-
-    /// Call a web service function and return the raw JSON response.
-    pub async fn call_raw(&self, wsfunction: &str, params: &Value) -> Result<Value, MoodleError> {
+    /// Moodle reports API errors with HTTP 200 and an `{exception, …}`
+    /// payload, which is mapped to [`MoodleError::Api`].
+    pub async fn call(&self, wsfunction: &str, params: &Value) -> Result<Value, MoodleError> {
         let url = format!(
             "{}/webservice/rest/server.php",
             self.base_url.trim_end_matches('/')
@@ -157,12 +148,7 @@ impl MoodleClient {
 
         let status = resp.status();
         let text = resp.text().await.map_err(MoodleError::from)?;
-        tracing::debug!(
-            wsfunction,
-            %status,
-            bytes = text.len(),
-            "moodle ws response"
-        );
+        tracing::debug!(wsfunction, %status, bytes = text.len(), "moodle ws response");
         tracing::trace!(body = truncate(&text, 1000), "moodle ws body");
         let value: Value = serde_json::from_str(&text).map_err(|_| {
             MoodleError::NonJsonResponse(format!(
@@ -171,11 +157,11 @@ impl MoodleClient {
             ))
         })?;
 
-        // Moodle reports API errors with HTTP 200 and an exception payload.
-        if let Some(obj) = value.as_object()
-            && obj.contains_key("exception")
+        if value
+            .as_object()
+            .is_some_and(|obj| obj.contains_key("exception"))
         {
-            let exc: MoodleException = serde_json::from_value(value).unwrap_or(MoodleException {
+            let exc = serde_json::from_value(value).unwrap_or(MoodleException {
                 exception: "unknown".into(),
                 errorcode: "unknown".into(),
                 message: truncate(&text, 200).to_string(),

@@ -202,7 +202,7 @@ async fn call_maps_exception_payload() {
 
     let client = client_for(&server).await;
     let err: MoodleError = client
-        .call::<Value>("anything", &json!({}))
+        .call("anything", &json!({}))
         .await
         .expect_err("must fail");
     match err {
@@ -231,7 +231,7 @@ async fn non_json_body_is_reported() {
 
     let client = client_for(&server).await;
     let err = client
-        .call::<Value>("anything", &json!({}))
+        .call("anything", &json!({}))
         .await
         .expect_err("must fail");
     let msg = err.to_tool_message();
@@ -282,7 +282,7 @@ async fn exception_without_errorcode_is_still_detected() {
 
     let client = client_for(&server).await;
     let err = client
-        .call::<Value>(
+        .call(
             "mod_forum_get_discussion_posts",
             &json!({"discussionid": 1}),
         )

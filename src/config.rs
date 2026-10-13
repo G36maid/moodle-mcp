@@ -1,5 +1,3 @@
-use std::fmt;
-
 /// Runtime configuration, loaded from environment variables.
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -14,8 +12,9 @@ pub struct Config {
 impl Config {
     pub fn from_env() -> Result<Self, String> {
         let base_url = std::env::var("MOODLE_URL")
-            .map_err(|_| "MOODLE_URL is required (e.g. https://moodle.example.com)".to_string())?;
-        let base_url = base_url.trim_end_matches('/').to_string();
+            .map_err(|_| "MOODLE_URL is required (e.g. https://moodle.example.com)".to_string())?
+            .trim_end_matches('/')
+            .to_string();
         if !base_url.starts_with("http://") && !base_url.starts_with("https://") {
             return Err(format!(
                 "MOODLE_URL must start with http(s)://, got: {base_url}"
@@ -32,15 +31,5 @@ impl Config {
             token,
             timeout_secs,
         })
-    }
-}
-
-impl fmt::Display for Config {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Config({} [token hidden], timeout={}s)",
-            self.base_url, self.timeout_secs
-        )
     }
 }

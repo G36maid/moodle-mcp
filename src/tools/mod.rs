@@ -30,11 +30,7 @@ use tokio::sync::RwLock;
 use crate::client::MoodleClient;
 use crate::error::MoodleError;
 use crate::output::{finish_doc, finish_json, finish_json_with_hints};
-
-/// Hints attached to `get_schedule` when parameters are omitted.
-const HINT_TIME: &str =
-    "Time range defaults to the next 30 days; pass time_from/time_to to query other ranges.";
-const HINT_COURSE: &str = "Defaults to all enrolled courses; pass course_ids to filter.";
+use crate::tools::schedule::{HINT_COURSE, HINT_TIME};
 
 #[derive(Deserialize, schemars::JsonSchema)]
 pub struct Empty {}
@@ -499,16 +495,14 @@ impl MoodleMcp {
         Parameters(p): Parameters<GradesParams>,
     ) -> Result<CallToolResult, McpError> {
         let res = match self.current_user_id().await {
-            Ok(uid) => grades::get_grades(&self.client, p.course_id, uid).await,
+            Ok(uid) => match grades::get_grades(&self.client, p.course_id, uid).await {
+                // 3.7's overview API omits course names — fill them from the roster.
+                Ok(v) if v["mode"] == json!("overview") => {
+                    grades::enrich_overview_course_names(&self.client, v, uid).await
+                }
+                other => other,
+            },
             Err(e) => Err(e),
-        };
-        // 3.7's overview API omits course names — fill them from the roster.
-        let res = match res {
-            Ok(v) if v.get("mode") == Some(&json!("overview")) => {
-                let uid = self.current_user_id().await.unwrap_or(0);
-                grades::enrich_overview_course_names(&self.client, v, uid).await
-            }
-            other => other,
         };
         finish(res)
     }
@@ -657,7 +651,7 @@ impl MoodleMcp {
         Parameters(p): Parameters<QuizAttemptsParams>,
     ) -> Result<CallToolResult, McpError> {
         let res = match self.current_user_id().await {
-            Ok(uid) => quizzes::get_quiz_attempts(&self.client, p.quiz_id, uid, "all").await,
+            Ok(uid) => quizzes::get_quiz_attempts(&self.client, p.quiz_id, uid).await,
             Err(e) => Err(e),
         };
         finish(res)

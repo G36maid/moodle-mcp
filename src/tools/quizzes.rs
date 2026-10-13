@@ -7,12 +7,12 @@ use crate::client::MoodleClient;
 use crate::error::MoodleError;
 use crate::util::unix_to_iso;
 
-/// `mod_quiz_get_user_attempts` — the user's attempts on a quiz.
+/// `mod_quiz_get_user_attempts` — the user's attempts on a quiz (all states;
+/// `includepreviews=0` skips teacher preview attempts).
 pub async fn get_quiz_attempts(
     client: &MoodleClient,
     quiz_id: i64,
     user_id: i64,
-    status: &str,
 ) -> Result<Value, MoodleError> {
     let v: Value = client
         .call(
@@ -20,7 +20,7 @@ pub async fn get_quiz_attempts(
             &json!({
                 "quizid": quiz_id,
                 "userid": user_id,
-                "status": status,
+                "status": "all",
                 "includepreviews": 0
             }),
         )

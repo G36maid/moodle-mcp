@@ -14,9 +14,10 @@ use crate::error::MoodleError;
 use crate::util::{now_unix, strip_empty_warnings, unix_to_iso};
 
 /// Default horizon when `time_to` is omitted: the next 30 days.
-pub const DEFAULT_DAYS_AHEAD: i64 = 30;
+const DEFAULT_DAYS_AHEAD: i64 = 30;
 
-/// Hints attached when the corresponding parameter is omitted.
+/// Hints attached to `get_schedule` when parameters are omitted (shared with
+/// the tool wrapper in `mod.rs`).
 pub const HINT_TIME: &str =
     "Time range defaults to the next 30 days; pass time_from/time_to to query other ranges.";
 pub const HINT_COURSE: &str = "Defaults to all enrolled courses; pass course_ids to filter.";

@@ -112,12 +112,6 @@ pub fn first_str<'a>(v: &'a Value, keys: &[&str]) -> Option<&'a str> {
     keys.iter().find_map(|k| v.get(*k).and_then(Value::as_str))
 }
 
-/// Read a human-facing name field (course/section/forum/assignment names):
-/// decode HTML entities (Moodle encodes `&` as `&amp;` even in plain names).
-pub fn name_field(v: &Value, keys: &[&str]) -> Option<String> {
-    first_str(v, keys).map(decode_entities)
-}
-
 /// Remove `warnings` arrays that are empty, to reduce output noise.
 pub fn strip_empty_warnings(mut v: Value) -> Value {
     if let Some(obj) = v.as_object_mut()
