@@ -18,6 +18,7 @@
 [![CI](https://github.com/G36maid/moodle-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/G36maid/moodle-mcp/actions/workflows/ci.yml)
 [![Codecov](https://img.shields.io/codecov/c/github/G36maid/moodle-mcp)](https://codecov.io/gh/G36maid/moodle-mcp)
 [![Release](https://img.shields.io/github/v/release/G36maid/moodle-mcp?include_prereleases)](https://github.com/G36maid/moodle-mcp/releases/latest)
+[![crates.io](https://img.shields.io/crates/v/moodle-mcp)](https://crates.io/crates/moodle-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](../LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.88%2B-orange.svg)](https://www.rust-lang.org)
 [![MCP](https://img.shields.io/badge/protocol-MCP%20stdio-6C5CE7)](https://modelcontextprotocol.io)
@@ -73,7 +74,7 @@
 - 站点端已开启 Web Services：启用 **REST 协议** 且你的账号获批使用 **`moodle_mobile_app`** 服务 — 这与官方 Moodle 移动端 App 使用完全相同的配置，多数站点已默认开启
 - 强烈建议使用 **HTTPS** — Token 随每次请求明文传输（详见 [安全说明](#-安全说明)）
 - 任何支持 MCP 的客户端 — Claude Code、Codex、OpenCode、pi，或任何通过 stdio 交互的 MCP 客户端
-- 仅在从源码构建时需要 Rust 1.88+（使用预编译二进制文件无需任何工具链）
+- 仅在使用 `cargo install` 或从源码构建时需要 Rust 1.88+（预编译二进制文件无需任何工具链）
 
 ## 📦 安装指南
 
@@ -92,6 +93,12 @@
 ```bash
 tar xzf moodle-mcp-*-aarch64-apple-darwin.tar.gz
 sudo mv moodle-mcp-*/moodle-mcp /usr/local/bin/   # 或 PATH 包含的任意目录
+```
+
+### 或使用 cargo 安装
+
+```bash
+cargo install moodle-mcp   # 需要 Rust 1.88+
 ```
 
 ### 或从源码编译

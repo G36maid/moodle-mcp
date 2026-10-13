@@ -18,6 +18,7 @@
 [![CI](https://github.com/G36maid/moodle-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/G36maid/moodle-mcp/actions/workflows/ci.yml)
 [![Codecov](https://img.shields.io/codecov/c/github/G36maid/moodle-mcp)](https://codecov.io/gh/G36maid/moodle-mcp)
 [![Release](https://img.shields.io/github/v/release/G36maid/moodle-mcp?include_prereleases)](https://github.com/G36maid/moodle-mcp/releases/latest)
+[![crates.io](https://img.shields.io/crates/v/moodle-mcp)](https://crates.io/crates/moodle-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](../LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.88%2B-orange.svg)](https://www.rust-lang.org)
 [![MCP](https://img.shields.io/badge/protocol-MCP%20stdio-6C5CE7)](https://modelcontextprotocol.io)
@@ -73,7 +74,7 @@ LLM エージェントが**本物の Moodle LMS を直接操作**できるよう
 - サイト側で Web サービスが有効化されていること：**REST プロトコル** および **`moodle_mobile_app`** サービスがあなたのアカウントに許可されていること（公式 Moodle モバイルアプリと同じ設定のため、多くの大学・学校で既に有効です）
 - **HTTPS** の使用を強く推奨 — トークンはリクエスト毎に送信されます（詳細は [セキュリティに関する注意](#-セキュリティに関する注意) を参照）
 - 任意の MCP クライアント — Claude Code、Codex、OpenCode、pi など、stdio 経由で MCP をサポートする環境
-- ソースからビルドする場合のみ Rust 1.88+ が必要（事前ビルド済みバイナリを使用する場合は不要）
+- `cargo install` またはソースからビルドする場合のみ Rust 1.88+ が必要（事前ビルド済みバイナリを使用する場合は不要）
 
 ## 📦 インストール
 
@@ -92,6 +93,12 @@ Rust 環境は不要です — [最新リリース](https://github.com/G36maid/m
 ```bash
 tar xzf moodle-mcp-*-aarch64-apple-darwin.tar.gz
 sudo mv moodle-mcp-*/moodle-mcp /usr/local/bin/   # または PATH の通ったディレクトリ
+```
+
+### または cargo でインストール
+
+```bash
+cargo install moodle-mcp   # Rust 1.88+ が必要
 ```
 
 ### またはソースからビルド

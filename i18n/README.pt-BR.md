@@ -18,6 +18,7 @@
 [![CI](https://github.com/G36maid/moodle-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/G36maid/moodle-mcp/actions/workflows/ci.yml)
 [![Codecov](https://img.shields.io/codecov/c/github/G36maid/moodle-mcp)](https://codecov.io/gh/G36maid/moodle-mcp)
 [![Release](https://img.shields.io/github/v/release/G36maid/moodle-mcp?include_prereleases)](https://github.com/G36maid/moodle-mcp/releases/latest)
+[![crates.io](https://img.shields.io/crates/v/moodle-mcp)](https://crates.io/crates/moodle-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](../LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.88%2B-orange.svg)](https://www.rust-lang.org)
 [![MCP](https://img.shields.io/badge/protocol-MCP%20stdio-6C5CE7)](https://modelcontextprotocol.io)
@@ -73,7 +74,7 @@ Confira fluxos completos em [Exemplos de prompts](#-exemplos-de-prompts) e [Como
 - Serviços Web ativados no site: **protocolo REST** e serviço **`moodle_mobile_app`** habilitado para sua conta (mesma configuração exigida pelo app móvel oficial do Moodle)
 - **HTTPS** altamente recomendado — o token trafega em cada requisição (veja [Notas de segurança](#-notas-de-segurança))
 - Qualquer cliente com suporte a MCP — Claude Code, Codex, OpenCode, pi ou qualquer cliente via stdio
-- Rust 1.88+ apenas se compilar do código-fonte (binários pré-compilados não necessitam de nada)
+- Rust 1.88+ apenas para `cargo install` ou se compilar do código-fonte (binários pré-compilados não necessitam de nada)
 
 ## 📦 Instalação
 
@@ -92,6 +93,12 @@ Não é necessário instalar Rust — baixe o arquivo para a sua plataforma na [
 ```bash
 tar xzf moodle-mcp-*-aarch64-apple-darwin.tar.gz
 sudo mv moodle-mcp-*/moodle-mcp /usr/local/bin/   # ou qualquer diretório no PATH
+```
+
+### Ou instalar com cargo
+
+```bash
+cargo install moodle-mcp   # requer Rust 1.88+
 ```
 
 ### Ou compilar do código-fonte

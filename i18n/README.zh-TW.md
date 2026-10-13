@@ -18,6 +18,7 @@
 [![CI](https://github.com/G36maid/moodle-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/G36maid/moodle-mcp/actions/workflows/ci.yml)
 [![Codecov](https://img.shields.io/codecov/c/github/G36maid/moodle-mcp)](https://codecov.io/gh/G36maid/moodle-mcp)
 [![Release](https://img.shields.io/github/v/release/G36maid/moodle-mcp?include_prereleases)](https://github.com/G36maid/moodle-mcp/releases/latest)
+[![crates.io](https://img.shields.io/crates/v/moodle-mcp)](https://crates.io/crates/moodle-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](../LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.88%2B-orange.svg)](https://www.rust-lang.org)
 [![MCP](https://img.shields.io/badge/protocol-MCP%20stdio-6C5CE7)](https://modelcontextprotocol.io)
@@ -73,7 +74,7 @@ AI 代理會自行串接所需的工具鏈：課程架構 → 作業說明 → P
 - 站點端已啟用 Web Services：允許 **REST 協定** 且你的帳號獲准使用 **`moodle_mobile_app`** 服務 — 這與官方 Moodle 手機 App 使用相同設定，因此絕大多數站點早已支援
 - 強烈建議使用 **HTTPS** — 權杖會隨每次請求傳輸（詳見 [安全性說明](#-安全性說明)）
 - 任何支援 MCP 的客戶端 — Claude Code、Codex、OpenCode、pi，或任何透過 stdio 通訊的 MCP 客戶端
-- 僅在從原始碼編譯時需要 Rust 1.88+（使用預編譯二進位檔則完全不需要）
+- 僅在使用 `cargo install` 或從原始碼編譯時需要 Rust 1.88+（預編譯執行檔則完全不需要）
 
 ## 📦 安裝方式
 
@@ -92,6 +93,12 @@ AI 代理會自行串接所需的工具鏈：課程架構 → 作業說明 → P
 ```bash
 tar xzf moodle-mcp-*-aarch64-apple-darwin.tar.gz
 sudo mv moodle-mcp-*/moodle-mcp /usr/local/bin/   # 或任何在 PATH 內的目錄
+```
+
+### 或使用 cargo 安裝
+
+```bash
+cargo install moodle-mcp   # 需要 Rust 1.88+
 ```
 
 ### 或從原始碼編譯
