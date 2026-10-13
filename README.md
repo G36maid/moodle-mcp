@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/moodle-mcp-banner.svg" alt="moodle-mcp hero banner" width="100%">
+  <img src="assets/moodle-mcp-banner.png" alt="moodle-mcp hero banner" width="100%">
 </p>
 
 <p align="center">
