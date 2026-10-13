@@ -77,28 +77,19 @@ pub async fn get_forum_discussions(
 }
 
 /// `mod_forum_get_discussion_posts` — every post in a thread (opening post
-/// included), oldest first. Older Moodle versions (e.g. 3.7) reject the
-/// pagination params; on `invalidparameter` we transparently retry without
-/// them.
+/// included), oldest first. No pagination parameters are sent: older Moodle
+/// versions (e.g. 3.7) reject the limit/offset params, and threads fit in one
+/// response on the sites this tool targets.
 pub async fn get_discussion_posts(
     client: &MoodleClient,
     discussion_id: i64,
 ) -> Result<Value, MoodleError> {
-    let with_paging = json!({ "discussionid": discussion_id });
-    let v: Value = match client
-        .call("mod_forum_get_discussion_posts", &with_paging)
-        .await
-    {
-        Err(MoodleError::Api { errorcode, .. }) if errorcode == "invalidparameter" => {
-            client
-                .call(
-                    "mod_forum_get_discussion_posts",
-                    &json!({ "discussionid": discussion_id }),
-                )
-                .await?
-        }
-        other => other?,
-    };
+    let v: Value = client
+        .call(
+            "mod_forum_get_discussion_posts",
+            &json!({ "discussionid": discussion_id }),
+        )
+        .await?;
 
     let mut posts: Vec<Value> = v
         .get("posts")

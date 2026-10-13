@@ -16,6 +16,108 @@ async fn client_for(server: &MockServer) -> MoodleClient {
     .expect("client")
 }
 
+/// Any unmatched request on the mock server fails the test loudly — these
+/// tests assert both what IS sent and what is NOT.
+fn expect_no_other_calls() -> Mock {
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(500).set_body_string("UNEXPECTED CALL"))
+}
+
+/// 3.7 regression: `core_user_get_users` is enabled but rejects the `search`
+/// criteria key (added in 3.8) with `invalidparameter` — the tool must
+/// transparently retry with `core_message_message_search_users`.
+#[tokio::test]
+async fn search_users_falls_back_on_invalidparameter() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(body_string_contains("wsfunction=core_user_get_users"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "exception": "invalid_parameter_exception",
+            "errorcode": "invalidparameter",
+            "message": "Missing required key in single structure: search"
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(body_string_contains(
+            "wsfunction=core_message_message_search_users",
+        ))
+        .and(body_string_contains("searchtext=chen"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "users": [{"id": 9, "fullname": "Wang Chen", "username": "chen"}]
+        })))
+        .mount(&server)
+        .await;
+
+    let client = client_for(&server).await;
+    let out =
+        moodle_mcp::tools::users::search_users(&client, "core_user_get_users", Some("chen"), 20)
+            .await
+            .expect("fallback search");
+    assert_eq!(out["count"], json!(1));
+    assert_eq!(out["users"][0]["fullname"], json!("Wang Chen"));
+}
+
+/// An empty `text` would overwrite the online text with blank content —
+/// refused client-side, with no HTTP call made at all.
+#[tokio::test]
+async fn submit_assignment_rejects_blank_text() {
+    let server = MockServer::start().await;
+    expect_no_other_calls().mount(&server).await;
+
+    let client = client_for(&server).await;
+    let err = moodle_mcp::tools::assignments::submit_assignment(
+        &client,
+        142121,
+        Some("   "),
+        None,
+        false,
+    )
+    .await
+    .expect_err("must refuse");
+    let msg = err.to_tool_message();
+    assert!(msg.contains("refusing to overwrite"), "{msg}");
+    assert_eq!(server.received_requests().await.unwrap().len(), 0);
+}
+
+/// 3.7 regression: the grades-overview API omits `coursename` — empty names
+/// are filled from the enrolled-course roster.
+#[tokio::test]
+async fn overview_course_names_are_enriched_from_roster() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(body_string_contains("wsfunction=gradereport_overview"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "grades": [
+                {"courseid": 61716, "coursename": "", "grade": "92.00"},
+                {"courseid": 59944, "coursename": "", "grade": "88.00"}
+            ]
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(body_string_contains(
+            "wsfunction=core_enrol_get_users_courses",
+        ))
+        .and(body_string_contains("userid=44785"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+            {"id": 61716, "fullname": "資訊安全"},
+            {"id": 59944, "fullname": "軟體工程"}
+        ])))
+        .mount(&server)
+        .await;
+
+    let client = client_for(&server).await;
+    let out = moodle_mcp::tools::grades::get_grades(&client, None, 44785)
+        .await
+        .expect("overview");
+    let out = moodle_mcp::tools::grades::enrich_overview_course_names(&client, out, 44785)
+        .await
+        .expect("enrich");
+    assert_eq!(out["courses"][0]["course"], json!("資訊安全"));
+    assert_eq!(out["courses"][1]["course"], json!("軟體工程"));
+}
+
 #[tokio::test]
 async fn call_parses_success_payload() {
     let server = MockServer::start().await;

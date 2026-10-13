@@ -29,7 +29,17 @@ pub async fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
             "--service" | "-s" => service = it.next().cloned(),
             "--open" => open_browser = true,
             "--output" | "-o" => {
-                output_json = matches!(it.next().map(String::as_str), Some("json"));
+                let val = it
+                    .next()
+                    .cloned()
+                    .ok_or("missing value after --output (env|json)")?;
+                match val.as_str() {
+                    "env" => output_json = false,
+                    "json" => output_json = true,
+                    other => {
+                        return Err(format!("unknown --output '{other}' (use env|json)").into());
+                    }
+                }
             }
             other => {
                 eprintln!("moodle-mcp token: unknown argument '{other}'");

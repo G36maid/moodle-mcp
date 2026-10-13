@@ -59,9 +59,12 @@ async fn lists_all_tools_over_mcp() {
         .await
         .expect("list_tools");
     let names: Vec<&str> = tools.tools.iter().map(|t| t.name.as_ref()).collect();
-    assert!(
-        names.len() >= 21,
-        "expected >=21 tools, got {}: {names:?}",
+    // Pinned exactly: 22 tools is the design contract — additions or losses
+    // are breaking changes that must be conscious.
+    assert_eq!(
+        names.len(),
+        22,
+        "expected exactly 22 tools, got {}: {names:?}",
         names.len()
     );
     for expected in [
@@ -145,6 +148,40 @@ async fn moodle_failure_becomes_tool_error() {
         .map(|t| t.text.as_str())
         .expect("text content");
     assert!(text.contains("accesscontrolexception"));
+}
+
+#[tokio::test]
+async fn raw_call_rejects_string_params_loudly() {
+    // LLM clients sometimes serialize `params` as a JSON-encoded string. The
+    // call must fail loudly — silently flattening it would invoke the
+    // function with NO parameters.
+    let server = MockServer::start().await;
+    site_info_mock().mount(&server).await;
+
+    let mcp = spawn_server(&server).await;
+    let args = json!({
+        "wsfunction": "core_webservice_get_site_info",
+        // A string that is NOT a JSON object — must be rejected loudly.
+        // (A string CONTAINING an object is accepted and parsed.)
+        "params": "[1, 2, 3]"
+    })
+    .as_object()
+    .expect("object")
+    .clone();
+    let result = mcp
+        .peer()
+        .call_tool(CallToolRequestParams::new("call_ws_function").with_arguments(args))
+        .await
+        .expect("call_tool");
+
+    assert_eq!(result.is_error, Some(true));
+    let text = result
+        .content
+        .first()
+        .and_then(|c| c.as_text())
+        .map(|t| t.text.as_str())
+        .expect("text content");
+    assert!(text.contains("params must be a JSON object"), "{text}");
 }
 
 #[tokio::test]

@@ -270,7 +270,13 @@ Everything not covered by the 20 dedicated tools is reachable through the
 - Use **HTTPS** — the token travels with every request.
 - The token is a credential: never commit it, never send it to hosts other
   than your Moodle site (the server only injects it into same-site
-  `pluginfile.php` URLs).
+  `pluginfile.php` URLs, and redirects leaving the Moodle host are stopped).
+- The token never appears in tool output or errors: any `token=…` in a
+  rendered error message is redacted to `token=[REDACTED]`.
+- Transfers are bounded: inline fetches cap at 100 MB, streamed downloads at
+  500 MB, uploads at 100 MB. Downloads stream to disk (never buffered whole
+  in memory) and are limited by a read-timeout rather than a total timeout,
+  so large files finish while stalled connections still die.
 - Write tools act **as the token owner**. The server's instructions tell the
   agent to confirm with you before submitting or sending.
 - Quiz-taking is intentionally **not** provided.
@@ -278,7 +284,7 @@ Everything not covered by the 20 dedicated tools is reachable through the
 ## 🧰 Development
 
 ```bash
-cargo test                 # 25 tests: unit + wiremock integration + MCP protocol
+cargo test                 # 39 tests: unit + wiremock integration + MCP protocol
 cargo clippy --all-targets
 cargo fmt -- --check
 cargo build --release

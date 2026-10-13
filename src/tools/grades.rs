@@ -24,14 +24,65 @@ async fn overview(client: &MoodleClient) -> Result<Value, MoodleError> {
         .map(|g| {
             json!({
                 "course_id": g.get("courseid").cloned().unwrap_or(Value::Null),
-                "course": first_str(&g, &["coursename", "course_shortname"])
-                    .map(str::to_string).unwrap_or_default(),
-                "grade": first_str(&g, &["grade", "rawgrade"])
-                    .map(str::to_string).unwrap_or_default(),
+                "course": first_str(&g, &["coursename", "course_shortname"]),
+                "grade": first_str(&g, &["grade", "rawgrade"]),
             })
         })
         .collect();
     Ok(json!({ "mode": "overview", "count": courses.len(), "courses": courses }))
+}
+
+/// Fill in empty course names in a grades-overview result by joining with the
+/// enrolled-course list (the overview API omits `coursename` on 3.7).
+/// Best-effort: a roster failure returns the result unchanged.
+pub async fn enrich_overview_course_names(
+    client: &MoodleClient,
+    mut v: Value,
+    user_id: i64,
+) -> Result<Value, MoodleError> {
+    let Some(courses) = v.get_mut("courses").and_then(Value::as_array_mut) else {
+        return Ok(v);
+    };
+    if courses.iter().all(|c| {
+        c.get("course")
+            .and_then(Value::as_str)
+            .is_some_and(|s| !s.trim().is_empty())
+    }) {
+        return Ok(v); // nothing to fill
+    }
+    let roster: Value = client
+        .call(
+            "core_enrol_get_users_courses",
+            &json!({ "userid": user_id }),
+        )
+        .await
+        .unwrap_or(Value::Null);
+    let name_of = |id: i64| -> Option<String> {
+        roster.as_array()?.iter().find_map(|c| {
+            (c.get("id").and_then(Value::as_i64) == Some(id))
+                .then(|| {
+                    c.get("fullname")
+                        .and_then(Value::as_str)
+                        .map(str::to_string)
+                })
+                .flatten()
+        })
+    };
+    for c in courses.iter_mut() {
+        let name_empty = c
+            .get("course")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .map(str::is_empty)
+            .unwrap_or(true);
+        if name_empty
+            && let Some(id) = c.get("course_id").and_then(Value::as_i64)
+            && let Some(name) = name_of(id)
+        {
+            c["course"] = json!(name);
+        }
+    }
+    Ok(v)
 }
 
 /// Full grade items of one course via `gradereport_user_get_grade_items`.

@@ -14,20 +14,62 @@ use crate::error::{MoodleError, MoodleException};
 /// own parameters in PHP array notation).
 #[derive(Clone)]
 pub struct MoodleClient {
+    /// RPC client — total request timeout applies (API calls are small).
     http: reqwest::Client,
+    /// File-transfer client — NO total timeout (large downloads stream for
+    /// minutes); a read timeout catches stalled connections instead.
+    download_http: reqwest::Client,
     base_url: String,
     token: String,
 }
 
+/// Redirect confinement: only redirects that ORIGINATE from the Moodle site
+/// are host-locked — those carry the injected `?token=` and must never cross
+/// to a third party. Redirect chains that started on an external URL (course
+/// links → CDNs, http→https hops) may continue.
+fn redirect_policy(base_host: Option<String>) -> reqwest::redirect::Policy {
+    reqwest::redirect::Policy::custom(move |attempt| {
+        if attempt.previous().len() >= 10 {
+            return attempt.error("too many redirects");
+        }
+        let from_site = attempt
+            .previous()
+            .last()
+            .and_then(|u| u.host_str())
+            .is_some_and(|h| Some(h) == base_host.as_deref());
+        match (from_site, attempt.url().host_str()) {
+            (true, Some(h)) if Some(h) != base_host.as_deref() => attempt.stop(),
+            _ => attempt.follow(),
+        }
+    })
+}
+
 impl MoodleClient {
     pub fn new(cfg: Config) -> Result<Self, MoodleError> {
+        let base = url::Url::parse(&cfg.base_url)
+            .map_err(|e| MoodleError::Config(format!("invalid MOODLE_URL: {e}")))?;
+        let base_host = base.host_str().map(str::to_string);
+        let ua = concat!("moodle-mcp/", env!("CARGO_PKG_VERSION"));
         let http = reqwest::Client::builder()
             .timeout(Duration::from_secs(cfg.timeout_secs))
-            .user_agent(concat!("moodle-mcp/", env!("CARGO_PKG_VERSION")))
+            .redirect(redirect_policy(base_host.clone()))
+            .user_agent(ua)
+            .build()
+            .map_err(|e| MoodleError::Config(format!("failed to build HTTP client: {e}")))?;
+        // File transfers: the total timeout above would abort any large
+        // download mid-stream. Instead bound only connection setup and the
+        // gap between reads, so stalled links still die but slow big files
+        // finish.
+        let download_http = reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(30))
+            .read_timeout(Duration::from_secs(cfg.timeout_secs.max(60)))
+            .redirect(redirect_policy(base_host))
+            .user_agent(ua)
             .build()
             .map_err(|e| MoodleError::Config(format!("failed to build HTTP client: {e}")))?;
         Ok(Self {
             http,
+            download_http,
             base_url: cfg.base_url,
             token: cfg.token,
         })
@@ -149,7 +191,11 @@ impl MoodleClient {
     /// token is never sent to third parties (SSRF/leak protection).
     pub async fn download_file(&self, file_url: &str) -> Result<reqwest::Response, MoodleError> {
         let url = self.prepare_download_url(file_url)?;
-        self.http.get(url).send().await.map_err(MoodleError::from)
+        self.download_http
+            .get(url)
+            .send()
+            .await
+            .map_err(MoodleError::from)
     }
 
     /// Build the final download URL: same-site `pluginfile.php` URLs get the

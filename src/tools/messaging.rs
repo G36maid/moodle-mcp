@@ -22,6 +22,7 @@ pub async fn get_notifications(
     limit: u32,
 ) -> Result<Value, MoodleError> {
     let legacy = wsfunction == "core_message_get_messages";
+    let popup = wsfunction == "message_popup_get_popup_notifications";
     let mut params = json!({ "useridto": user_id, "limitnum": limit.max(1) });
     if legacy {
         params["type"] = json!("notifications");
@@ -29,6 +30,9 @@ pub async fn get_notifications(
         if let Some(r) = read {
             params["read"] = json!(if r { 1 } else { 0 });
         }
+    } else if popup {
+        // message_popup_get_popup_notifications accepts neither `read` nor
+        // `newestfirst`; extra params would be rejected with invalidparameter.
     } else {
         params["newestfirst"] = json!(true);
         if let Some(r) = read {
@@ -40,6 +44,7 @@ pub async fn get_notifications(
     let items: Vec<Value> = v
         .get("list")
         .or_else(|| v.get("messages"))
+        .or_else(|| v.get("notifications"))
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default()

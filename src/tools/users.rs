@@ -45,27 +45,28 @@ pub async fn get_user_by_field(
 /// `core_user_get_users` (needs user-listing capability) or
 /// `core_message_message_search_users` (3.x mobile service). Both may be
 /// permission-denied for students — the tool error says so plainly.
+///
+/// 3.7 regression guard: `core_user_get_users` is often *enabled* on 3.7 but
+/// rejects the `search` criteria key (added in 3.8) with `invalidparameter`.
+/// On that error we transparently retry with `core_message_message_search_users`
+/// (available since 3.2 in the mobile service) instead of reporting a
+/// misleading permission problem.
 pub async fn search_users(
     client: &MoodleClient,
     wsfunction: &str,
     search: Option<&str>,
     limit: u32,
 ) -> Result<Value, MoodleError> {
-    let params = if wsfunction == "core_user_get_users" {
-        let criteria = match search {
-            Some(q) => json!([{ "key": "search", "value": q }]),
-            None => json!([]),
-        };
-        json!({ "criteria": criteria, "limitnum": limit })
-    } else {
-        let mut p = json!({});
-        if let Some(q) = search {
-            p["searchtext"] = json!(q);
+    let v = search_call(client, wsfunction, search, limit).await;
+    let v = match v {
+        Err(MoodleError::Api { ref errorcode, .. })
+            if errorcode == "invalidparameter" && wsfunction == "core_user_get_users" =>
+        {
+            search_call(client, "core_message_message_search_users", search, limit).await
         }
-        p["limitnum"] = json!(limit);
-        p
+        other => other,
     };
-    let v: Value = client.call(wsfunction, &params).await.map_err(|e| {
+    let v: Value = v.map_err(|e| {
         MoodleError::Config(format!(
             "user search is unavailable for this account ({e}). Use known ids from \
              conversations, notifications or forum posts with get_user instead."
@@ -87,4 +88,28 @@ pub async fn search_users(
         })
         .collect();
     Ok(json!({ "count": users.len(), "users": users }))
+}
+
+/// One search attempt against a specific WS function.
+async fn search_call(
+    client: &MoodleClient,
+    wsfunction: &str,
+    search: Option<&str>,
+    limit: u32,
+) -> Result<Value, MoodleError> {
+    let params = if wsfunction == "core_user_get_users" {
+        let criteria = match search {
+            Some(q) => json!([{ "key": "search", "value": q }]),
+            None => json!([]),
+        };
+        json!({ "criteria": criteria, "limitnum": limit })
+    } else {
+        let mut p = json!({});
+        if let Some(q) = search {
+            p["searchtext"] = json!(q);
+        }
+        p["limitnum"] = json!(limit);
+        p
+    };
+    client.call(wsfunction, &params).await
 }

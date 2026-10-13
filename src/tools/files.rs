@@ -15,6 +15,10 @@ const MAX_FETCH_CHARS: usize = 100_000;
 const MAX_FETCH_INPUT_BYTES: u64 = 100_000_000; // 100 MB
 /// Hard cap for streamed downloads (protects memory and disk).
 const MAX_DOWNLOAD_BYTES: u64 = 500_000_000; // 500 MB
+/// Upload cap: Moodle sites cap uploads far below this (default ~8–50 MB);
+/// the check avoids buffering an absurd file into RAM before the server
+/// would reject it anyway.
+const MAX_UPLOAD_BYTES: u64 = 100_000_000; // 100 MB
 /// Fetch a Moodle file and return its content as **markdown** for the agent
 /// to read. PDF/DOCX/PPTX/XLSX/ODT/RTF/EPUB/CSV are converted with anydoc;
 /// plain text passes through; anything else (zip, images…) cannot be
@@ -40,16 +44,17 @@ pub async fn fetch_file(client: &MoodleClient, url: &str) -> Result<Value, Moodl
         )));
     }
     // Size guard BEFORE buffering: reject anything the declared size says is
-    // too big. Chunked/unknown lengths are re-checked by the inline cap below.
+    // too big. Unknown/chunked lengths are enforced mid-stream by read_capped
+    // below (a missing Content-Length must not become a full in-RAM buffer).
     if let Some(len) = resp.content_length()
         && len > MAX_FETCH_INPUT_BYTES
     {
         return Err(MoodleError::InvalidBody(format!(
             "file is {len} bytes — too large to fetch inline (limit {MAX_FETCH_INPUT_BYTES}); \
-                 use download_file to save it to disk instead"
+             use download_file to save it to disk instead"
         )));
     }
-    let bytes = resp.bytes().await.map_err(MoodleError::from)?;
+    let bytes = read_capped(resp, MAX_FETCH_INPUT_BYTES).await?;
     let size = bytes.len();
 
     // Documents → markdown via anydoc. Errors are transparent (encrypted /
@@ -74,36 +79,46 @@ pub async fn fetch_file(client: &MoodleClient, url: &str) -> Result<Value, Moodl
             crate::util::unique_item_id(),
             ext
         );
-        std::fs::write(&tmp, &bytes)
-            .map_err(|e| MoodleError::Config(format!("failed to buffer download: {e}")))?;
-        let result = anydoc::to_markdown(&tmp);
-        let _ = std::fs::remove_file(&tmp);
-        match result {
-            Ok(md) => {
-                let total = md.chars().count();
-                let text = if total > MAX_FETCH_CHARS {
-                    let head: String = md.chars().take(MAX_FETCH_CHARS).collect();
-                    format!(
-                        "{head}\n\n…[truncated: {MAX_FETCH_CHARS} of {total} chars — use download_file to save the full document]"
-                    )
-                } else {
-                    md
-                };
-                return Ok(json!({
-                    "url": url,
-                    "content_type": content_type,
-                    "size_bytes": size,
-                    "format": ext,
-                    "chars": text.chars().count(),
-                    "markdown": text,
-                }));
+        // Conversion (write + anydoc + cleanup) is synchronous — run it on
+        // the blocking pool so it never stalls the async workers.
+        let conv = tokio::task::spawn_blocking({
+            let bytes = bytes.clone();
+            let tmp = tmp.clone();
+            move || -> Result<String, MoodleError> {
+                let out = (|| -> Result<String, MoodleError> {
+                    std::fs::write(&tmp, &bytes).map_err(|e| {
+                        MoodleError::Config(format!("failed to buffer download: {e}"))
+                    })?;
+                    anydoc::to_markdown(&tmp).map_err(|e| {
+                        MoodleError::InvalidBody(format!(
+                            "document conversion failed ({e}) — use download_file to save the original"
+                        ))
+                    })
+                })();
+                let _ = std::fs::remove_file(&tmp);
+                out
             }
-            Err(e) => {
-                return Err(MoodleError::InvalidBody(format!(
-                    "document conversion failed ({e}) — use download_file to save the original"
-                )));
-            }
-        }
+        })
+        .await
+        .map_err(|e| MoodleError::Config(format!("conversion task failed: {e}")))??;
+        let md = conv;
+        let total = md.chars().count();
+        let text = if total > MAX_FETCH_CHARS {
+            let head: String = md.chars().take(MAX_FETCH_CHARS).collect();
+            format!(
+                "{head}\n\n…[truncated: {MAX_FETCH_CHARS} of {total} chars — use download_file to save the full document]"
+            )
+        } else {
+            md
+        };
+        return Ok(json!({
+            "url": url,
+            "content_type": content_type,
+            "size_bytes": size,
+            "format": ext,
+            "chars": text.chars().count(),
+            "markdown": text,
+        }));
     }
 
     // Plain text (or decodable small payloads) → inline.
@@ -228,6 +243,17 @@ pub async fn upload_file_from_path(
     filename: Option<&str>,
     item_id: i64,
 ) -> Result<Value, MoodleError> {
+    let meta = tokio::fs::metadata(path)
+        .await
+        .map_err(|e| MoodleError::Config(format!("failed to stat {path}: {e}")))?;
+    if meta.len() > MAX_UPLOAD_BYTES {
+        return Err(MoodleError::Config(format!(
+            "{path} is {} bytes — over the {}-byte upload limit (Moodle sites cap uploads \
+             far below this anyway)",
+            meta.len(),
+            MAX_UPLOAD_BYTES
+        )));
+    }
     let bytes = tokio::fs::read(path)
         .await
         .map_err(|e| MoodleError::Config(format!("failed to read {path}: {e}")))?;
@@ -243,4 +269,59 @@ fn basename(path: &str) -> String {
         .and_then(|s| s.to_str())
         .unwrap_or(path)
         .to_string()
+}
+
+/// Read the response body up to `cap` bytes. Streams with `chunk()` so that
+/// oversized payloads with no (or lying) Content-Length are rejected
+/// mid-transfer instead of being buffered whole into memory.
+async fn read_capped(mut resp: reqwest::Response, cap: u64) -> Result<Vec<u8>, MoodleError> {
+    let mut buf: Vec<u8> = Vec::new();
+    let mut remaining = cap;
+    while let Some(chunk) = resp.chunk().await.map_err(MoodleError::from)? {
+        if chunk.len() as u64 > remaining {
+            return Err(MoodleError::InvalidBody(format!(
+                "file exceeds the {cap}-byte inline fetch limit — use download_file \
+                 to save it to disk instead"
+            )));
+        }
+        remaining -= chunk.len() as u64;
+        buf.extend_from_slice(&chunk);
+    }
+    Ok(buf)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    use crate::config::Config;
+
+    #[tokio::test]
+    async fn read_capped_rejects_oversized_stream() {
+        // No Content-Length declared — only the mid-stream cap can stop it.
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/big.bin"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_string("x".repeat(5000))
+                    .insert_header("transfer-encoding", "chunked"),
+            )
+            .mount(&server)
+            .await;
+        let client = MoodleClient::new(Config {
+            base_url: server.uri(),
+            token: "t".into(),
+            timeout_secs: 10,
+        })
+        .unwrap();
+        let resp = client
+            .download_file(&format!("{}/big.bin", server.uri()))
+            .await
+            .unwrap();
+        let err = read_capped(resp, 100).await.expect_err("must reject");
+        assert!(err.to_string().contains("100"), "{err:?}");
+    }
 }

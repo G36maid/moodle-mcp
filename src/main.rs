@@ -38,16 +38,16 @@ fn load_config() -> Config {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
 
-    // Subcommand dispatch. `token` is the only one; anything else (or nothing)
-    // is the MCP server.
+    // Subcommand dispatch. `token` is the only real subcommand; `serve` (and
+    // nothing at all) runs the MCP server over stdio.
     match args.next().as_deref() {
         Some("token") => return moodle_mcp::token::run(&args.collect::<Vec<_>>()).await,
+        Some("serve") | None => {}
         Some(other) => {
             eprintln!("moodle-mcp: unknown subcommand '{other}'");
             eprintln!("usage: moodle-mcp [serve] | moodle-mcp token --url <site> ...");
             std::process::exit(2);
         }
-        _ => {}
     }
 
     init_tracing();

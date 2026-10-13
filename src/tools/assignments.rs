@@ -115,11 +115,8 @@ pub async fn get_assignment(
         ));
     };
     // A null submission is a legitimate state (never submitted yet) — rendered
-    // as "not submitted", NOT an error.
-    let _graded = matches!(
-        gradingstatus.as_str(),
-        Some("graded") | Some("graded_followup_submitted") | Some("graded_followup_edit")
-    );
+    // as "not submitted", NOT an error. The upstream `gradingstatus` is
+    // exposed verbatim in the structured output.
 
     // --- submission ---
     let mut sub_files: Vec<Value> = Vec::new();
@@ -207,7 +204,12 @@ pub async fn get_assignment(
         .get("attemptnumber")
         .cloned()
         .unwrap_or(Value::Null);
-    let prev_count = 0; // 3.7 的 submission_status 不含 previousattempts
+    // Modern shapes carry `previousattempts` at the top level; 3.7's
+    // submission_status omits it entirely.
+    let prev_count = status
+        .get("previousattempts")
+        .and_then(Value::as_array)
+        .map_or(0, |a| a.len());
 
     // --- structured ---
     let structured = json!({
@@ -232,6 +234,7 @@ pub async fn get_assignment(
             "files": sub_files,
         },
         "graded": graded,
+        "grading_status": gradingstatus,
         "grade": grade,
         "feedback_comment": fb_comment,
         "feedback_files": fb_files,
@@ -332,6 +335,15 @@ pub async fn submit_assignment(
     if text.is_none() && item_id.is_none() {
         return Err(MoodleError::Config(
             "provide text (online text) and/or item_id (draft files) to submit".into(),
+        ));
+    }
+    if let Some(t) = text
+        && t.trim().is_empty()
+    {
+        return Err(MoodleError::Config(
+            "text is empty — refusing to overwrite the online text with blank content \
+             (pass real content, or use item_id only for file submissions)"
+                .into(),
         ));
     }
     let mut plugindata = json!({});

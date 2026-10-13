@@ -1,4 +1,4 @@
-//! MCP tool surface — 22 tools, per docs/design-decisions.md.
+//! MCP tool surface — 22 tools.
 //!
 //! All `#[tool]` methods live in the single `#[tool_router]` impl block
 //! required by rmcp; business logic lives in the per-domain modules.
@@ -233,27 +233,36 @@ pub struct ListFunctionsParams {
     query: String,
 }
 
-/// The MCP server: 22 tools for a student's Moodle, per docs/design-decisions.md.
+/// Cache entries expire after this long: enrollment changes and function
+/// toggles made during a session become visible without restarting.
+const CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(600);
+
+/// A cached value with its fill time (see [`CACHE_TTL`]).
+type Cached<T> = Arc<RwLock<Option<(std::time::Instant, T)>>>;
+
+/// The MCP server: 22 tools for a student's Moodle.
 #[derive(Clone)]
 pub struct MoodleMcp {
     client: Arc<MoodleClient>,
-    site_cache: Arc<RwLock<Option<Value>>>,
-    courses_cache: Arc<RwLock<Option<Vec<i64>>>>,
+    site_cache: Cached<Value>,
+    courses_cache: Cached<Vec<i64>>,
     tool_router: ToolRouter<Self>,
 }
 
 impl MoodleMcp {
     /// Cached `core_webservice_get_site_info` payload (identity, functions,
-    /// release — the bootstrap record).
+    /// release — the bootstrap record), refreshed every 10 minutes.
     async fn site_info_cached(&self) -> Result<Value, MoodleError> {
-        if let Some(hit) = self.site_cache.read().await.clone() {
+        if let Some((at, hit)) = self.site_cache.read().await.clone()
+            && at.elapsed() < CACHE_TTL
+        {
             return Ok(hit);
         }
         let info: Value = self
             .client
             .call("core_webservice_get_site_info", &json!({}))
             .await?;
-        *self.site_cache.write().await = Some(info.clone());
+        *self.site_cache.write().await = Some((std::time::Instant::now(), info.clone()));
         Ok(info)
     }
 
@@ -306,9 +315,11 @@ impl MoodleMcp {
             })
     }
 
-    /// The token owner's enrolled course ids (cached).
+    /// The token owner's enrolled course ids (cached, 10-minute TTL).
     async fn enrolled_course_ids(&self) -> Result<Vec<i64>, MoodleError> {
-        if let Some(hit) = self.courses_cache.read().await.clone() {
+        if let Some((at, hit)) = self.courses_cache.read().await.clone()
+            && at.elapsed() < CACHE_TTL
+        {
             return Ok(hit);
         }
         let user_id = self.current_user_id().await?;
@@ -326,7 +337,7 @@ impl MoodleMcp {
             .into_iter()
             .filter_map(|c| c.get("id").and_then(Value::as_i64))
             .collect();
-        *self.courses_cache.write().await = Some(ids.clone());
+        *self.courses_cache.write().await = Some((std::time::Instant::now(), ids.clone()));
         Ok(ids)
     }
 }
@@ -487,10 +498,19 @@ impl MoodleMcp {
         &self,
         Parameters(p): Parameters<GradesParams>,
     ) -> Result<CallToolResult, McpError> {
-        finish(match self.current_user_id().await {
+        let res = match self.current_user_id().await {
             Ok(uid) => grades::get_grades(&self.client, p.course_id, uid).await,
             Err(e) => Err(e),
-        })
+        };
+        // 3.7's overview API omits course names — fill them from the roster.
+        let res = match res {
+            Ok(v) if v.get("mode") == Some(&json!("overview")) => {
+                let uid = self.current_user_id().await.unwrap_or(0);
+                grades::enrich_overview_course_names(&self.client, v, uid).await
+            }
+            other => other,
+        };
+        finish(res)
     }
 
     // ---------- schedule ----------
@@ -540,6 +560,9 @@ impl MoodleMcp {
             .pick_function(&[
                 "core_message_get_notifications",
                 "core_message_get_messages",
+                // Last resort only (different response shape; handled via
+                // the `notifications` key below) — keeps verified paths first.
+                "message_popup_get_popup_notifications",
             ])
             .await;
         let res = match wsfunction {
@@ -686,7 +709,24 @@ impl MoodleMcp {
         Parameters(p): Parameters<RawCallParams>,
     ) -> Result<CallToolResult, McpError> {
         let allowed = self.allowed_functions().await;
-        let params = p.params.unwrap_or_else(|| serde_json::json!({}));
+        // LLM clients sometimes serialize `params` as a JSON-encoded string.
+        // Accept both an object and a string containing a JSON object, but
+        // fail loudly (never silently {}) so a malformed call cannot invoke
+        // the function with unintended defaults.
+        let params = match p.params {
+            Some(Value::String(s)) => match serde_json::from_str::<Value>(&s) {
+                Ok(v) if v.is_object() => v,
+                Ok(_) | Err(_) => {
+                    return Ok(crate::error::moodle_to_tool_result(MoodleError::Config(
+                        "params must be a JSON object (or a string containing one) — \
+                         fix the arguments and retry"
+                            .into(),
+                    )));
+                }
+            },
+            Some(v) => v,
+            None => serde_json::json!({}),
+        };
         finish(raw::call_ws_function(&self.client, &p.wsfunction, &params, &allowed).await)
     }
 

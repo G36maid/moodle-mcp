@@ -86,13 +86,14 @@ pub fn unique_item_id() -> i64 {
     now_unix() * 1_000 + (nanos % 1_000)
 }
 
-/// Truncate a string to `max` characters, appending an ellipsis marker.
+/// Truncate a string to `max` characters, appending a neutral marker.
+/// Callers that have a dedicated "full content" tool add their own pointer.
 pub fn truncate_chars(s: &str, max: usize) -> String {
     if s.chars().count() <= max {
         return s.to_string();
     }
     let cut: String = s.chars().take(max).collect();
-    format!("{cut}… [truncated — see get_discussion_posts for the full content]")
+    format!("{cut}… [truncated]")
 }
 
 /// Fetch a value from nested JSON by a `a.b.c`-style path (objects only).
@@ -170,7 +171,7 @@ mod tests {
         assert_eq!(truncate_chars("abc", 10), "abc");
         let t = truncate_chars("abcdef", 3);
         assert!(t.starts_with("abc"));
-        assert!(t.contains("truncated"));
+        assert!(t.ends_with("[truncated]"));
     }
 
     #[test]

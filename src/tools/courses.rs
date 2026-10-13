@@ -328,10 +328,13 @@ pub async fn get_course_overview(
                 } else {
                     "link"
                 };
+                let size = c["filesize"]
+                    .as_i64()
+                    .map(|n| n.to_string())
+                    .unwrap_or_else(|| "?".into());
                 md.push_str(&format!(
-                    "    - {kind}: {} ({} bytes) — {}\n",
+                    "    - {kind}: {} ({size} bytes) — {}\n",
                     c["filename"].as_str().unwrap_or("?"),
-                    c["filesize"],
                     c["fileurl"].as_str().unwrap_or("no url"),
                 ));
             }
