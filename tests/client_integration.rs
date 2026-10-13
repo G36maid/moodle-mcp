@@ -66,15 +66,10 @@ async fn submit_assignment_rejects_blank_text() {
     expect_no_other_calls().mount(&server).await;
 
     let client = client_for(&server).await;
-    let err = moodle_mcp::tools::assignments::submit_assignment(
-        &client,
-        142121,
-        Some("   "),
-        None,
-        false,
-    )
-    .await
-    .expect_err("must refuse");
+    let err =
+        moodle_mcp::tools::assignments::submit_assignment(&client, 1002, Some("   "), None, false)
+            .await
+            .expect_err("must refuse");
     let msg = err.to_tool_message();
     assert!(msg.contains("refusing to overwrite"), "{msg}");
     assert_eq!(server.received_requests().await.unwrap().len(), 0);
@@ -89,8 +84,8 @@ async fn overview_course_names_are_enriched_from_roster() {
         .and(body_string_contains("wsfunction=gradereport_overview"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
             "grades": [
-                {"courseid": 61716, "coursename": "", "grade": "92.00"},
-                {"courseid": 59944, "coursename": "", "grade": "88.00"}
+                {"courseid": 101, "coursename": "", "grade": "92.00"},
+                {"courseid": 102, "coursename": "", "grade": "88.00"}
             ]
         })))
         .mount(&server)
@@ -99,23 +94,23 @@ async fn overview_course_names_are_enriched_from_roster() {
         .and(body_string_contains(
             "wsfunction=core_enrol_get_users_courses",
         ))
-        .and(body_string_contains("userid=44785"))
+        .and(body_string_contains("userid=42"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!([
-            {"id": 61716, "fullname": "資訊安全"},
-            {"id": 59944, "fullname": "軟體工程"}
+            {"id": 101, "fullname": "Course One"},
+            {"id": 102, "fullname": "Course Two"}
         ])))
         .mount(&server)
         .await;
 
     let client = client_for(&server).await;
-    let out = moodle_mcp::tools::grades::get_grades(&client, None, 44785)
+    let out = moodle_mcp::tools::grades::get_grades(&client, None, 42)
         .await
         .expect("overview");
-    let out = moodle_mcp::tools::grades::enrich_overview_course_names(&client, out, 44785)
+    let out = moodle_mcp::tools::grades::enrich_overview_course_names(&client, out, 42)
         .await
         .expect("enrich");
-    assert_eq!(out["courses"][0]["course"], json!("資訊安全"));
-    assert_eq!(out["courses"][1]["course"], json!("軟體工程"));
+    assert_eq!(out["courses"][0]["course"], json!("Course One"));
+    assert_eq!(out["courses"][1]["course"], json!("Course Two"));
 }
 
 #[tokio::test]
@@ -241,12 +236,13 @@ async fn download_injects_token_into_pluginfile_url() {
     assert_eq!(resp.bytes().await.expect("bytes"), "hello file");
 }
 
-// ---- 回歸測試:真實 NTNU 3.7 發現的問題 ----
+// ---- Regression tests: issues found on a live 3.7 site ----
 
 #[tokio::test]
 async fn exception_without_errorcode_is_still_detected() {
-    // NTNU 實測:mod_forum_get_discussion_posts 對某些討論串回
-    // {exception: "Error", message: "..."} —— 沒有 errorcode 欄位。
+    // Live 3.7 finding: mod_forum_get_discussion_posts returns
+    // {exception: "Error", message: "…"} for some discussions — with NO
+    // errorcode field at all.
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
@@ -267,46 +263,48 @@ async fn exception_without_errorcode_is_still_detected() {
     assert!(matches!(err, MoodleError::Api { .. }), "got: {err}");
 }
 
-// ---- 回歸測試:pi e2e 發現的問題 ----
+// ---- Regression tests: issues found by agent e2e testing ----
 
 #[tokio::test]
 async fn schedule_sends_course_ids_and_time_window() {
-    // pi e2e 發現:get_schedule 曾忽略 course_ids(混入他課事件)。
-    // 3.7 的巢狀參數必須是 events[courseids] + options[timestart/timeend]。
+    // e2e finding: get_schedule used to ignore course_ids (events from other
+    // courses leaked in). 3.7 needs the nested params events[courseids] +
+    // options[timestart/timeend].
     let server = MockServer::start().await;
     Mock::given(method("POST"))
-        .and(body_string_contains("events%5Bcourseids%5D%5B0%5D=59944"))
+        .and(body_string_contains("events%5Bcourseids%5D%5B0%5D=102"))
         .and(body_string_contains("options%5Btimestart%5D="))
         .and(body_string_contains("options%5Btimeend%5D="))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
             "events": [
                 {"id": 1, "name": "HW due", "timestart": 1790000000,
-                 "eventtype": "due", "modulename": "assign", "courseid": 59944}
+                 "eventtype": "due", "modulename": "assign", "courseid": 102}
             ]
         })))
         .mount(&server)
         .await;
 
     let client = client_for(&server).await;
-    let (out, hints) = moodle_mcp::tools::schedule::get_schedule(&client, &[59944], None, None)
+    let (out, hints) = moodle_mcp::tools::schedule::get_schedule(&client, &[102], None, None)
         .await
         .expect("schedule");
     assert_eq!(out["count"], json!(1));
-    assert_eq!(out["schedule"][0]["course_id"], json!(59944));
+    assert_eq!(out["schedule"][0]["course_id"], json!(102));
     assert!(hints.is_empty());
 }
 
 #[tokio::test]
 async fn grades_always_send_own_userid_3_7_regression() {
-    // pi e2e 發現:3.7 的 gradereport_user_get_grade_items 不帶 userid 會走
-    // 「所有用戶」路徑 → required_capability_exception。必須永遠帶 userid。
+    // e2e finding: on 3.7, gradereport_user_get_grade_items without userid
+    // takes the all-users path → required_capability_exception. The caller's
+    // own userid must ALWAYS be sent.
     let server = MockServer::start().await;
     Mock::given(method("POST"))
-        .and(body_string_contains("userid=44785"))
-        .and(body_string_contains("courseid=61716"))
+        .and(body_string_contains("userid=42"))
+        .and(body_string_contains("courseid=101"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
             "usergrades": [{
-                "courseid": 61716,
+                "courseid": 101,
                 "gradeitems": [
                     {"itemname": "Lab01", "gradeformatted": "100.00",
                      "grademaxformatted": "100.00"}
@@ -317,7 +315,7 @@ async fn grades_always_send_own_userid_3_7_regression() {
         .await;
 
     let client = client_for(&server).await;
-    let out = moodle_mcp::tools::grades::get_grades(&client, Some(61716), 44785)
+    let out = moodle_mcp::tools::grades::get_grades(&client, Some(101), 42)
         .await
         .expect("grades");
     assert_eq!(out["items"][0]["grade"], json!("100.00"));
@@ -325,17 +323,18 @@ async fn grades_always_send_own_userid_3_7_regression() {
 
 #[tokio::test]
 async fn null_submission_renders_as_not_submitted() {
-    // pi e2e 發現:從未提交的作業(submission 與 feedback 皆 null)曾誤報
-    // "empty submission status" —— 合法狀態,應渲染為 not submitted。
+    // e2e finding: a never-submitted assignment (submission AND feedback
+    // both null) used to be misreported as "empty submission status" — it
+    // is a legitimate state and must render as not submitted.
     let server = MockServer::start().await;
-    // 廣泛的 mock:任何 mod_assign 呼叫都回對應形狀
+    // Broad mocks: any mod_assign call returns the matching shape.
     Mock::given(method("POST"))
         .and(body_string_contains(
             "wsfunction=mod_assign_get_assignments",
         ))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-            "courses": [{"id": 61716, "fullname": "課程", "assignments": [
-                {"id": 144948, "cmid": 1, "name": "HW", "submissiondraft": 0}
+            "courses": [{"id": 101, "fullname": "Demo Course", "assignments": [
+                {"id": 1001, "cmid": 1, "name": "HW", "submissiondraft": 0}
             ]}]
         })))
         .mount(&server)
@@ -356,7 +355,7 @@ async fn null_submission_renders_as_not_submitted() {
         .await;
 
     let client = client_for(&server).await;
-    let (md, structured) = moodle_mcp::tools::assignments::get_assignment(&client, 144948)
+    let (md, structured) = moodle_mcp::tools::assignments::get_assignment(&client, 1001)
         .await
         .expect("get_assignment");
     assert!(md.contains("**Submission**: no submission yet"), "{md}");

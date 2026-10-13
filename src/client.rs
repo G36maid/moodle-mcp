@@ -315,13 +315,13 @@ mod tests {
         })
         .unwrap();
 
-        // 同站 pluginfile:注入 token
+        // Same-site pluginfile URL: token injected.
         let u = client
             .prepare_download_url("https://moodle.example.com/webservice/pluginfile.php/1/f.pdf")
             .unwrap();
         assert!(u.query_pairs().any(|(k, v)| k == "token" && v == "secret"));
 
-        // 已帶 token:不重複
+        // Token already present: never duplicated.
         let u = client
             .prepare_download_url(
                 "https://moodle.example.com/webservice/pluginfile.php/1/f.pdf?token=other",
@@ -329,13 +329,14 @@ mod tests {
             .unwrap();
         assert_eq!(u.query_pairs().filter(|(k, _)| k == "token").count(), 1);
 
-        // 外部主機:即使路徑含 pluginfile.php 也不注入(token 外洩防護)
+        // External host: never inject, even if the path contains
+        // pluginfile.php (token-leak protection).
         let u = client
             .prepare_download_url("https://evil.example.com/pluginfile.php/1/f.pdf")
             .unwrap();
         assert!(!u.query_pairs().any(|(k, _)| k == "token"));
 
-        // 非本站路徑:不注入
+        // Off-site path: never inject.
         let u = client
             .prepare_download_url("https://cdn.example.com/files/f.pdf")
             .unwrap();

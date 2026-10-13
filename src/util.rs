@@ -2,7 +2,8 @@
 
 use serde_json::Value;
 
-/// Convert Moodle's HTML fragments (課程描述、論壇訊息、通知內文…) to markdown.
+/// Convert Moodle's HTML fragments (course descriptions, forum posts,
+/// notification bodies…) to markdown.
 ///
 /// Uses `htmd` (turndown.js-inspired; preserves tables, lists and links).
 /// Falls back to a minimal internal cleaner if the converter rejects the
@@ -154,7 +155,8 @@ mod tests {
 
     #[test]
     fn html_double_encoded_and_nbsp() {
-        // NTNU 42593 實測:label 來源為雙重編碼(&amp;nbsp;)且 htmd 輸出 U+00A0
+        // 3.7 live finding: label fields are double-encoded (&amp;nbsp;)
+        // and htmd emits U+00A0 for &nbsp;.
         let md = html_to_markdown("Group 2 :&amp;nbsp;electricity");
         assert!(!md.contains("&nbsp;"), "{md}");
         assert!(!md.contains("&amp;"), "{md}");

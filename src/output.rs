@@ -121,9 +121,10 @@ mod tests {
 
     #[test]
     fn non_object_results_are_wrapped_for_mcp() {
-        // MCP 規範:structuredContent 必須是物件。逃生口的原樣陣列/純量
-        // (NTNU 實測:userid=-1 回 [])要包進 {"result": ...},否則 client
-        // 會拒絕("Invalid MCP tools/call structured content")。
+        // MCP requires structuredContent to be an object. Raw arrays/scalars
+        // from the escape hatch (live finding: userid=-1 returns []) must be
+        // wrapped in {"result": …}, or clients reject the response with
+        // "Invalid MCP tools/call structured content".
         let out = finish_json(json!([1, 2])).unwrap();
         let sc = out.structured_content.unwrap();
         assert_eq!(sc["result"], json!([1, 2]));
