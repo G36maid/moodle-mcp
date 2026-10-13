@@ -36,7 +36,6 @@
 - ❌ 仅仅为了确认“这周有哪些截止日期？”，就得开 5 个浏览器标签页
 - ❌ 手动下载作业 PDF，再拖拽上传到对话窗口
 - ❌ 一页一页手动复制粘贴讨论区帖子和成绩
-- ❌ 询问关于*你自己的*课程问题时模型只能凭空猜测 — 因为它看不到任何实际内容
 
 ## ✅ 使用 moodle-mcp 后
 
@@ -109,15 +108,19 @@ cargo build --release
 使用内置 CLI 命令（同一二进制文件）：
 
 ```bash
-moodle-mcp token --url https://moodle.example.com --username yourname
-# Password: (密码输入不回显)
+moodle-mcp auth
+# Moodle URL (e.g. https://moodle.example.com): https://moodle.example.com
+# Username: yourname
+# Password: ********   （输入时以 * 遮蔽）
 # → export MOODLE_URL='https://moodle.example.com' MOODLE_TOKEN='…'
 ```
+
+通过参数（`--url`、`--username`、`--password`）传入的值会跳过对应的提示，因此脚本也能以非交互方式运行。
 
 若学校使用 SSO 单点登录（无账号密码），可在浏览器中直接打开安全密钥页面：
 
 ```bash
-moodle-mcp token --url https://moodle.example.com --open
+moodle-mcp auth --url https://moodle.example.com --open
 ```
 
 若获取 Token 失败，表明站点缺少 [环境要求](#-环境要求) 中的权限 — 请联系管理员开启 Web Services。

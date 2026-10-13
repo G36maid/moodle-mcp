@@ -36,7 +36,6 @@
 - ❌ 只是為了知道「這週有什麼截止日期？」，就得開五個瀏覽器分頁
 - ❌ 手動下載作業 PDF，再拖曳上傳到對話視窗
 - ❌ 一頁一頁手動複製貼上討論區討論串與成績
-- ❌ 詢問*你的*課程相關問題時模型只能憑空猜測 — 因為它根本無法查閱任何實際內容
 
 ## ✅ 使用 moodle-mcp 後
 
@@ -109,15 +108,19 @@ cargo build --release
 使用內建的 CLI 工具（相同執行檔）：
 
 ```bash
-moodle-mcp token --url https://moodle.example.com --username yourname
-# Password: (密碼輸入不顯示)
+moodle-mcp auth
+# Moodle URL (e.g. https://moodle.example.com): https://moodle.example.com
+# Username: yourname
+# Password: ********   （輸入時以 * 遮蔽）
 # → export MOODLE_URL='https://moodle.example.com' MOODLE_TOKEN='…'
 ```
+
+以參數（`--url`、`--username`、`--password`）傳入的值會跳過對應的提示，因此腳本也能以非互動方式運行。
 
 若學校使用 SSO 單一登入（無純文字密碼），改在瀏覽器中開啟安全性金鑰頁面：
 
 ```bash
-moodle-mcp token --url https://moodle.example.com --open
+moodle-mcp auth --url https://moodle.example.com --open
 ```
 
 若權杖取得失敗，表示站點缺少 [需求條件](#-需求條件) 中的設定 — 請洽詢學校管理員啟用 Web Services。

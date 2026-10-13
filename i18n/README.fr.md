@@ -36,7 +36,6 @@ Un chatbot ordinaire ne dispose d'aucun accès à votre Moodle, ce qui oblige à
 - ❌ Cinq onglets ouverts dans le navigateur simplement pour savoir : *« Quels devoirs sont à rendre cette semaine ? »*
 - ❌ Téléchargement manuel des PDF de devoirs puis glisser-déposer dans la fenêtre de chat
 - ❌ Copier-coller fastidieux des fils de discussion de forums et des notes page par page
-- ❌ Les questions portant sur *vos* cours reçoivent des réponses approximatives — le modèle ne pouvant rien vérifier
 
 ## ✅ Avec moodle-mcp
 
@@ -109,15 +108,19 @@ cargo build --release
 Utilisez la commande CLI intégrée (même binaire) :
 
 ```bash
-moodle-mcp token --url https://moodle.example.com --username votre_identifiant
-# Password: (mot de passe masqué)
+moodle-mcp auth
+# Moodle URL (e.g. https://moodle.example.com): https://moodle.example.com
+# Username: votre_identifiant
+# Password: ********   (masqué pendant la saisie)
 # → export MOODLE_URL='https://moodle.example.com' MOODLE_TOKEN='…'
 ```
+
+Toute valeur passée en option (`--url`, `--username`, `--password`) évite l'invite correspondante — les scripts fonctionnent donc aussi sans interaction.
 
 En cas d'authentification unique (SSO institutionnel sans mot de passe direct), ouvrez la page des clés de sécurité dans votre navigateur :
 
 ```bash
-moodle-mcp token --url https://moodle.example.com --open
+moodle-mcp auth --url https://moodle.example.com --open
 ```
 
 Si l'obtention du jeton échoue, la plateforme ne dispose pas des options requises dans les [Prérequis](#-prérequis) — demandez à votre administrateur d'activer les services web.

@@ -36,7 +36,6 @@ LLM エージェントが**本物の Moodle LMS を直接操作**できるよう
 - ❌ 「今週の締め切りは何がある？」を確認するだけで 5 つのタブを開く必要がある
 - ❌ 課題 PDF を手動でダウンロードし、チャット画面にドラッグ＆ドロップする手間
 - ❌ フォーラムの投稿や成績を 1 ページずつコピー＆ペースト
-- ❌ あなたのコースに関する質問に対して、モデルは推測でしか答えられない（実際のデータを確認できないため）
 
 ## ✅ moodle-mcp がある場合
 
@@ -109,15 +108,19 @@ cargo build --release
 内蔵の CLI サブコマンドを使用します（同一バイナリ）：
 
 ```bash
-moodle-mcp token --url https://moodle.example.com --username yourname
-# Password: (パスワード入力は非表示)
+moodle-mcp auth
+# Moodle URL (e.g. https://moodle.example.com): https://moodle.example.com
+# Username: yourname
+# Password: ********   （入力はマスク表示）
 # → export MOODLE_URL='https://moodle.example.com' MOODLE_TOKEN='…'
 ```
+
+フラグ（`--url`、`--username`、`--password`）で渡した値は対応するプロンプトをスキップするため、スクリプトからも非対話で利用できます。
 
 SSO 連携などで直接のパスワードがない場合は、ブラウザでセキュリティキートークンページを開きます：
 
 ```bash
-moodle-mcp token --url https://moodle.example.com --open
+moodle-mcp auth --url https://moodle.example.com --open
 ```
 
 トークンの取得に失敗する場合は、[必要条件](#-必要条件) の設定が不足しています — サイト管理者にお問い合わせください。

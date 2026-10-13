@@ -36,7 +36,6 @@ Ein generischer Chatbot hat keinen Zugriff auf dein Moodle, sodass alle Studiena
 - ❌ Fünf Browser-Tabs geöffnet, nur um zu sehen: *„Was ist diese Woche fällig?“*
 - ❌ Aufgaben-PDFs manuell herunterladen und in das Chatfenster ziehen
 - ❌ Forenbeiträge und Noten mühsam Seite für Seite kopieren und einfügen
-- ❌ Fragen zu *deinen* Kursen werden nur mit Vermutungen beantwortet — das Modell kann nichts nachprüfen
 
 ## ✅ Mit moodle-mcp
 
@@ -59,7 +58,7 @@ Vollständige Abläufe unter [Prompt-Beispiele](#-prompt-beispiele) und [Funktio
 
 ## ✨ Funktionen & Highlights
 
-- **Batteries included** — Dokumentenkonvertierung (anydoc), HTML → Markdown (htmd), Token-CLI und Notfall-Fallback direkt integriert: keine Plugins, keine Hilfsskripte, keine zusätzliche Laufzeitumgebung.
+- **Batteries included** — Dokumentenkonvertierung (anydoc), HTML → Markdown (htmd), Auth-CLI und Notfall-Fallback direkt integriert: keine Plugins, keine Hilfsskripte, keine zusätzliche Laufzeitumgebung.
 - **Agent-native** — Werkzeuge akzeptieren und liefern **lokale Dateipfade** statt Base64; Antworten enthalten direkt die IDs für den nächsten Schritt; Standardwerte bieten Hilfestellungen (z. B. "pass course_ids to filter"); Fehlermeldungen sind verständlich und schlagen Lösungen vor.
 - **22 maßgeschneiderte Werkzeuge** — Jedes Werkzeug spiegelt einen realen Schritt in Moodle wider: Kurse, Kursübersicht, Aufgaben, Abgaben, Foren, Dateien (Abrufen/Konvertieren/Herunterladen/Hochladen), Noten, Zeitplan, Nachrichten, Quiz-Versuche. Kein 1:1-Dump von ~350 rohen Web-Service-Funktionen; ein generischer Escape-Hatch (`call_ws_function` + `list_functions`) erreicht dennoch alles Weitere.
 - **Vollständige Kurskarte in einem Aufruf** — `get_course_overview` bündelt fünf Moodle-Endpunkte in ein einziges Markdown-Dokument mit allen IDs und Dateilinks.
@@ -109,15 +108,19 @@ cargo build --release
 Verwende das integrierte CLI-Tool:
 
 ```bash
-moodle-mcp token --url https://moodle.example.com --username deinbenutzer
-# Password: (Passworteingabe ausgeblendet)
+moodle-mcp auth
+# Moodle URL (e.g. https://moodle.example.com): https://moodle.example.com
+# Username: deinbenutzer
+# Password: ********   (Eingabe wird maskiert)
 # → export MOODLE_URL='https://moodle.example.com' MOODLE_TOKEN='…'
 ```
+
+Werte, die als Flag übergeben werden (`--url`, `--username`, `--password`), überspringen die jeweilige Abfrage — so funktionieren auch Skripte ohne Interaktion.
 
 Bei SSO (ohne Direktpasswort) öffne stattdessen die Moodle-Sicherheitsschlüsselseite im Browser:
 
 ```bash
-moodle-mcp token --url https://moodle.example.com --open
+moodle-mcp auth --url https://moodle.example.com --open
 ```
 
 Falls der Token-Abruf fehlschlägt, fehlen der Moodle-Instanz Einstellungen aus den [Anforderungen](#-anforderungen) — wende dich an deinen Moodle-Administrator.

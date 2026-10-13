@@ -36,7 +36,6 @@ Un chatbot genérico no tiene acceso a tu Moodle, por lo que cada tarea de estud
 - ❌ Abrir cinco pestañas del navegador solo para ver *«¿qué entregas vencen esta semana?»*
 - ❌ Descargar PDFs de tareas manualmente y subirlos a la ventana de chat
 - ❌ Copiar y pegar hilos de foros y calificaciones página por página
-- ❌ Preguntas sobre *tus* cursos respondidas con suposiciones — el modelo no puede verificar nada
 
 ## ✅ Con moodle-mcp
 
@@ -109,15 +108,19 @@ cargo build --release
 Usa la CLI integrada en el binario:
 
 ```bash
-moodle-mcp token --url https://moodle.example.com --username tu_usuario
-# Password: (contraseña oculta)
+moodle-mcp auth
+# Moodle URL (e.g. https://moodle.example.com): https://moodle.example.com
+# Username: tu_usuario
+# Password: ********   (enmascarada al escribir)
 # → export MOODLE_URL='https://moodle.example.com' MOODLE_TOKEN='…'
 ```
+
+Los valores pasados como flags (`--url`, `--username`, `--password`) omiten el aviso correspondiente, así los scripts también funcionan sin interacción.
 
 Si tu institución usa SSO (sin contraseña directa), abre la página de claves de seguridad en el navegador:
 
 ```bash
-moodle-mcp token --url https://moodle.example.com --open
+moodle-mcp auth --url https://moodle.example.com --open
 ```
 
 Si la solicitud de token falla, el sitio carece de algún ajuste en los [Requisitos](#-requisitos) — solicita al administrador activar los servicios web.
