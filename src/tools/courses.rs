@@ -18,7 +18,7 @@ pub async fn list_courses(
         .call("core_enrol_get_users_courses", &json!({ "userid": userid }))
         .await?;
 
-    let needle = search.map(|s| s.to_lowercase());
+    let needle = search.map(str::trim).filter(|s| !s.is_empty()).map(str::to_lowercase);
     let courses: Vec<Value> = raw
         .as_array()
         .cloned()

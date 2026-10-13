@@ -29,7 +29,7 @@ use tokio::sync::RwLock;
 
 use crate::client::MoodleClient;
 use crate::error::MoodleError;
-use crate::output::{finish_doc, finish_json};
+use crate::output::{finish_doc, finish_json, finish_json_with_hints};
 
 /// Hints attached to `get_schedule` when parameters are omitted.
 const HINT_TIME: &str =
@@ -511,8 +511,12 @@ impl MoodleMcp {
             },
         };
         match schedule::get_schedule(&self.client, &ids, p.time_from, p.time_to).await {
-            Ok(v) => Ok(crate::output::finish_json_with_hints(v, &hints)?),
-            Err(e) => Ok(crate::error::moodle_to_tool_result(e)),
+            Ok((v, extra_hints)) => {
+                let mut all = hints.clone();
+                all.extend(extra_hints);
+                finish_json_with_hints(v, &all)
+            }
+            Err(e) => finish(Err(e)),
         }
     }
 
@@ -668,7 +672,7 @@ impl MoodleMcp {
     // ---------- escape hatch ----------
 
     #[tool(
-        description = "Call any Moodle web service function by name with free-form JSON parameters (advanced escape hatch). Nested arrays/objects are flattened to Moodle's PHP bracket notation. The function must be enabled for this token — discover candidates with list_functions."
+        description = "Call any Moodle web service function by name with free-form JSON parameters (advanced escape hatch). Nested arrays/objects are flattened to Moodle's PHP bracket notation. The function must be enabled for this token — discover candidates with list_functions. WARNING: destructive functions (delete/block/reset) take effect immediately without confirmation — double-check with the user first."
     )]
     async fn call_ws_function(
         &self,

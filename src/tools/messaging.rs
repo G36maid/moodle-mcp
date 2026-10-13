@@ -22,7 +22,7 @@ pub async fn get_notifications(
     limit: u32,
 ) -> Result<Value, MoodleError> {
     let legacy = wsfunction == "core_message_get_messages";
-    let mut params = json!({ "useridto": user_id, "limitnum": limit });
+    let mut params = json!({ "useridto": user_id, "limitnum": limit.max(1) });
     if legacy {
         params["type"] = json!("notifications");
         params["newestfirst"] = json!(true);
@@ -73,7 +73,7 @@ pub async fn get_conversations(
     let v: Value = client
         .call(
             "core_message_get_conversations",
-            &json!({ "userid": user_id, "limitnum": limit }),
+            &json!({ "userid": user_id, "limitnum": limit.max(1) }),
         )
         .await?;
 

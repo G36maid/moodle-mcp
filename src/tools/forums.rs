@@ -37,13 +37,23 @@ pub async fn get_forum_discussions(
         .unwrap_or_default()
         .into_iter()
         .map(|d| {
-            let subject = decode_entities(first_str(&d, &["name", "subject"]).unwrap_or_default());
+            // Legacy (3.x) records are the opening POST: `id` = post id,
+            // `discussion` = discussion id. Modern summaries: `id` = discussion
+            // id. Resolve accordingly and expose the opening post id for
+            // reply_to_discussion.
+            let discussion_id = d
+                .get("discussion")
+                .cloned()
+                .unwrap_or_else(|| d.get("id").cloned().unwrap_or(Value::Null));
+            let subject =
+                decode_entities(first_str(&d, &["name", "subject"]).unwrap_or_default());
             let preview = truncate_chars(
                 &html_to_markdown(d.get("message").and_then(Value::as_str).unwrap_or_default()),
                 200,
             );
             json!({
-                "discussion_id": d.get("id").cloned().unwrap_or(Value::Null),
+                "discussion_id": discussion_id,
+                "opening_post_id": d.get("id").cloned().unwrap_or(Value::Null),
                 "subject": subject,
                 "preview": preview,
                 "author": first_str(&d, &["userfullname", "usermodifiedfullname"])

@@ -144,11 +144,21 @@ impl MoodleClient {
     }
 
     /// Download bytes from a Moodle file URL, injecting the web service token
-    /// if the URL points at `pluginfile.php` and carries no token.
+    /// ONLY when the URL points at the same Moodle site's `pluginfile.php`
+    /// and carries no token. URLs on other hosts are fetched as-is — the
+    /// token is never sent to third parties (SSRF/leak protection).
     pub async fn download_file(&self, file_url: &str) -> Result<reqwest::Response, MoodleError> {
-        let mut url = url::Url::parse(file_url)
-            .map_err(|e| MoodleError::Config(format!("invalid file URL: {e}")))?;
-        if !url.query_pairs().any(|(k, _)| k == "token") && url.path().contains("pluginfile.php") {
+        let mut url =
+            url::Url::parse(file_url).map_err(|e| MoodleError::Config(format!("invalid file URL: {e}")))?;
+        let base = url::Url::parse(&self.base_url)
+            .map_err(|e| MoodleError::Config(format!("invalid base URL: {e}")))?;
+        let same_site = url.scheme() == base.scheme()
+            && url.host_str() == base.host_str()
+            && url.port_or_known_default() == base.port_or_known_default();
+        if same_site
+            && !url.query_pairs().any(|(k, _)| k == "token")
+            && url.path().contains("pluginfile.php")
+        {
             url.query_pairs_mut().append_pair("token", &self.token);
         }
         self.http.get(url).send().await.map_err(MoodleError::from)

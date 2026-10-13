@@ -20,15 +20,20 @@ pub const DEFAULT_DAYS_AHEAD: i64 = 30;
 pub const HINT_TIME: &str =
     "Time range defaults to the next 30 days; pass time_from/time_to to query other ranges.";
 pub const HINT_COURSE: &str = "Defaults to all enrolled courses; pass course_ids to filter.";
+pub const HINT_REVERSED: &str = "time_from is after time_to — the window is empty, so no events match. Swap the two values to get results.";
 
 pub async fn get_schedule(
     client: &MoodleClient,
     course_ids: &[i64],
     time_from: Option<i64>,
     time_to: Option<i64>,
-) -> Result<Value, MoodleError> {
+) -> Result<(Value, Vec<String>), MoodleError> {
     let from = time_from.unwrap_or_else(now_unix);
     let to = time_to.unwrap_or_else(|| now_unix() + DEFAULT_DAYS_AHEAD * 86_400);
+    let mut hints = Vec::new();
+    if from > to {
+        hints.push(HINT_REVERSED.to_string());
+    }
 
     let mut params = json!({
         "events": { "courseids": course_ids },
@@ -68,10 +73,10 @@ pub async fn get_schedule(
             .unwrap_or_default()
     });
 
-    Ok(strip_empty_warnings(json!({
+    Ok((strip_empty_warnings(json!({
         "count": events.len(),
         "from": crate::util::unix_to_iso(json!(from)),
         "to": crate::util::unix_to_iso(json!(to)),
         "schedule": events,
-    })))
+    })), hints))
 }
