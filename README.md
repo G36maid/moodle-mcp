@@ -2,8 +2,8 @@
 
 **A Moodle LMS → MCP (Model Context Protocol) bridge, written in Rust.**
 
-Expose your Moodle site's Web Services to any MCP client (pi, Claude Code,
-Codex, Claude Desktop, …) as a set of typed, student-first tools. Ships as a
+Expose your Moodle site's Web Services to any MCP client (Claude Code,
+Codex, opencode, pi, etc…) as a set of typed, student-first tools. Ships as a
 single static binary over the `stdio` transport.
 
 Built on the official Rust MCP SDK [`rmcp`](https://crates.io/crates/rmcp)
