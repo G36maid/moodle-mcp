@@ -127,14 +127,26 @@ claude mcp add moodle --env MOODLE_URL=https://moodle.example.com \
   --env MOODLE_TOKEN=your-token -- /path/to/moodle-mcp
 ```
 
-**Claude Desktop / any `mcpServers` client:**
+**Codex** — `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.moodle]
+command = "/path/to/moodle-mcp"
+env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "your-token" }
+```
+
+**OpenCode** — `opencode.json`:
 
 ```json
 {
-  "mcpServers": {
+  "mcp": {
     "moodle": {
-      "command": "/path/to/moodle-mcp",
-      "env": { "MOODLE_URL": "https://moodle.example.com", "MOODLE_TOKEN": "your-token" }
+      "type": "local",
+      "command": ["/path/to/moodle-mcp"],
+      "environment": {
+        "MOODLE_URL": "https://moodle.example.com",
+        "MOODLE_TOKEN": "your-token"
+      }
     }
   }
 }
