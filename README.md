@@ -14,11 +14,21 @@ Validated live against **Moodle 3.7 → 5.x**.
 
 ---
 
+## ❌ Without moodle-mcp
+
+A generic chatbot has no way into your Moodle, so every study task stays manual:
+
+- ❌ Five browser tabs open just to answer *"what's due this week?"*
+- ❌ Assignment PDFs downloaded by hand, then re-uploaded into a chat window
+- ❌ Forum threads and grades copy-pasted one page at a time
+- ❌ Questions about *your* courses answered with guesses — the model can't see
+  anything to check against
+
 ## ✅ With moodle-mcp
 
-22 typed tools that cover the full student journey just like a real human — from a quick
-deadline check to fully automated assignment assistance, without ever opening
-a browser:
+The agent signs in as you. 22 typed tools cover the full student journey just like a
+real human — from a quick deadline check to fully automated assignment assistance,
+without ever opening a browser:
 
 ```txt
 What's due in the next two weeks? Plan my studying around it.
@@ -63,6 +73,18 @@ Full journeys in [Prompt examples](#-prompt-examples) and
   provided
 - **Single static binary** — no runtime dependencies
 
+## 📋 Requirements
+
+- A **Moodle 3.7 → 5.x** site you have an account on
+- Web services enabled site-side: **REST protocol** and the **`moodle_mobile_app`
+  service allowed for your account** — the same switches the official Moodle mobile
+  app uses, so most sites already qualify
+- **HTTPS** strongly recommended — the token travels with every request (see
+  [Security notes](#-security-notes))
+- Any MCP client — Claude Code, Codex, OpenCode, pi, or anything that speaks MCP
+  over stdio
+- Rust 1.88+ only if building from source (prebuilt binaries need nothing)
+
 ## 📦 Install
 
 ### Build
@@ -90,15 +112,16 @@ With SSO (no password), open the Security keys page in a browser instead:
 moodle-mcp token --url https://moodle.example.com --open
 ```
 
-Site-side requirements: web services enabled, REST protocol, and the
-`moodle_mobile_app` service allowed for your account (standard Moodle setup).
+If the token request fails, the site is missing something from
+[Requirements](#-requirements) — ask your admin to enable web services.
 
 ### Connect a client
 
 All four clients read the same stdio server: launch `/path/to/moodle-mcp` with
 `MOODLE_URL` / `MOODLE_TOKEN` in its environment.
 
-**Claude Code** — `.mcp.json` (project) or `~/.claude.json` (global):
+<details open>
+<summary><b>Claude Code</b> — <code>.mcp.json</code> (project) or <code>~/.claude.json</code> (global)</summary>
 
 ```json
 {
@@ -114,7 +137,10 @@ All four clients read the same stdio server: launch `/path/to/moodle-mcp` with
 }
 ```
 
-**Codex** — `~/.codex/config.toml` (global):
+</details>
+
+<details>
+<summary><b>Codex</b> — <code>~/.codex/config.toml</code> (global)</summary>
 
 ```toml
 [mcp_servers.moodle]
@@ -122,7 +148,10 @@ command = "/path/to/moodle-mcp"
 env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "your-token" }
 ```
 
-**OpenCode** — `opencode.json` (project) or `~/.config/opencode/opencode.json` (global):
+</details>
+
+<details>
+<summary><b>OpenCode</b> — <code>opencode.json</code> (project) or <code>~/.config/opencode/opencode.json</code> (global)</summary>
 
 ```json
 {
@@ -139,7 +168,10 @@ env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "your-toke
 }
 ```
 
-**pi** — `.pi/mcp.json` (project) or `~/.pi/agent/mcp.json` (global):
+</details>
+
+<details>
+<summary><b>pi</b> — <code>.pi/mcp.json</code> (project) or <code>~/.pi/agent/mcp.json</code> (global)</summary>
 
 ```json
 {
@@ -154,6 +186,8 @@ env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "your-toke
   }
 }
 ```
+
+</details>
 
 | Env var | Required | Default | Description |
 |---|:---:|---|---|
@@ -214,56 +248,60 @@ The same building blocks compose into larger flows — a study plan is
 `get_schedule` (deadlines) plus `get_course_overview` per course (materials);
 a weekly digest is `get_notifications` plus the forum read chain.
 
-Everything not covered by the 20 dedicated tools is reachable through the
+Everything the 20 dedicated tools don't cover is reachable through the
 `call_ws_function` + `list_functions` escape hatch — full coverage of the
-~350 functions a typical token can call.
+~350 functions a typical token can call (20 + 2 = 22 in total).
 
 ## 🛠 Tool reference
 
+RW — what a call does to your Moodle: 📖 read-only · ✍️ write. Write tools act
+as the token owner; the server's instructions tell the agent to confirm with you
+first, and uploads land in your private draft area, not with your teacher.
+
 ### Identity & courses
-| Tool | Signature | Purpose |
-|---|---|---|
-| `whoami` | `()` | Token owner identity + site/release |
-| `list_courses` | `(search?)` | Enrolled courses; optional name filter |
-| `get_course_overview` | `(course_id)` | Whole-course markdown map |
+| Tool | Signature | RW | Purpose |
+|---|---|:-:|---|
+| `whoami` | `()` | 📖 | Token owner identity + site/release |
+| `list_courses` | `(search?)` | 📖 | Enrolled courses; optional name filter |
+| `get_course_overview` | `(course_id)` | 📖 | Whole-course markdown map |
 
 ### Assignments
-| Tool | Signature | Purpose |
-|---|---|---|
-| `get_assignment` | `(assignment_id)` | Full document: times, state, description, attachments, submission, grade & feedback |
-| `submit_assignment` | `(assignment_id, text?, item_id?, finalize?)` | The single write: online text and/or draft files, optionally finalizing |
+| Tool | Signature | RW | Purpose |
+|---|---|:-:|---|
+| `get_assignment` | `(assignment_id)` | 📖 | Full document: times, state, description, attachments, submission, grade & feedback |
+| `submit_assignment` | `(assignment_id, text?, item_id?, finalize?)` | ✍️ | The single write: online text and/or draft files, optionally finalizing |
 
 ### Forums
-| Tool | Signature | Purpose |
-|---|---|---|
-| `get_forum_discussions` | `(forum_id)` | Thread list with opening-post previews |
-| `get_discussion_posts` | `(discussion_id)` | Whole thread, converted to markdown, attachments included |
-| `create_forum_discussion` | `(forum_id, subject, message)` | Start a thread |
-| `reply_to_discussion` | `(post_id, subject, message)` | Reply (to the opening post = reply to the thread) |
+| Tool | Signature | RW | Purpose |
+|---|---|:-:|---|
+| `get_forum_discussions` | `(forum_id)` | 📖 | Thread list with opening-post previews |
+| `get_discussion_posts` | `(discussion_id)` | 📖 | Whole thread, converted to markdown, attachments included |
+| `create_forum_discussion` | `(forum_id, subject, message)` | ✍️ | Start a thread |
+| `reply_to_discussion` | `(post_id, subject, message)` | ✍️ | Reply (to the opening post = reply to the thread) |
 
 ### Files
-| Tool | Signature | Purpose |
-|---|---|---|
-| `fetch_file` | `(url)` | PDF/DOCX/PPTX/XLSX/ODT/RTF/EPUB/CSV → markdown (anydoc); 100k-char cap |
-| `download_file` | `(url, save_to)` | Raw bytes → local path (metadata only) |
-| `upload_file` | `(path, item_id?)` | Local file → draft area |
+| Tool | Signature | RW | Purpose |
+|---|---|:-:|---|
+| `fetch_file` | `(url)` | 📖 | PDF/DOCX/PPTX/XLSX/ODT/RTF/EPUB/CSV → markdown (anydoc); 100k-char cap |
+| `download_file` | `(url, save_to)` | 📖 | Raw bytes → local path (metadata only) |
+| `upload_file` | `(path, item_id?)` | ✍️ | Local file → draft area |
 
 ### Grades, schedule, messaging
-| Tool | Signature | Purpose |
-|---|---|---|
-| `get_grades` | `(course_id?)` | Cross-course summary, or every grade item of one course |
-| `get_schedule` | `(time_from?, time_to?, course_ids?)` | Merged timeline (default: next 30 days) |
-| `get_notifications` | `(read?, limit?)` | Recent notifications |
-| `get_conversations` | `(limit?)` | Conversations with member ids |
-| `send_message` | `(user_id, text)` | Direct message |
-| `get_quiz_attempts` | `(quiz_id)` | Attempt records (read-only) |
-| `get_user` / `search_users` | `(field, value)` / `(search?, limit?)` | Profile lookup / user search |
+| Tool | Signature | RW | Purpose |
+|---|---|:-:|---|
+| `get_grades` | `(course_id?)` | 📖 | Cross-course summary, or every grade item of one course |
+| `get_schedule` | `(time_from?, time_to?, course_ids?)` | 📖 | Merged timeline (default: next 30 days) |
+| `get_notifications` | `(read?, limit?)` | 📖 | Recent notifications |
+| `get_conversations` | `(limit?)` | 📖 | Conversations with member ids |
+| `send_message` | `(user_id, text)` | ✍️ | Direct message |
+| `get_quiz_attempts` | `(quiz_id)` | 📖 | Attempt records (read-only) |
+| `get_user` / `search_users` | `(field, value)` / `(search?, limit?)` | 📖 | Profile lookup / user search |
 
 ### Escape hatch
-| Tool | Signature | Purpose |
-|---|---|---|
-| `call_ws_function` | `(wsfunction, params?)` | Call any enabled WS function (PHP bracket notation handled) |
-| `list_functions` | `(query?)` | Discover callable functions by keyword |
+| Tool | Signature | RW | Purpose |
+|---|---|:-:|---|
+| `call_ws_function` | `(wsfunction, params?)` | 📖/✍️ | Call any enabled WS function (PHP bracket notation handled) |
+| `list_functions` | `(query?)` | 📖 | Discover callable functions by keyword |
 
 ## 🔐 Security notes
 
