@@ -99,3 +99,55 @@ jobs:
             --title "moodle-mcp ${{ github.ref_name }}" \
             --generate-notes \
             dist/*
+
+  # Publishes the crate via crates.io trusted publishing (OIDC): no long-lived
+  # API token is stored in repo secrets. Requires a one-time config on
+  # crates.io (crate Settings -> Trusted Publishing): owner G36maid, repo
+  # moodle-mcp, workflow release.yml, no environment. The very first version
+  # must be published manually; afterwards tags drive it. Versions that are
+  # already on crates.io (e.g. that first manual publish) are skipped.
+  publish:
+    name: publish (crates.io)
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC token, exchanged for a short-lived publish token
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: publish
+
+      - name: Check version matches tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          grep -qx "version = \"$VERSION\"" Cargo.toml || {
+            echo "::error::Cargo.toml version is not $VERSION (tag ${{ github.ref_name }})"
+            exit 1
+          }
+
+      - name: Skip if version already on crates.io
+        id: published
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if curl -fsS -A "moodle-mcp release job (https://github.com/G36maid/moodle-mcp)" \
+               "https://crates.io/api/v1/crates/moodle-mcp/$VERSION" > /dev/null; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Authenticate with crates.io
+        if: steps.published.outputs.already != 'true'
+        uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+
+      - name: Publish
+        if: steps.published.outputs.already != 'true'
+        run: cargo publish --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
