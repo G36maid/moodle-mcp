@@ -49,6 +49,12 @@ Full journeys in [Prompt examples](#-prompt-examples) and
 
 ## ✨ Features
 
+- **Batteries included** — document conversion (anydoc), HTML → markdown
+  (htmd), token CLI and the escape hatch ship in the box: no plugins,
+  no helper scripts, no second runtime
+- **Agent-native** — tools take and return **local file paths** instead of
+  base64; results embed the IDs for the next tool; defaults come with hints
+  ("pass course_ids to filter"); errors are plain-language and suggest the fix
 - **22 tools** — courses, course map, assignments, submission, forums,
   files (fetch/convert/download/upload), grades, schedule, messaging,
   quiz attempts, plus a generic escape hatch (`call_ws_function` +
@@ -58,8 +64,6 @@ Full journeys in [Prompt examples](#-prompt-examples) and
 - **PDF → markdown** — assignment briefs become readable requirements via
   [anydoc](https://crates.io/crates/anydoc); HTML descriptions keep their
   tables via [htmd](https://crates.io/crates/htmd)
-- **Files stay on disk** — `download_file`/`upload_file` work with local
-  paths; binaries never pass through the conversation
 - **Version-adaptive** — verified against Moodle 3.7 and designed for 4.x/5.x;
   differences (function names, pagination, response shapes) are absorbed
   automatically
@@ -196,10 +200,6 @@ The same building blocks compose into larger flows — a study plan is
 a weekly digest is `get_notifications` plus the forum read chain.
 
 Everything not covered by the 20 dedicated tools is reachable through the
-`call_ws_function` + `list_functions` escape hatch — full coverage of the
-~350 functions a typical token can call.
-
-Everything not covered by the 21 dedicated tools is reachable through the
 `call_ws_function` + `list_functions` escape hatch — full coverage of the
 ~350 functions a typical token can call.
 
