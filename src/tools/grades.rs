@@ -71,6 +71,13 @@ async fn course_items(
                     .unwrap_or_else(|| g.get("itemtype").cloned().unwrap_or(Value::Null)),
                 "type": g.get("itemtype").cloned().unwrap_or(Value::Null),
                 "module": g.get("itemmodule").cloned().unwrap_or(Value::Null),
+                // For module items, iteminstance is the activity's own id
+                // (e.g. assignment_id for assign) — enables direct chaining.
+                "assignment_id": if g.get("itemmodule").and_then(Value::as_str) == Some("assign") {
+                    g.get("iteminstance").cloned().unwrap_or(Value::Null)
+                } else {
+                    Value::Null
+                },
                 "grade": grade,
                 "range": json!({
                     "min": g.get("grademinformatted").filter(|x| !x.is_null())

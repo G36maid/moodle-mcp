@@ -100,12 +100,13 @@ fn shape_module(m: &Value, assignments_by_cmid: &std::collections::HashMap<i64, 
 pub async fn get_course_overview(
     client: &MoodleClient,
     course_id: i64,
+    user_id: i64,
 ) -> Result<(String, Value), MoodleError> {
     let contents_params = json!({ "courseid": course_id });
     let assign_params = json!({ "courseids": [course_id] });
     let quiz_params = json!({ "courseids": [course_id] });
     let forum_params = json!({ "courseids": [course_id] });
-    let grade_params = json!({ "courseid": course_id });
+    let grade_params = json!({ "courseid": course_id, "userid": user_id });
 
     // Five sources, fetched concurrently.
     let (contents_r, assign_r, quiz_r, forum_r, grade_r) = tokio::join!(

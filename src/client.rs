@@ -148,19 +148,7 @@ impl MoodleClient {
     /// and carries no token. URLs on other hosts are fetched as-is — the
     /// token is never sent to third parties (SSRF/leak protection).
     pub async fn download_file(&self, file_url: &str) -> Result<reqwest::Response, MoodleError> {
-        let mut url = url::Url::parse(file_url)
-            .map_err(|e| MoodleError::Config(format!("invalid file URL: {e}")))?;
-        let base = url::Url::parse(&self.base_url)
-            .map_err(|e| MoodleError::Config(format!("invalid base URL: {e}")))?;
-        let same_site = url.scheme() == base.scheme()
-            && url.host_str() == base.host_str()
-            && url.port_or_known_default() == base.port_or_known_default();
-        if same_site
-            && !url.query_pairs().any(|(k, _)| k == "token")
-            && url.path().contains("pluginfile.php")
-        {
-            url.query_pairs_mut().append_pair("token", &self.token);
-        }
+        let url = self.prepare_download_url(file_url)?;
         self.http.get(url).send().await.map_err(MoodleError::from)
     }
 

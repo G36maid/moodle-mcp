@@ -378,9 +378,13 @@ impl MoodleMcp {
         &self,
         Parameters(p): Parameters<CourseOverviewParams>,
     ) -> Result<CallToolResult, McpError> {
-        match courses::get_course_overview(&self.client, p.course_id).await {
+        let user_id = match self.current_user_id().await {
+            Ok(uid) => uid,
+            Err(e) => return finish(Err(e)),
+        };
+        match courses::get_course_overview(&self.client, p.course_id, user_id).await {
             Ok((md, structured)) => finish_doc(md, structured),
-            Err(e) => Ok(crate::error::moodle_to_tool_result(e)),
+            Err(e) => finish(Err(e)),
         }
     }
 

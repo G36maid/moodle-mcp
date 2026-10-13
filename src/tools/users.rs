@@ -23,7 +23,9 @@ pub async fn get_user_by_field(
     let u = v
         .as_array()
         .and_then(|a| a.first())
-        .ok_or_else(|| MoodleError::InvalidBody(format!("no user found with {field}={value}")))?;
+        .ok_or_else(|| MoodleError::InvalidBody(format!(
+            "no visible user matches {field}={value}. Note: this site's privacy policy may hide other students' profiles — ids from your conversations, notifications or forum posts still work."
+        )))?;
     Ok(json!({
         "user_id": u.get("id").cloned().unwrap_or(Value::Null),
         "username": u.get("username").cloned().unwrap_or(Value::Null),

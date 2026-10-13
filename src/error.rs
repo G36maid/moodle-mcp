@@ -66,11 +66,22 @@ impl MoodleError {
                 } else {
                     errorcode.as_str()
                 };
+                let hint = match code {
+                    "invalidtoken" => "check MOODLE_TOKEN — it may have been reset or expired.".to_string(),
+                    "nopermissions" | "accesscontrolexception" | "required_capability_exception" => "the function is not enabled for this token, or you lack the capability on this site/course.".to_string(),
+                    "sitemaintenance" => "the site is under maintenance — try again later.".to_string(),
+                    "invalidrecord" | "dml_missing_record_exception" => "the referenced record does not exist — double-check the id (a wrong-type id, e.g. a module id instead of an instance id, can also look like this).".to_string(),
+                    "invalidparameter" | "invalid_parameter_exception" | "invalidresponse" => "check the parameter names, types and value formats against what the tool asked for.".to_string(),
+                    "toomanyrequests" | "ratelimit" => "rate limited — wait a moment and retry.".to_string(),
+                    _ => String::new(),
+                };
+                let hint_block = if hint.is_empty() {
+                    String::new()
+                } else {
+                    format!("\n\nHints: {hint}")
+                };
                 format!(
-                    "Moodle API error {code}: {message} (exception: {exception})\n\n\
-                     Hints: `invalidtoken` → check MOODLE_TOKEN; `accesscontrolexception`/`nopermission` → \
-                     the function is not in the token's external service or you lack the capability; \
-                     `sitemaintenance` → site is under maintenance."
+                    "Moodle API error {code}: {message} (exception: {exception}){hint_block}"
                 )
             }
             MoodleError::Http(e) => format!("HTTP request to Moodle failed: {e}"),
