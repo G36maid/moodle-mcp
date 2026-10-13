@@ -6,6 +6,7 @@
   <a href="https://github.com/G36maid/moodle-mcp/actions/workflows/ci.yml"><img src="https://github.com/G36maid/moodle-mcp/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://codecov.io/gh/G36maid/moodle-mcp"><img src="https://img.shields.io/codecov/c/github/G36maid/moodle-mcp" alt="Codecov"></a>
   <a href="https://github.com/G36maid/moodle-mcp/releases/latest"><img src="https://img.shields.io/github/v/release/G36maid/moodle-mcp?include_prereleases" alt="Release"></a>
+  <a href="https://crates.io/crates/moodle-mcp"><img src="https://img.shields.io/crates/v/moodle-mcp" alt="crates.io"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
   <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/rust-1.88%2B-orange.svg" alt="Rust"></a>
   <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/protocol-MCP%20stdio-6C5CE7" alt="MCP"></a>
@@ -101,7 +102,8 @@ Full journeys in [Prompt examples](#-prompt-examples) and
   [Security notes](#-security-notes))
 - Any MCP client — Claude Code, Codex, OpenCode, pi, or anything that speaks MCP
   over stdio
-- Rust 1.88+ only if building from source (prebuilt binaries need nothing)
+- Rust 1.88+ only for `cargo install` or building from source (prebuilt
+  binaries need nothing)
 
 ## 📦 Install
 
@@ -121,6 +123,12 @@ No Rust toolchain needed — grab the archive for your platform from the
 ```bash
 tar xzf moodle-mcp-*-aarch64-apple-darwin.tar.gz
 sudo mv moodle-mcp-*/moodle-mcp /usr/local/bin/   # or anywhere on PATH
+```
+
+### Or install with cargo
+
+```bash
+cargo install moodle-mcp   # needs Rust 1.88+
 ```
 
 ### Or build from source
