@@ -82,7 +82,7 @@ impl MoodleError {
                 };
                 format!("Moodle API error {code}: {message} (exception: {exception}){hint_block}")
             }
-            MoodleError::Http(e) => format!("HTTP request to Moodle failed: {e}"),
+            MoodleError::Http(e) => scrub_token(&format!("HTTP request to Moodle failed: {e}")),
             MoodleError::Json(e) => format!(
                 "Moodle returned a non-JSON response: {e}. Web services may be disabled on the site."
             ),
@@ -104,3 +104,63 @@ pub fn moodle_to_tool_result(err: MoodleError) -> CallToolResult {
 }
 
 use rmcp::model::{CallToolResult, ContentBlock};
+
+/// Replace `token=…`-style query values with `[REDACTED]` in an arbitrary
+/// string. reqwest errors embed the full request URL — query string included
+/// — and download URLs carry the injected web-service token, which must never
+/// reach the model, tool output, or logs.
+pub(crate) fn scrub_token(s: &str) -> String {
+    const KEY: &str = "token=";
+    let mut out = String::with_capacity(s.len());
+    let mut rest = s;
+    while let Some(idx) = rest.find(KEY) {
+        out.push_str(&rest[..idx + KEY.len()]);
+        let after = &rest[idx + KEY.len()..];
+        // Token values are URL-safe ([A-Za-z0-9_-]); redact until the first
+        // character that cannot belong to one (delimiter, space, paren…).
+        let end = after
+            .find(|c: char| !c.is_ascii_alphanumeric() && c != '_' && c != '-')
+            .unwrap_or(after.len());
+        out.push_str("[REDACTED]");
+        rest = &after[end..];
+    }
+    out.push_str(rest);
+    out
+}
+
+#[cfg(test)]
+mod scrub_tests {
+    use super::*;
+
+    #[test]
+    fn scrubs_token_values() {
+        let msg = "error sending request for url \
+                  (https://moodle.example.com/webservice/pluginfile.php/1/f.pdf?forcedownload=1&token=AbC_123-x)";
+        let out = scrub_token(msg);
+        assert!(out.contains("token=[REDACTED]"), "{out}");
+        assert!(!out.contains("AbC_123-x"), "{out}");
+        assert!(out.contains("pluginfile.php/1/f.pdf"), "keep path: {out}");
+
+        assert_eq!(
+            scrub_token("https://x/?token=SECRET&next=1"),
+            "https://x/?token=[REDACTED]&next=1"
+        );
+        assert_eq!(
+            scrub_token("https://x/?token=TAIL"),
+            "https://x/?token=[REDACTED]"
+        );
+        assert_eq!(scrub_token("plain error text"), "plain error text");
+    }
+
+    #[tokio::test]
+    async fn http_tool_message_never_leaks_token() {
+        let err = reqwest::Client::new()
+            .get("https://127.0.0.1:1/pluginfile.php/1/f.pdf?token=SECRET123")
+            .send()
+            .await
+            .expect_err("must fail");
+        let msg = MoodleError::Http(err).to_tool_message();
+        assert!(!msg.contains("SECRET123"), "token leaked: {msg}");
+        assert!(msg.contains("127.0.0.1"), "keep host for diagnosis: {msg}");
+    }
+}

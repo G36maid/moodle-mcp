@@ -11,6 +11,10 @@ use crate::util::truncate_chars;
 /// MAX_INLINE_FILE_CHARS (100k chars). Beyond this, head-truncate with a
 /// marker and point at `download_file`.
 const MAX_FETCH_CHARS: usize = 100_000;
+/// Input cap for `fetch_file` (declared Content-Length must not exceed this).
+const MAX_FETCH_INPUT_BYTES: u64 = 100_000_000; // 100 MB
+/// Hard cap for streamed downloads (protects memory and disk).
+const MAX_DOWNLOAD_BYTES: u64 = 500_000_000; // 500 MB
 /// Fetch a Moodle file and return its content as **markdown** for the agent
 /// to read. PDF/DOCX/PPTX/XLSX/ODT/RTF/EPUB/CSV are converted with anydoc;
 /// plain text passes through; anything else (zip, images…) cannot be
@@ -33,6 +37,16 @@ pub async fn fetch_file(client: &MoodleClient, url: &str) -> Result<Value, Moodl
     if !(200..300).contains(&status) {
         return Err(MoodleError::InvalidBody(format!(
             "file fetch returned HTTP {status}; the URL may be expired or the file inaccessible"
+        )));
+    }
+    // Size guard BEFORE buffering: reject anything the declared size says is
+    // too big. Chunked/unknown lengths are re-checked by the inline cap below.
+    if let Some(len) = resp.content_length()
+        && len > MAX_FETCH_INPUT_BYTES
+    {
+        return Err(MoodleError::InvalidBody(format!(
+            "file is {len} bytes — too large to fetch inline (limit {MAX_FETCH_INPUT_BYTES}); \
+                 use download_file to save it to disk instead"
         )));
     }
     let bytes = resp.bytes().await.map_err(MoodleError::from)?;
@@ -120,7 +134,7 @@ pub async fn download_file(
     url: &str,
     save_to: &str,
 ) -> Result<Value, MoodleError> {
-    let resp = client.download_file(url).await?;
+    let mut resp = client.download_file(url).await?;
     let status = resp.status().as_u16();
     let content_type = resp
         .headers()
@@ -138,11 +152,41 @@ pub async fn download_file(
             "download returned HTTP {status}; the URL may be expired or the file inaccessible"
         )));
     }
-    let bytes = resp.bytes().await.map_err(MoodleError::from)?;
-    let size = bytes.len();
-    tokio::fs::write(save_to, &bytes)
+    // Stream to disk in chunks (no full-body buffering) with a hard cap;
+    // a mid-stream overage aborts and removes the partial file.
+    use tokio::io::AsyncWriteExt;
+    let mut file = tokio::fs::File::create(save_to)
         .await
-        .map_err(|e| MoodleError::Config(format!("failed to write {save_to}: {e}")))?;
+        .map_err(|e| MoodleError::Config(format!("failed to create {save_to}: {e}")))?;
+    let mut downloaded: u64 = 0;
+    loop {
+        let chunk = match resp.chunk().await {
+            Ok(Some(c)) => c,
+            Ok(None) => break,
+            Err(e) => {
+                let _ = file.shutdown().await;
+                let _ = tokio::fs::remove_file(save_to).await;
+                return Err(MoodleError::Config(format!(
+                    "download aborted after {downloaded} bytes: {e} (partial file removed)"
+                )));
+            }
+        };
+        downloaded += chunk.len() as u64;
+        if downloaded > MAX_DOWNLOAD_BYTES {
+            let _ = file.shutdown().await;
+            let _ = tokio::fs::remove_file(save_to).await;
+            return Err(MoodleError::Config(format!(
+                "download exceeded the {MAX_DOWNLOAD_BYTES}-byte limit — aborted, partial file removed"
+            )));
+        }
+        file.write_all(&chunk)
+            .await
+            .map_err(|e| MoodleError::Config(format!("failed to write {save_to}: {e}")))?;
+    }
+    file.flush()
+        .await
+        .map_err(|e| MoodleError::Config(format!("failed to flush {save_to}: {e}")))?;
+    let size = file.metadata().await.map(|m| m.len()).unwrap_or(0);
     Ok(json!({
         "url": url,
         "status": status,
