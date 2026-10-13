@@ -1,7 +1,8 @@
-//! moodle-mcp binary — MCP stdio server by default, plus the `token` CLI.
+//! moodle-mcp binary — MCP stdio server by default, plus the `auth` CLI.
 //!
-//! - `moodle-mcp`                    → serve MCP over stdio (env: MOODLE_URL, MOODLE_TOKEN)
-//! - `moodle-mcp token --url ...`    → obtain a web service token (see token.rs)
+//! - `moodle-mcp`                  → serve MCP over stdio (env: MOODLE_URL, MOODLE_TOKEN)
+//! - `moodle-mcp auth`             → interactive: prompt for site, username, password (masked)
+//! - `moodle-mcp auth --url ...`   → obtain a web service token (see auth.rs)
 
 use std::sync::Arc;
 
@@ -38,14 +39,14 @@ fn load_config() -> Config {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
 
-    // Subcommand dispatch. `token` is the only real subcommand; `serve` (and
+    // Subcommand dispatch. `auth` is the only real subcommand; `serve` (and
     // nothing at all) runs the MCP server over stdio.
     match args.next().as_deref() {
-        Some("token") => return moodle_mcp::token::run(&args.collect::<Vec<_>>()).await,
+        Some("auth") => return moodle_mcp::auth::run(&args.collect::<Vec<_>>()).await,
         Some("serve") | None => {}
         Some(other) => {
             eprintln!("moodle-mcp: unknown subcommand '{other}'");
-            eprintln!("usage: moodle-mcp [serve] | moodle-mcp token --url <site> ...");
+            eprintln!("usage: moodle-mcp [serve] | moodle-mcp auth [--url <site> ...]");
             std::process::exit(2);
         }
     }
