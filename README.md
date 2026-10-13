@@ -25,26 +25,27 @@ An agent asked about your coursework can only guess:
 
 ## ✅ With moodle-mcp
 
-22 typed tools covering the full student journey. The agent figures out the
-rest:
+22 typed tools covering the full student journey — from a quick deadline
+check to a **fully autonomous assignment cycle**, without ever opening a
+browser:
 
 ```txt
-What's due in the next two weeks?
+What's due in the next two weeks? Plan my studying around it.
 ```
-→ `get_schedule` returns a merged timeline of assignment due dates, quiz
-closes and calendar events.
 
 ```txt
-Read the HW1 assignment brief and summarize the requirements.
+Finish my Information Security HW1: read the assignment brief and the
+attached PDF, work through the problems, and submit a draft.
 ```
-→ `get_assignment` finds it, `fetch_file` converts the attached PDF into
-markdown (math notation included) — right in the agent's context.
 
 ```txt
-Upload my solution and turn it in.
+I missed what happened in Data Communication this week — catch me up.
 ```
-→ `upload_file` puts the file in the draft area, `submit_assignment` saves
-and finalizes it.
+
+The agent chains the tools itself: course map → assignment brief → PDF →
+markdown → solution → upload → draft submission → read-back verification.
+Full journeys in [Prompt examples](#-prompt-examples) and
+[How the agent works](#-how-the-agent-works).
 
 ## ✨ Features
 
@@ -145,9 +146,20 @@ claude mcp add moodle --env MOODLE_URL=https://moodle.example.com \
 ## 💬 Prompt examples
 
 All of these work with no further setup — the agent discovers the tools from
-their descriptions:
+their descriptions and chains them itself:
 
-| You say | The agent does |
+### Full-auto (one prompt, whole journey)
+
+| You say | The agent chains |
+|---|---|
+| *"Finish my Information Security HW1: read the assignment brief and the attached PDF, work through the problems, and submit a draft."* | `get_assignment` (brief + attachments) → `fetch_file` (PDF → markdown, math included) → solves it → writes the answer file → `upload_file` → `submit_assignment` → `get_assignment` (verify submitted ✓) |
+| *"Based on upcoming deadlines and course materials, build me a complete study plan for the next two weeks."* | `get_schedule` (all deadlines) → `get_course_overview` per course (materials & reading list) → day-by-day plan balanced against due dates |
+| *"I missed what happened in Data Communication this week — catch me up, including the announcements forum."* | `get_notifications` + `get_forum_discussions` → `get_discussion_posts` → synthesized weekly digest |
+| *"Prep me for the Software Engineering quiz: what did the teacher post about it?"* | `get_course_overview` (quiz entry) → `get_assignment` (requirements) → related forum threads |
+
+### Quick queries
+
+| You say | The agent chains |
 |---|---|
 | *"What's due in the next two weeks?"* | `get_schedule` → merged timeline of due dates, quiz closes, events |
 | *"What's the HW1 assignment about? Read the brief."* | `get_assignment` → `fetch_file` converts the attached PDF to markdown |
@@ -161,25 +173,31 @@ their descriptions:
 ## 🔄 How the agent works
 
 The tools mirror how you navigate Moodle — each level's output embeds the IDs
-for the next:
+for the next. Every journey starts from the course list and the course map;
+from there the agent drills down or runs a full workflow on its own:
 
-```text
-list_courses ──→ get_course_overview(course_id)        one map: everything
-                    │                │
-                    │ sections       │ forum_id / assignment_id / quiz_id / grades
-                    ▼                ▼
-      get_forum_discussions    get_assignment (full document)
-                │                    │
-                ▼                    ▼
-      get_discussion_posts      fetch_file / download_file
-      (thread + attachments)    (read the brief / save the PDF)
-                                     │
-                                     ▼
-                upload_file(path) → item_id
-                                     │
-                                     ▼
-                submit_assignment(assignment_id, item_id, finalize?)
+```mermaid
+flowchart TD
+    Q["💬 prompt (intent only)"] --> LC["list_courses(search?)<br/>find the course"]
+    LC --> OV["get_course_overview(course_id)<br/>markdown map: sections · files ·<br/>assignments · quizzes · forums · grades"]
+    OV --> FD["get_forum_discussions(forum_id)<br/>→ get_discussion_posts(discussion_id)"]
+    OV --> AS["get_assignment(assignment_id)<br/>brief · attachments · submission · grade"]
+    AS --> FF["fetch_file(url)<br/>assignment PDF → readable markdown"]
+    FF --> WK["agent works:<br/>answers · code · report on disk"]
+    WK --> UP["upload_file(path, filename)<br/>solution → draft area → item_id"]
+    UP --> SB["submit_assignment(assignment_id, item_id?, finalize?)<br/>save draft or turn in"]
+    SB --> VF["get_assignment<br/>verify: submitted ✓ files ✓"]
+    OV --> SC["get_schedule(time window)<br/>deadlines → study plan"]
+    OV --> GR["get_grades(course_id)<br/>graded items + feedback"]
 ```
+
+The same building blocks compose into larger flows — a study plan is
+`get_schedule` (deadlines) plus `get_course_overview` per course (materials);
+a weekly digest is `get_notifications` plus the forum read chain.
+
+Everything not covered by the 20 dedicated tools is reachable through the
+`call_ws_function` + `list_functions` escape hatch — full coverage of the
+~350 functions a typical token can call.
 
 Everything not covered by the 21 dedicated tools is reachable through the
 `call_ws_function` + `list_functions` escape hatch — full coverage of the
