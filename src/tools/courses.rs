@@ -304,6 +304,39 @@ pub async fn get_course_overview(
     let mut md = String::new();
     md.push_str(&format!("# {fullname} (course_id: {course_id})\n\n"));
 
+    md.push_str("\n## Sections\n");
+    for s in &sections {
+        md.push_str(&format!(
+            "### {} (section_id: {})\n",
+            s["name"].as_str().unwrap_or("?"),
+            s["section_id"],
+        ));
+        for m in s["modules"].as_array().unwrap_or(&Vec::new()) {
+            md.push_str(&format!(
+                "- [{}] {} (module_id: {}{}\n",
+                m["type"].as_str().unwrap_or("?"),
+                m["name"].as_str().unwrap_or("?"),
+                m["module_id"],
+                m.get("assignment_id")
+                    .map(|a| format!(", assignment_id: {a})"))
+                    .unwrap_or_else(|| ")".into()),
+            ));
+            for c in m["contents"].as_array().unwrap_or(&Vec::new()) {
+                let kind = if c["type"].as_str() == Some("file") {
+                    "file"
+                } else {
+                    "link"
+                };
+                md.push_str(&format!(
+                    "    - {kind}: {} ({} bytes) — {}\n",
+                    c["filename"].as_str().unwrap_or("?"),
+                    c["filesize"],
+                    c["fileurl"].as_str().unwrap_or("no url"),
+                ));
+            }
+        }
+    }
+
     md.push_str("## Assignments\n");
     if assignments.is_empty() {
         md.push_str("_none_\n");
@@ -346,39 +379,6 @@ pub async fn get_course_overview(
     md.push_str("\n## Grades (graded items)\n");
     md.push_str(&grades_section_md);
     md.push('\n');
-
-    md.push_str("\n## Sections\n");
-    for s in &sections {
-        md.push_str(&format!(
-            "### {} (section_id: {})\n",
-            s["name"].as_str().unwrap_or("?"),
-            s["section_id"],
-        ));
-        for m in s["modules"].as_array().unwrap_or(&Vec::new()) {
-            md.push_str(&format!(
-                "- [{}] {} (module_id: {}{}\n",
-                m["type"].as_str().unwrap_or("?"),
-                m["name"].as_str().unwrap_or("?"),
-                m["module_id"],
-                m.get("assignment_id")
-                    .map(|a| format!(", assignment_id: {a})"))
-                    .unwrap_or_else(|| ")".into()),
-            ));
-            for c in m["contents"].as_array().unwrap_or(&Vec::new()) {
-                let kind = if c["type"].as_str() == Some("file") {
-                    "file"
-                } else {
-                    "link"
-                };
-                md.push_str(&format!(
-                    "    - {kind}: {} ({} bytes) — {}\n",
-                    c["filename"].as_str().unwrap_or("?"),
-                    c["filesize"],
-                    c["fileurl"].as_str().unwrap_or("no url"),
-                ));
-            }
-        }
-    }
 
     Ok((md, structured))
 }
