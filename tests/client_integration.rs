@@ -75,6 +75,34 @@ async fn submit_assignment_rejects_blank_text() {
     assert_eq!(server.received_requests().await.unwrap().len(), 0);
 }
 
+/// HTML resources render as markdown, not raw tags (live finding: an .html
+/// course resource used to come back as a raw `<div>…` blob).
+#[tokio::test]
+async fn fetch_converts_html_to_markdown() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/page.html"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string(
+                    "<h1>Chap2</h1><table><tr><th>Q</th></tr><tr><td>7</td></tr></table>",
+                )
+                .insert_header("content-type", "text/html; charset=utf-8"),
+        )
+        .mount(&server)
+        .await;
+
+    let client = client_for(&server).await;
+    let out = moodle_mcp::tools::files::fetch_file(&client, &format!("{}/page.html", server.uri()))
+        .await
+        .expect("fetch");
+    assert_eq!(out["format"], json!("html"));
+    let md = out["markdown"].as_str().unwrap();
+    assert!(md.contains("Chap2"), "heading lost: {md}");
+    assert!(md.contains("|"), "table lost: {md}");
+    assert!(!md.contains("<table>"), "raw tags leaked: {md}");
+}
+
 /// 3.7 regression: the grades-overview API omits `coursename` — empty names
 /// are filled from the enrolled-course roster.
 #[tokio::test]

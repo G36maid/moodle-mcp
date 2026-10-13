@@ -15,6 +15,8 @@ const MAX_FETCH_CHARS: usize = 100_000;
 const MAX_FETCH_INPUT_BYTES: u64 = 100_000_000; // 100 MB
 /// Hard cap for streamed downloads (protects memory and disk).
 const MAX_DOWNLOAD_BYTES: u64 = 500_000_000; // 500 MB
+/// Inline cap for plain-text / HTML payloads (same as the legacy text path).
+const MAX_TEXT_BYTES: usize = 1_000_000; // 1 MB
 /// Upload cap: Moodle sites cap uploads far below this (default ~8–50 MB);
 /// the check avoids buffering an absurd file into RAM before the server
 /// would reject it anyway.
@@ -121,8 +123,28 @@ pub async fn fetch_file(client: &MoodleClient, url: &str) -> Result<Value, Moodl
         }));
     }
 
+    // HTML resources → markdown (same promise as the document converters
+    // above; a raw `<div>…` blob is not something an agent should read).
+    let is_html = content_type.starts_with("text/html") || matches!(ext.as_str(), "html" | "htm");
+    if is_html
+        && size <= MAX_TEXT_BYTES
+        && let Some(md) = std::str::from_utf8(&bytes)
+            .ok()
+            .map(crate::util::html_to_markdown)
+    {
+        let text = truncate_chars(&md, MAX_FETCH_CHARS);
+        return Ok(json!({
+            "url": url,
+            "content_type": content_type,
+            "size_bytes": size,
+            "format": "html",
+            "chars": text.chars().count(),
+            "markdown": text,
+        }));
+    }
+
     // Plain text (or decodable small payloads) → inline.
-    if size <= 1_000_000
+    if size <= MAX_TEXT_BYTES
         && let Ok(text) = std::str::from_utf8(&bytes)
     {
         let text = truncate_chars(text, MAX_FETCH_CHARS);
