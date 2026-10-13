@@ -101,7 +101,7 @@ pub async fn get_discussion_posts(
         other => other?,
     };
 
-    let posts: Vec<Value> = v
+    let mut posts: Vec<Value> = v
         .get("posts")
         .and_then(Value::as_array)
         .cloned()
@@ -135,6 +135,14 @@ pub async fn get_discussion_posts(
             })
         })
         .collect();
+    // Chronological order for reading a thread (upstream may return
+    // newest-first depending on version/sort).
+    posts.sort_by_key(|p| {
+        p.get("created")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .unwrap_or_default()
+    });
     Ok(json!({
         "discussion_id": discussion_id,
         "count": posts.len(),
