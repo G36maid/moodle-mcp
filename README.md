@@ -1,11 +1,27 @@
-# moodle-mcp
+<p align="center">
+  <img src="assets/moodle-mcp-banner.svg" alt="moodle-mcp hero banner" width="100%">
+</p>
 
-[![CI](https://github.com/G36maid/moodle-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/G36maid/moodle-mcp/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/G36maid/moodle-mcp?include_prereleases)](https://github.com/G36maid/moodle-mcp/releases/latest)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/rust-1.88%2B-orange.svg)](https://www.rust-lang.org)
-[![MCP](https://img.shields.io/badge/protocol-MCP%20stdio-6C5CE7)](https://modelcontextprotocol.io)
-[![Release](https://github.com/G36maid/moodle-mcp/actions/workflows/release.yml/badge.svg)](https://github.com/G36maid/moodle-mcp/actions/workflows/release.yml)
+<p align="center">
+  <a href="https://github.com/G36maid/moodle-mcp/actions/workflows/ci.yml"><img src="https://github.com/G36maid/moodle-mcp/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://codecov.io/gh/G36maid/moodle-mcp"><img src="https://img.shields.io/codecov/c/github/G36maid/moodle-mcp" alt="Codecov"></a>
+  <a href="https://github.com/G36maid/moodle-mcp/releases/latest"><img src="https://img.shields.io/github/v/release/G36maid/moodle-mcp?include_prereleases" alt="Release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/rust-1.88%2B-orange.svg" alt="Rust"></a>
+  <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/protocol-MCP%20stdio-6C5CE7" alt="MCP"></a>
+  <a href="https://github.com/G36maid/moodle-mcp/actions/workflows/release.yml"><img src="https://github.com/G36maid/moodle-mcp/actions/workflows/release.yml/badge.svg" alt="Release"></a>
+</p>
+
+<p align="center">
+  <b>English</b> | 
+  <a href="i18n/README.zh-TW.md">繁體中文</a> | 
+  <a href="i18n/README.zh-CN.md">简体中文</a> | 
+  <a href="i18n/README.ja.md">日本語</a> | 
+  <a href="i18n/README.es.md">Español</a> | 
+  <a href="i18n/README.de.md">Deutsch</a> | 
+  <a href="i18n/README.pt-BR.md">Português</a> | 
+  <a href="i18n/README.fr.md">Français</a>
+</p>
 
 A [Model Context Protocol](https://modelcontextprotocol.io) server that lets
 LLM agents **use a real Moodle LMS** — read courses, fetch assignment PDFs,
