@@ -1,5 +1,7 @@
 # moodle-mcp
 
+[![CI](https://github.com/G36maid/moodle-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/G36maid/moodle-mcp/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/G36maid/moodle-mcp?include_prereleases)](https://github.com/G36maid/moodle-mcp/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.88%2B-orange.svg)](https://www.rust-lang.org)
 [![MCP](https://img.shields.io/badge/protocol-MCP%20stdio-6C5CE7)](https://modelcontextprotocol.io)
@@ -56,10 +58,12 @@ Full journeys in [Prompt examples](#-prompt-examples) and
 - **Agent-native** — tools take and return **local file paths** instead of
   base64; results embed the IDs for the next tool; defaults come with hints
   ("pass course_ids to filter"); errors are plain-language and suggest the fix
-- **22 tools** — courses, course map, assignments, submission, forums,
-  files (fetch/convert/download/upload), grades, schedule, messaging,
-  quiz attempts, plus a generic escape hatch (`call_ws_function` +
-  `list_functions`) so nothing is out of reach
+- **22 curated tools, human-shaped** — each one mirrors a step you'd
+  actually take clicking through Moodle: courses, course map, assignments,
+  submission, forums, files (fetch/convert/download/upload), grades,
+  schedule, messaging, quiz attempts — not a 1:1 dump of the ~350 raw
+  web-service functions; a generic escape hatch (`call_ws_function` +
+  `list_functions`) still reaches everything else
 - **Course map in one call** — `get_course_overview` merges five Moodle
   endpoints into a single markdown document with every ID and file URL embedded
 - **PDF → markdown** — assignment briefs become readable requirements via
@@ -87,7 +91,25 @@ Full journeys in [Prompt examples](#-prompt-examples) and
 
 ## 📦 Install
 
-### Build
+### Download a prebuilt binary
+
+No Rust toolchain needed — grab the archive for your platform from the
+[latest release](https://github.com/G36maid/moodle-mcp/releases/latest):
+
+| Platform | Archive |
+|---|---|
+| Linux x86_64 | `moodle-mcp-<version>-x86_64-unknown-linux-gnu.tar.gz` |
+| Linux arm64 | `moodle-mcp-<version>-aarch64-unknown-linux-gnu.tar.gz` |
+| macOS Apple Silicon | `moodle-mcp-<version>-aarch64-apple-darwin.tar.gz` |
+| macOS Intel | `moodle-mcp-<version>-x86_64-apple-darwin.tar.gz` |
+| Windows x64 | `moodle-mcp-<version>-x86_64-pc-windows-msvc.zip` |
+
+```bash
+tar xzf moodle-mcp-*-aarch64-apple-darwin.tar.gz
+sudo mv moodle-mcp-*/moodle-mcp /usr/local/bin/   # or anywhere on PATH
+```
+
+### Or build from source
 
 ```bash
 git clone https://github.com/G36maid/moodle-mcp
@@ -118,7 +140,17 @@ If the token request fails, the site is missing something from
 ### Connect a client
 
 All four clients read the same stdio server: launch `/path/to/moodle-mcp` with
-`MOODLE_URL` / `MOODLE_TOKEN` in its environment.
+`MOODLE_URL` / `MOODLE_TOKEN` in its environment. Claude Code can also be
+wired up with a single command:
+
+```bash
+claude mcp add moodle \
+  --env MOODLE_URL=https://moodle.example.com \
+  --env MOODLE_TOKEN=your-token \
+  -- /path/to/moodle-mcp
+```
+
+Otherwise, pick your client:
 
 <details open>
 <summary><b>Claude Code</b> — <code>.mcp.json</code> (project) or <code>~/.claude.json</code> (global)</summary>
