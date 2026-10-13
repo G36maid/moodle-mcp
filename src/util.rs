@@ -152,6 +152,15 @@ mod tests {
     }
 
     #[test]
+    fn html_double_encoded_and_nbsp() {
+        // NTNU 42593 實測:label 來源為雙重編碼(&amp;nbsp;)且 htmd 輸出 U+00A0
+        let md = html_to_markdown("Group 2 :&amp;nbsp;electricity");
+        assert!(!md.contains("&nbsp;"), "{md}");
+        assert!(!md.contains("&amp;"), "{md}");
+        assert!(!md.contains('\u{00A0}'), "{md}");
+    }
+
+    #[test]
     fn html_empty_is_empty() {
         assert_eq!(html_to_markdown("   "), "");
     }

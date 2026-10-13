@@ -164,6 +164,25 @@ impl MoodleClient {
         self.http.get(url).send().await.map_err(MoodleError::from)
     }
 
+    /// Build the final download URL: same-site `pluginfile.php` URLs get the
+    /// token injected; everything else is passed through untouched.
+    pub(crate) fn prepare_download_url(&self, file_url: &str) -> Result<url::Url, MoodleError> {
+        let mut url =
+            url::Url::parse(file_url).map_err(|e| MoodleError::Config(format!("invalid file URL: {e}")))?;
+        let base = url::Url::parse(&self.base_url)
+            .map_err(|e| MoodleError::Config(format!("invalid base URL: {e}")))?;
+        let same_site = url.scheme() == base.scheme()
+            && url.host_str() == base.host_str()
+            && url.port_or_known_default() == base.port_or_known_default();
+        if same_site
+            && !url.query_pairs().any(|(k, _)| k == "token")
+            && url.path().contains("pluginfile.php")
+        {
+            url.query_pairs_mut().append_pair("token", &self.token);
+        }
+        Ok(url)
+    }
+
     /// Upload a file to the user's draft file area via `webservice/upload.php`.
     ///
     /// Returns the raw JSON array response (contains `itemid` to reference
@@ -252,6 +271,40 @@ fn truncate(s: &str, max: usize) -> &str {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn download_url_token_rules() {
+        let client = MoodleClient::new(Config {
+            base_url: "https://moodle.example.com".into(),
+            token: "secret".into(),
+            timeout_secs: 10,
+        })
+        .unwrap();
+
+        // 同站 pluginfile:注入 token
+        let u = client
+            .prepare_download_url("https://moodle.example.com/webservice/pluginfile.php/1/f.pdf")
+            .unwrap();
+        assert!(u.query_pairs().any(|(k, v)| k == "token" && v == "secret"));
+
+        // 已帶 token:不重複
+        let u = client
+            .prepare_download_url("https://moodle.example.com/webservice/pluginfile.php/1/f.pdf?token=other")
+            .unwrap();
+        assert_eq!(u.query_pairs().filter(|(k, _)| k == "token").count(), 1);
+
+        // 外部主機:即使路徑含 pluginfile.php 也不注入(token 外洩防護)
+        let u = client
+            .prepare_download_url("https://evil.example.com/pluginfile.php/1/f.pdf")
+            .unwrap();
+        assert!(!u.query_pairs().any(|(k, _)| k == "token"));
+
+        // 非本站路徑:不注入
+        let u = client
+            .prepare_download_url("https://cdn.example.com/files/f.pdf")
+            .unwrap();
+        assert!(!u.query_pairs().any(|(k, _)| k == "token"));
+    }
 
     #[test]
     fn flattens_php_notation() {

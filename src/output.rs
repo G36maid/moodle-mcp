@@ -120,6 +120,19 @@ mod tests {
     }
 
     #[test]
+    fn non_object_results_are_wrapped_for_mcp() {
+        // MCP 規範:structuredContent 必須是物件。逃生口的原樣陣列/純量
+        // (NTNU 實測:userid=-1 回 [])要包進 {"result": ...},否則 client
+        // 會拒絕("Invalid MCP tools/call structured content")。
+        let out = finish_json(json!([1, 2])).unwrap();
+        let sc = out.structured_content.unwrap();
+        assert_eq!(sc["result"], json!([1, 2]));
+
+        let out = finish_json(json!("plain")).unwrap();
+        assert_eq!(out.structured_content.unwrap()["result"], json!("plain"));
+    }
+
+    #[test]
     fn doc_truncation_keeps_json_valid() {
         let md = "x".repeat(300_000);
         let out = finish_doc(md, json!({"k": 1})).unwrap();
