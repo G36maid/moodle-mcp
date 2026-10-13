@@ -80,9 +80,7 @@ impl MoodleError {
                 } else {
                     format!("\n\nHints: {hint}")
                 };
-                format!(
-                    "Moodle API error {code}: {message} (exception: {exception}){hint_block}"
-                )
+                format!("Moodle API error {code}: {message} (exception: {exception}){hint_block}")
             }
             MoodleError::Http(e) => format!("HTTP request to Moodle failed: {e}"),
             MoodleError::Json(e) => format!(

@@ -155,8 +155,8 @@ impl MoodleClient {
     /// Build the final download URL: same-site `pluginfile.php` URLs get the
     /// token injected; everything else is passed through untouched.
     pub(crate) fn prepare_download_url(&self, file_url: &str) -> Result<url::Url, MoodleError> {
-        let mut url =
-            url::Url::parse(file_url).map_err(|e| MoodleError::Config(format!("invalid file URL: {e}")))?;
+        let mut url = url::Url::parse(file_url)
+            .map_err(|e| MoodleError::Config(format!("invalid file URL: {e}")))?;
         let base = url::Url::parse(&self.base_url)
             .map_err(|e| MoodleError::Config(format!("invalid base URL: {e}")))?;
         let same_site = url.scheme() == base.scheme()
@@ -277,7 +277,9 @@ mod tests {
 
         // 已帶 token:不重複
         let u = client
-            .prepare_download_url("https://moodle.example.com/webservice/pluginfile.php/1/f.pdf?token=other")
+            .prepare_download_url(
+                "https://moodle.example.com/webservice/pluginfile.php/1/f.pdf?token=other",
+            )
             .unwrap();
         assert_eq!(u.query_pairs().filter(|(k, _)| k == "token").count(), 1);
 

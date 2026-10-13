@@ -156,12 +156,14 @@ async fn exception_without_errorcode_is_still_detected() {
 
     let client = client_for(&server).await;
     let err = client
-        .call::<Value>("mod_forum_get_discussion_posts", &json!({"discussionid": 1}))
+        .call::<Value>(
+            "mod_forum_get_discussion_posts",
+            &json!({"discussionid": 1}),
+        )
         .await
         .expect_err("must fail");
     assert!(matches!(err, MoodleError::Api { .. }), "got: {err}");
 }
-
 
 // ---- 回歸測試:pi e2e 發現的問題 ----
 
@@ -226,7 +228,9 @@ async fn null_submission_renders_as_not_submitted() {
     let server = MockServer::start().await;
     // 廣泛的 mock:任何 mod_assign 呼叫都回對應形狀
     Mock::given(method("POST"))
-        .and(body_string_contains("wsfunction=mod_assign_get_assignments"))
+        .and(body_string_contains(
+            "wsfunction=mod_assign_get_assignments",
+        ))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
             "courses": [{"id": 61716, "fullname": "課程", "assignments": [
                 {"id": 144948, "cmid": 1, "name": "HW", "submissiondraft": 0}
@@ -235,7 +239,9 @@ async fn null_submission_renders_as_not_submitted() {
         .mount(&server)
         .await;
     Mock::given(method("POST"))
-        .and(body_string_contains("wsfunction=mod_assign_get_submission_status"))
+        .and(body_string_contains(
+            "wsfunction=mod_assign_get_submission_status",
+        ))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
             "lastattempt": {
                 "submission": null,
@@ -252,5 +258,8 @@ async fn null_submission_renders_as_not_submitted() {
         .await
         .expect("get_assignment");
     assert!(md.contains("**Submission**: no submission yet"), "{md}");
-    assert_eq!(structured["submission"]["status"], json!("no submission yet"));
+    assert_eq!(
+        structured["submission"]["status"],
+        json!("no submission yet")
+    );
 }
