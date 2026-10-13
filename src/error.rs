@@ -31,10 +31,14 @@ pub enum MoodleError {
 }
 
 /// The exception payload Moodle returns instead of the expected data.
+/// `errorcode` may be absent on PHP fatals (e.g. 3.7 returns only
+/// `{exception, message}`).
 #[derive(Debug, serde::Deserialize)]
 pub struct MoodleException {
     pub exception: String,
+    #[serde(default)]
     pub errorcode: String,
+    #[serde(default)]
     pub message: String,
 }
 
@@ -54,12 +58,21 @@ impl MoodleError {
                 exception,
                 errorcode,
                 message,
-            } => format!(
-                "Moodle API error {errorcode}: {message} (exception: {exception})\n\n\
-                 Hints: `invalidtoken` → check MOODLE_TOKEN; `accesscontrolexception`/`nopermission` → \
-                 the function is not in the token's external service or you lack the capability; \
-                 `sitemaintenance` → site is under maintenance."
-            ),
+            } => {
+                // PHP fatals arrive with an empty errorcode — fall back to the
+                // exception class name so the code shown is never empty.
+                let code = if errorcode.is_empty() {
+                    exception.as_str()
+                } else {
+                    errorcode.as_str()
+                };
+                format!(
+                    "Moodle API error {code}: {message} (exception: {exception})\n\n\
+                     Hints: `invalidtoken` → check MOODLE_TOKEN; `accesscontrolexception`/`nopermission` → \
+                     the function is not in the token's external service or you lack the capability; \
+                     `sitemaintenance` → site is under maintenance."
+                )
+            }
             MoodleError::Http(e) => format!("HTTP request to Moodle failed: {e}"),
             MoodleError::Json(e) => format!(
                 "Moodle returned a non-JSON response: {e}. Web services may be disabled on the site."

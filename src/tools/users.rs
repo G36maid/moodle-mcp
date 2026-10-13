@@ -63,7 +63,12 @@ pub async fn search_users(
         p["limitnum"] = json!(limit);
         p
     };
-    let v: Value = client.call(wsfunction, &params).await?;
+    let v: Value = client.call(wsfunction, &params).await.map_err(|e| {
+        MoodleError::Config(format!(
+            "user search is unavailable for this account ({e}). Use known ids from \
+             conversations, notifications or forum posts with get_user instead."
+        ))
+    })?;
     let users: Vec<Value> = v
         .get("users")
         .and_then(Value::as_array)

@@ -132,9 +132,12 @@ impl MoodleClient {
         // Moodle reports API errors with HTTP 200 and an exception payload.
         if let Some(obj) = value.as_object()
             && obj.contains_key("exception")
-            && obj.contains_key("errorcode")
         {
-            let exc: MoodleException = serde_json::from_value(value).map_err(MoodleError::from)?;
+            let exc: MoodleException = serde_json::from_value(value).unwrap_or(MoodleException {
+                exception: "unknown".into(),
+                errorcode: "unknown".into(),
+                message: truncate(&text, 200).to_string(),
+            });
             return Err(MoodleError::from_exception(exc));
         }
         Ok(value)
@@ -188,9 +191,12 @@ impl MoodleClient {
         })?;
         if let Some(obj) = value.as_object()
             && obj.contains_key("exception")
-            && obj.contains_key("errorcode")
         {
-            let exc: MoodleException = serde_json::from_value(value).map_err(MoodleError::from)?;
+            let exc: MoodleException = serde_json::from_value(value).unwrap_or(MoodleException {
+                exception: "unknown".into(),
+                errorcode: "unknown".into(),
+                message: truncate(&text, 200).to_string(),
+            });
             return Err(MoodleError::from_exception(exc));
         }
         Ok(value)

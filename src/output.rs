@@ -12,7 +12,7 @@
 //! JSON).
 
 use rmcp::model::{CallToolResult, ContentBlock};
-use serde_json::{Map, Value};
+use serde_json::{Map, Value, json};
 
 /// Hard cap for markdown documents (chars). Beyond this the text is truncated
 /// with a marker; `structuredContent` is never truncated.
@@ -58,8 +58,17 @@ fn with_hints(mut v: Value, hints: &[String]) -> Value {
 }
 
 /// Standard tool result: JSON in both channels (nulls stripped).
+/// MCP requires `structuredContent` to be an object — non-object results
+/// (raw arrays/scalars, e.g. from the escape hatch) are wrapped in
+/// `{"result": …}`.
 pub fn finish_json(v: Value) -> Result<CallToolResult, rmcp::ErrorData> {
-    Ok(CallToolResult::structured(strip_nulls(&v)))
+    let v = strip_nulls(&v);
+    let v = if v.is_object() {
+        v
+    } else {
+        json!({ "result": v })
+    };
+    Ok(CallToolResult::structured(v))
 }
 
 /// Standard tool result with hint lines attached (top-level `hints` array).

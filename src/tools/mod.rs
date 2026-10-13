@@ -502,9 +502,13 @@ impl MoodleMcp {
         if p.course_ids.is_none() {
             hints.push(HINT_COURSE.to_string());
         }
-        let ids = match self.enrolled_course_ids().await {
-            Ok(ids) => ids,
-            Err(e) => return Ok(crate::error::moodle_to_tool_result(e)),
+        // Agent-provided course_ids win; omitted → all enrolled courses.
+        let ids = match p.course_ids.clone() {
+            Some(ids) if !ids.is_empty() => ids,
+            _ => match self.enrolled_course_ids().await {
+                Ok(ids) => ids,
+                Err(e) => return Ok(crate::error::moodle_to_tool_result(e)),
+            },
         };
         match schedule::get_schedule(&self.client, &ids, p.time_from, p.time_to).await {
             Ok(v) => Ok(crate::output::finish_json_with_hints(v, &hints)?),

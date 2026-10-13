@@ -113,6 +113,12 @@ pub async fn get_course_overview(
         client.call::<Value>("gradereport_user_get_grade_items", &grade_params),
     );
 
+    // A failed contents fetch means the course is invalid/inaccessible —
+    // surface it as an error instead of rendering an empty map.
+    if let Err(e) = &contents_r {
+        return Err(MoodleError::InvalidBody(e.to_tool_message()));
+    }
+
     // --- course meta (fullname from the assignments response; sections[0].name
     // is the first section, NOT the course name) ---
     let fullname = assign_r
