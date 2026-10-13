@@ -39,8 +39,6 @@ A generic chatbot has no way into your Moodle, so every study task stays manual:
 - ❌ Five browser tabs open just to answer *"what's due this week?"*
 - ❌ Assignment PDFs downloaded by hand, then re-uploaded into a chat window
 - ❌ Forum threads and grades copy-pasted one page at a time
-- ❌ Questions about *your* courses answered with guesses — the model can't see
-  anything to check against
 
 ## ✅ With moodle-mcp
 
@@ -69,7 +67,7 @@ Full journeys in [Prompt examples](#-prompt-examples) and
 ## ✨ Features
 
 - **Batteries included** — document conversion (anydoc), HTML → markdown
-  (htmd), token CLI and the escape hatch ship in the box: no plugins,
+  (htmd), auth CLI and the escape hatch ship in the box: no plugins,
   no helper scripts, no second runtime
 - **Agent-native** — tools take and return **local file paths** instead of
   base64; results embed the IDs for the next tool; defaults come with hints
@@ -139,15 +137,20 @@ cargo build --release
 Use the built-in CLI (same binary):
 
 ```bash
-moodle-mcp token --url https://moodle.example.com --username yourname
-# Password: (hidden prompt)
+moodle-mcp auth
+# Moodle URL (e.g. https://moodle.example.com): https://moodle.example.com
+# Username: yourname
+# Password: ********   (masked as you type)
 # → export MOODLE_URL='https://moodle.example.com' MOODLE_TOKEN='…'
 ```
+
+Anything passed as a flag (`--url`, `--username`, `--password`) skips the
+matching prompt, so scripts work non-interactively too.
 
 With SSO (no password), open the Security keys page in a browser instead:
 
 ```bash
-moodle-mcp token --url https://moodle.example.com --open
+moodle-mcp auth --url https://moodle.example.com --open
 ```
 
 If the token request fails, the site is missing something from
