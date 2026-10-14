@@ -54,15 +54,23 @@ pub async fn get_user_by_field(
 pub async fn search_users(
     client: &MoodleClient,
     wsfunction: &str,
+    user_id: i64,
     search: Option<&str>,
     limit: u32,
 ) -> Result<Value, MoodleError> {
-    let v = search_call(client, wsfunction, search, limit).await;
+    let v = search_call(client, wsfunction, user_id, search, limit).await;
     let v = match v {
         Err(MoodleError::Api { ref errorcode, .. })
             if errorcode == "invalidparameter" && wsfunction == "core_user_get_users" =>
         {
-            search_call(client, "core_message_message_search_users", search, limit).await
+            search_call(
+                client,
+                "core_message_message_search_users",
+                user_id,
+                search,
+                limit,
+            )
+            .await
         }
         other => other,
     };
@@ -94,6 +102,7 @@ pub async fn search_users(
 async fn search_call(
     client: &MoodleClient,
     wsfunction: &str,
+    user_id: i64,
     search: Option<&str>,
     limit: u32,
 ) -> Result<Value, MoodleError> {
@@ -104,12 +113,16 @@ async fn search_call(
         };
         json!({ "criteria": criteria, "limitnum": limit })
     } else {
-        let mut p = json!({});
-        if let Some(q) = search {
-            p["searchtext"] = json!(q);
-        }
-        p["limitnum"] = json!(limit);
-        p
+        // core_message_message_search_users requires `userid` and `search`
+        // (verified identical on 3.7 and 4.5+ — `searchtext` is rejected
+        // with invalidparameter) and only lets the account search as
+        // itself, so always send the token owner's id.
+        json!({
+            "userid": user_id,
+            "search": search.unwrap_or(""),
+            "limitfrom": 0,
+            "limitnum": limit,
+        })
     };
     client.call(wsfunction, &params).await
 }

@@ -42,7 +42,8 @@ async fn search_users_falls_back_on_invalidparameter() {
         .and(body_string_contains(
             "wsfunction=core_message_message_search_users",
         ))
-        .and(body_string_contains("searchtext=chen"))
+        .and(body_string_contains("userid=5"))
+        .and(body_string_contains("search=chen"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
             "users": [{"id": 9, "fullname": "Wang Chen", "username": "chen"}]
         })))
@@ -51,7 +52,7 @@ async fn search_users_falls_back_on_invalidparameter() {
 
     let client = client_for(&server).await;
     let out =
-        moodle_mcp::tools::users::search_users(&client, "core_user_get_users", Some("chen"), 20)
+        moodle_mcp::tools::users::search_users(&client, "core_user_get_users", 5, Some("chen"), 20)
             .await
             .expect("fallback search");
     assert_eq!(out["count"], json!(1));

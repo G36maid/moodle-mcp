@@ -632,10 +632,19 @@ impl MoodleMcp {
             .pick_function(&["core_user_get_users", "core_message_message_search_users"])
             .await;
         let res = match wsfunction {
-            Ok(f) => {
-                users::search_users(&self.client, &f, p.search.as_deref(), p.limit.unwrap_or(20))
+            Ok(f) => match self.current_user_id().await {
+                Ok(uid) => {
+                    users::search_users(
+                        &self.client,
+                        &f,
+                        uid,
+                        p.search.as_deref(),
+                        p.limit.unwrap_or(20),
+                    )
                     .await
-            }
+                }
+                Err(e) => Err(e),
+            },
             Err(e) => Err(e),
         };
         finish(res)
