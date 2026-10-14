@@ -1,0 +1,113 @@
+---
+import Base from '../layouts/Base.astro';
+
+// Mirrors README's tool reference. RW: 📖 read-only · ✍️ write.
+const groups = [
+  {
+    name: '身分與課程',
+    sig: 'Identity & courses',
+    tools: [
+      { n: 'whoami', s: '()', rw: '📖', d: 'Token 擁有者身分 + 站台版本。' },
+      { n: 'list_courses', s: '(search?)', rw: '📖', d: '已選課程；可選名稱過濾。' },
+      { n: 'get_course_overview', s: '(course_id)', rw: '📖', d: '整門課的 Markdown 全貌地圖。' },
+    ],
+  },
+  {
+    name: '作業',
+    sig: 'Assignments',
+    tools: [
+      { n: 'get_assignment', s: '(assignment_id)', rw: '📖', d: '完整文件：時間、狀態、說明、附件、繳交與成績評語。' },
+      { n: 'submit_assignment', s: '(assignment_id, text?, item_id?, finalize?)', rw: '✍️', d: '唯一的繳交入口：線上文字與／或草稿檔案，可選擇定稿。' },
+    ],
+  },
+  {
+    name: '討論區',
+    sig: 'Forums',
+    tools: [
+      { n: 'get_forum_discussions', s: '(forum_id)', rw: '📖', d: '討論串清單，含首篇預覽。' },
+      { n: 'get_discussion_posts', s: '(discussion_id)', rw: '📖', d: '整串討論轉為 Markdown，附件包含在內。' },
+      { n: 'create_forum_discussion', s: '(forum_id, subject, message)', rw: '✍️', d: '發起新討論串。' },
+      { n: 'reply_to_discussion', s: '(post_id, subject, message)', rw: '✍️', d: '回覆（回首篇＝回覆整串）。' },
+    ],
+  },
+  {
+    name: '檔案',
+    sig: 'Files',
+    tools: [
+      { n: 'fetch_file', s: '(url)', rw: '📖', d: 'PDF/DOCX/PPTX/XLSX/ODT/RTF/EPUB/CSV → Markdown（anydoc）；100k 字上限。' },
+      { n: 'download_file', s: '(url, save_to)', rw: '📖', d: '原始位元組串流 → 本機路徑（僅回傳 metadata）。' },
+      { n: 'upload_file', s: '(path, item_id?)', rw: '✍️', d: '本機檔案 → 草稿區。' },
+    ],
+  },
+  {
+    name: '成績、時程與訊息',
+    sig: 'Grades, schedule, messaging',
+    tools: [
+      { n: 'get_grades', s: '(course_id?)', rw: '📖', d: '跨課程彙總，或單門課的每個成績項目。' },
+      { n: 'get_schedule', s: '(time_from?, time_to?, course_ids?)', rw: '📖', d: '合併時間軸（預設未來 30 天）。' },
+      { n: 'get_notifications', s: '(read?, limit?)', rw: '📖', d: '最近的通知。' },
+      { n: 'get_conversations', s: '(limit?)', rw: '📖', d: '對話清單，含成員 ID。' },
+      { n: 'send_message', s: '(user_id, text)', rw: '✍️', d: '直送訊息。' },
+      { n: 'get_quiz_attempts', s: '(quiz_id)', rw: '📖', d: '測驗嘗試紀錄（唯讀）。' },
+      { n: 'get_user / search_users', s: '(field, value) / (search?, limit?)', rw: '📖', d: '個人檔案查詢／使用者搜尋。' },
+    ],
+  },
+  {
+    name: '逃生出口',
+    sig: 'Escape hatch',
+    id: 'escape',
+    tools: [
+      { n: 'call_ws_function', s: '(wsfunction, params?)', rw: '📖/✍️', d: '呼叫任何已啟用的 WS 函式（PHP 方括號記法自動處理）。' },
+      { n: 'list_functions', s: '(query?)', rw: '📖', d: '依關鍵字探索可呼叫函式。' },
+    ],
+  },
+];
+---
+<Base title="工具參考 — moodle-mcp" description="moodle-mcp 的 22 個工具：身分與課程、作業、討論區、檔案、成績、時程、訊息與逃生出口。">
+  <section class="section" style="padding-bottom:40px;">
+    <div class="shell">
+      <div class="section-head">
+        <div>
+          <h2>工具參考</h2>
+          <p class="lede">22 個具備型別的工具，對應你實際點擊 Moodle 的每一步——而非 350+ 個原始 WS 函式的 1:1 照搬。</p>
+        </div>
+        <div class="actions">
+          <a class="btn btn-outline" href="https://github.com/G36maid/moodle-mcp#-tool-reference" target="_blank" rel="noopener">README ›</a>
+        </div>
+      </div>
+      <input id="tool-search" class="toolsearch" type="search" placeholder="篩選工具…（例如：作業、forum、grades）" autocomplete="off" />
+      {groups.map((g) => (
+        <div class="toolgroup" id={g.id ?? undefined}>
+          <h3>{g.name}</h3>
+          <div class="gs">{g.sig}</div>
+          <table class="tooltable">
+            <thead>
+              <tr><th style="width:22%">工具</th><th style="width:30%">簽名</th><th style="width:6%">RW</th><th>用途</th></tr>
+            </thead>
+            <tbody>
+              {g.tools.map((t) => (
+                <tr data-text={`${t.n} ${t.s} ${t.d} ${g.name}`.toLowerCase()}>
+                  <td class="tname">{t.n}</td>
+                  <td class="tsig">{t.s}</td>
+                  <td class="trw">{t.rw}</td>
+                  <td class="tdesc">{t.d}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+      <p class="mono" style="color:var(--ink-faint);">📖 唯讀 · ✍️ 寫入（執行前會先與你確認；上傳一律進草稿區）。</p>
+    </div>
+  </section>
+
+  <script is:inline>
+    const input = document.getElementById('tool-search');
+    input?.addEventListener('input', () => {
+      const q = input.value.trim().toLowerCase();
+      document.querySelectorAll('.tooltable tbody tr').forEach((tr) => {
+        tr.classList.toggle('hide', !!q && !tr.dataset.text.includes(q));
+      });
+    });
+  </script>
+</Base>
