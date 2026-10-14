@@ -352,6 +352,7 @@ mod tests {
             base_url: "https://moodle.example.com".into(),
             token: "secret".into(),
             timeout_secs: 10,
+            timezone: None,
         })
         .unwrap();
 
@@ -372,6 +373,7 @@ mod tests {
             base_url: "https://example.com/campus".into(),
             token: "secret".into(),
             timeout_secs: 10,
+            timezone: None,
         })
         .unwrap();
         let u = sub
@@ -399,6 +401,7 @@ mod tests {
             base_url: "https://moodle.example.com".into(),
             token: "secret".into(),
             timeout_secs: 10,
+            timezone: None,
         })
         .unwrap();
 

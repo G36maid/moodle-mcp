@@ -12,6 +12,7 @@ async fn client_for(server: &MockServer) -> MoodleClient {
         base_url: server.uri(),
         token: "testtoken".into(),
         timeout_secs: 10,
+        timezone: None,
     })
     .expect("client")
 }

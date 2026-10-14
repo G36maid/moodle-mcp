@@ -35,6 +35,39 @@ fn load_config() -> Config {
     }
 }
 
+/// Resolve the timestamp-rendering timezone: an explicit MOODLE_TIMEZONE
+/// wins (already validated by Config); otherwise the user's Moodle timezone
+/// preference is consulted (its value may be '99' = site default, which no
+/// web service exposes, or otherwise unparseable) and anything unknown
+/// falls back to UTC with a log line.
+async fn resolve_timezone(client: &MoodleClient, env_tz: Option<&str>) {
+    if let Some(name) = env_tz {
+        let tz = moodle_mcp::util::parse_timezone(name)
+            .expect("MOODLE_TIMEZONE validated at config load");
+        moodle_mcp::util::set_timezone(tz);
+        tracing::info!(%name, "timestamp timezone set from MOODLE_TIMEZONE");
+        return;
+    }
+    let detected = client
+        .call(
+            "core_user_get_user_preferences",
+            &serde_json::json!({ "name": "timezone" }),
+        )
+        .await
+        .ok()
+        .and_then(|v| moodle_mcp::util::timezone_from_preferences(&v));
+    match detected {
+        Some(tz) => {
+            moodle_mcp::util::set_timezone(tz);
+            tracing::info!(timezone = %tz, "timestamp timezone detected from the Moodle user preference");
+        }
+        None => tracing::info!(
+            "timezone unknown (site default or not exposed) — rendering timestamps in UTC; \
+             set MOODLE_TIMEZONE to override"
+        ),
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
@@ -59,7 +92,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         cfg.base_url
     );
 
-    let client = Arc::new(MoodleClient::new(cfg)?);
+    let client = Arc::new(MoodleClient::new(cfg.clone())?);
+    resolve_timezone(&client, cfg.timezone.as_deref()).await;
     let server = MoodleMcp::new(client);
 
     let running = server.serve(stdio()).await?;

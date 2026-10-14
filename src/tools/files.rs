@@ -417,6 +417,7 @@ mod tests {
             base_url: server.uri(),
             token: "t".into(),
             timeout_secs: 10,
+            timezone: None,
         })
         .unwrap();
         let resp = client

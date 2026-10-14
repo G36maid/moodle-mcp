@@ -253,6 +253,7 @@ env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "your-toke
 | `MOODLE_URL` | ✔ | — | Site base URL, no trailing slash |
 | `MOODLE_TOKEN` | ✔ | — | Web service token |
 | `MOODLE_TIMEOUT_SECS` | — | `60` | Per-request timeout |
+| `MOODLE_TIMEZONE` | — | auto / `UTC` | IANA name (`Asia/Taipei`) for rendering timestamps; default auto-detects the Moodle user's timezone preference and falls back to UTC |
 | `RUST_LOG` | — | `info` | Log filter (logs → stderr; stdout is the MCP stream) |
 
 ## 💬 Prompt examples

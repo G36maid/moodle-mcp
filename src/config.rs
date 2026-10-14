@@ -7,6 +7,10 @@ pub struct Config {
     pub token: String,
     /// Request timeout in seconds.
     pub timeout_secs: u64,
+    /// IANA timezone override for rendering timestamps (MOODLE_TIMEZONE).
+    /// Validated at load so a typo fails fast; `None` = auto-detect from the
+    /// user's Moodle timezone preference, falling back to UTC.
+    pub timezone: Option<String>,
 }
 
 impl Config {
@@ -26,10 +30,23 @@ impl Config {
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(60);
+        let timezone = std::env::var("MOODLE_TIMEZONE")
+            .ok()
+            .map(|v| v.trim().to_string())
+            .filter(|v| !v.is_empty());
+        if let Some(tz) = &timezone
+            && crate::util::parse_timezone(tz).is_err()
+        {
+            return Err(format!(
+                "MOODLE_TIMEZONE: '{}' is not an IANA timezone name (e.g. Asia/Taipei)",
+                tz
+            ));
+        }
         Ok(Self {
             base_url,
             token,
             timeout_secs,
+            timezone,
         })
     }
 }

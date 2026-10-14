@@ -1,6 +1,45 @@
 //! Shared helpers: HTML conversion, time formatting, truncation, JSON tools.
 
+use std::sync::OnceLock;
+
 use serde_json::Value;
+
+/// Process-wide timezone used to render Moodle timestamps. Stays UTC until
+/// [set_timezone] installs the resolved one at startup (the process serves
+/// exactly one Moodle site, so a global is the pragmatic choice).
+static TIMEZONE: OnceLock<chrono_tz::Tz> = OnceLock::new();
+
+/// Install the timezone all timestamps render in (startup only; the first
+/// call wins, later calls are no-ops).
+pub fn set_timezone(tz: chrono_tz::Tz) {
+    let _ = TIMEZONE.set(tz);
+}
+
+/// The active rendering timezone (UTC until startup resolution).
+pub fn timezone() -> chrono_tz::Tz {
+    *TIMEZONE.get().unwrap_or(&chrono_tz::Tz::UTC)
+}
+
+/// Parse an IANA timezone name (e.g. `Asia/Taipei`).
+pub fn parse_timezone(name: &str) -> Result<chrono_tz::Tz, String> {
+    name.trim()
+        .parse()
+        .map_err(|_| format!("'{name}' is not an IANA timezone name (e.g. Asia/Taipei)"))
+}
+
+/// Extract the timezone from a `core_user_get_user_preferences`
+/// (`name=timezone`) response. Moodle stores `99` (use the site default,
+/// which no WS exposes), an empty string, or legacy numeric offsets there —
+/// anything unparseable yields `None` so the caller can fall back.
+pub fn timezone_from_preferences(prefs: &Value) -> Option<chrono_tz::Tz> {
+    let value = prefs
+        .get("preferences")?
+        .as_array()?
+        .iter()
+        .find(|p| p.get("name").and_then(Value::as_str) == Some("timezone"))
+        .and_then(|p| p.get("value").and_then(Value::as_str))?;
+    parse_timezone(value).ok()
+}
 
 /// Convert Moodle's HTML fragments (course descriptions, forum posts,
 /// notification bodies…) to markdown.
@@ -65,15 +104,25 @@ fn decode_entities_once(s: &str) -> String {
         .replace("&#39;", "'")
 }
 
-/// Convert a unix timestamp (seconds) to an ISO-8601 / RFC-3339 string.
-pub fn unix_to_iso(secs: Value) -> Value {
+/// Convert a unix timestamp (seconds) to an ISO-8601 / RFC-3339 string in
+/// `tz` (e.g. `2026-10-20T00:00:00+08:00`; UTC keeps the `Z` suffix).
+pub fn unix_to_iso_with(tz: chrono_tz::Tz, secs: Value) -> Value {
     match secs.as_i64() {
         Some(0) | None => Value::Null,
         Some(s) => match chrono::DateTime::from_timestamp(s, 0) {
-            Some(dt) => Value::String(dt.to_rfc3339_opts(chrono::SecondsFormat::Secs, true)),
+            Some(dt) => Value::String(
+                dt.with_timezone(&tz)
+                    .to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+            ),
             None => Value::String(s.to_string()),
         },
     }
+}
+
+/// Convert a unix timestamp (seconds) to an ISO-8601 / RFC-3339 string in
+/// the active [timezone].
+pub fn unix_to_iso(secs: Value) -> Value {
+    unix_to_iso_with(timezone(), secs)
 }
 
 /// Current time as a unix timestamp in seconds.
@@ -193,6 +242,49 @@ mod tests {
             unix_to_iso(json!(1_700_000_000)),
             json!("2023-11-14T22:13:20Z")
         );
+    }
+
+    #[test]
+    fn unix_iso_in_timezone() {
+        let taipei = parse_timezone("Asia/Taipei").unwrap();
+        // UTC 2023-11-14T22:13:20Z → +08:00 crosses the date boundary — the
+        // exact off-by-a-day case from the issue.
+        assert_eq!(
+            unix_to_iso_with(taipei, json!(1_700_000_000)),
+            json!("2023-11-15T06:13:20+08:00")
+        );
+        // UTC keeps the Z suffix.
+        assert_eq!(
+            unix_to_iso_with(chrono_tz::Tz::UTC, json!(1_700_000_000)),
+            json!("2023-11-14T22:13:20Z")
+        );
+        assert_eq!(unix_to_iso_with(taipei, json!(0)), Value::Null);
+    }
+
+    #[test]
+    fn timezone_preference_parsing() {
+        let prefs = json!({"preferences": [{"name": "timezone", "value": "Asia/Taipei"}]});
+        assert_eq!(
+            timezone_from_preferences(&prefs),
+            Some(parse_timezone("Asia/Taipei").unwrap())
+        );
+        // 99 = use site default (not exposed via WS) → None → caller falls
+        // back to UTC; same for legacy numeric offsets and missing entries.
+        assert_eq!(
+            timezone_from_preferences(
+                &json!({"preferences": [{"name": "timezone", "value": "99"}]})
+            ),
+            None
+        );
+        assert_eq!(
+            timezone_from_preferences(
+                &json!({"preferences": [{"name": "timezone", "value": "8.0"}]})
+            ),
+            None
+        );
+        assert_eq!(timezone_from_preferences(&json!({"preferences": []})), None);
+        assert_eq!(timezone_from_preferences(&json!({})), None);
+        assert!(parse_timezone("Not/A_Zone").is_err());
     }
 
     #[test]

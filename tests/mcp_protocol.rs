@@ -16,6 +16,7 @@ async fn spawn_server(server: &MockServer) -> rmcp::service::RunningService<rmcp
         base_url: server.uri(),
         token: "testtoken".into(),
         timeout_secs: 10,
+        timezone: None,
     })
     .expect("client");
 
