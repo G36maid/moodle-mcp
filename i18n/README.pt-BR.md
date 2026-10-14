@@ -218,8 +218,8 @@ env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "seu-token
 |---|:---:|---|---|
 | `MOODLE_URL` | ✔ | — | URL base do site, sem barra final |
 | `MOODLE_TOKEN` | ✔ | — | Token de serviço web |
-| `MOODLE_TIMEOUT_SECS` | — | `60` | Timeout por requisição em segundos |
-| `MOODLE_TIMEZONE` | — | automático / `UTC` | Fuso horário IANA (`Asia/Taipei`) usado para exibir marcações de tempo; por padrão detecta automaticamente o fuso horário preferido do usuário do Moodle e, caso contrário, usa UTC |
+| `MOODLE_TIMEOUT_SECS` | — | `60` | Timeout por requisição em segundos; também é o tempo total permitido para detectar o fuso horário na inicialização |
+| `MOODLE_TIMEZONE` | — | automático / `UTC` | Fuso horário IANA (`Asia/Taipei`) usado para exibir marcações de tempo; por padrão detecta o fuso que o Moodle usa para o usuário: o fuso forçado do site, depois o do perfil (se o site não o ocultar) e, por último, o fuso padrão do site (essas duas configurações do site exigem Moodle 4.2+); se nenhum estiver disponível, usa UTC |
 | `MOODLE_READ_ONLY` | — | desativado | `1` oculta da lista de ferramentas todas as de escrita/upload (`create_forum_discussion`, `reply_to_discussion`, `submit_assignment`, `send_message`, `upload_file`, `call_ws_function`) — acesso LLM somente leitura |
 | `MOODLE_DISABLE_TOOLS` | — | — | Nomes de ferramentas separados por vírgula para ocultar adicionalmente (ex.: `send_message,upload_file`); nomes desconhecidos geram um aviso na inicialização |
 | `RUST_LOG` | — | `info` | Nível de log (logs vão para stderr; stdout é o canal MCP) |

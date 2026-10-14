@@ -218,8 +218,8 @@ env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "your-toke
 |---|:---:|---|---|
 | `MOODLE_URL` | ✔ | — | 站点基础 URL，末尾不加斜杠 |
 | `MOODLE_TOKEN` | ✔ | — | Web Service Token |
-| `MOODLE_TIMEOUT_SECS` | — | `60` | 单次请求超时秒数 |
-| `MOODLE_TIMEZONE` | — | 自动 / `UTC` | 渲染时间戳用的 IANA 时区名（`Asia/Taipei`）；默认自动检测 Moodle 用户的时区偏好，失败则使用 UTC |
+| `MOODLE_TIMEOUT_SECS` | — | `60` | 单次请求超时秒数；也是启动时检测时区的总时限 |
+| `MOODLE_TIMEZONE` | — | 自动 / `UTC` | 渲染时间戳用的 IANA 时区名（`Asia/Taipei`）；默认检测 Moodle 对你实际生效的时区：站点强制时区，其次是个人资料中的时区（站点未隐藏该字段时），最后是站点默认时区（两项站点设置需要 Moodle 4.2+），都获取不到则使用 UTC |
 | `MOODLE_READ_ONLY` | — | 关 | `1` 从工具列表中隐藏所有写入/上传类工具（`create_forum_discussion`、`reply_to_discussion`、`submit_assignment`、`send_message`、`upload_file`、`call_ws_function`）— 只读 LLM 访问 |
 | `MOODLE_DISABLE_TOOLS` | — | — | 额外隐藏的工具名，逗号分隔（如 `send_message,upload_file`）；未知名称会在启动时警告 |
 | `RUST_LOG` | — | `info` | 日志过滤级别（日志输出到 stderr；stdout 专用于 MCP 交互） |

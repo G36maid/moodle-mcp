@@ -218,8 +218,8 @@ env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "votre-tok
 |---|:---:|---|---|
 | `MOODLE_URL` | ✔ | — | URL de base de la plateforme Moodle, sans barre oblique finale |
 | `MOODLE_TOKEN` | ✔ | — | Jeton d'accès de service web |
-| `MOODLE_TIMEOUT_SECS` | — | `60` | Délai d'attente par requête en secondes |
-| `MOODLE_TIMEZONE` | — | auto / `UTC` | Fuseau horaire IANA (`Asia/Taipei`) pour l'affichage des horodatages ; par défaut, détecte automatiquement le fuseau horaire de l'utilisateur Moodle et, sinon, utilise UTC |
+| `MOODLE_TIMEOUT_SECS` | — | `60` | Délai d'attente par requête en secondes ; c'est aussi la durée totale accordée à la détection du fuseau horaire au démarrage |
+| `MOODLE_TIMEZONE` | — | auto / `UTC` | Fuseau horaire IANA (`Asia/Taipei`) pour l'affichage des horodatages ; par défaut, détecte le fuseau que Moodle utilise pour l'utilisateur : le fuseau imposé par le site, puis celui du profil (si le site ne le masque pas), puis le fuseau par défaut du site (ces deux réglages du site nécessitent Moodle 4.2+) ; à défaut, utilise UTC |
 | `MOODLE_READ_ONLY` | — | désactivé | `1` masque de la liste d'outils tous les outils d'écriture/téléversement (`create_forum_discussion`, `reply_to_discussion`, `submit_assignment`, `send_message`, `upload_file`, `call_ws_function`) — accès LLM en lecture seule |
 | `MOODLE_DISABLE_TOOLS` | — | — | Noms d'outils séparés par des virgules à masquer en plus (p. ex. `send_message,upload_file`) ; les noms inconnus déclenchent un avertissement au démarrage |
 | `RUST_LOG` | — | `info` | Niveau de journalisation (logs vers stderr ; stdout réservé au protocole MCP) |

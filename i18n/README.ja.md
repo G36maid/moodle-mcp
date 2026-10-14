@@ -218,8 +218,8 @@ env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "your-toke
 |---|:---:|---|---|
 | `MOODLE_URL` | ✔ | — | サイトのベース URL（末尾スラッシュなし） |
 | `MOODLE_TOKEN` | ✔ | — | Web サービストークン |
-| `MOODLE_TIMEOUT_SECS` | — | `60` | リクエストごとのタイムアウト秒数 |
-| `MOODLE_TIMEZONE` | — | 自動 / `UTC` | タイムスタンプ表示に使う IANA タイムゾーン名（`Asia/Taipei`）。デフォルトは Moodle ユーザーのタイムゾーン設定を自動検出し、取得できない場合は UTC |
+| `MOODLE_TIMEOUT_SECS` | — | `60` | リクエストごとのタイムアウト秒数。起動時のタイムゾーン検出全体の上限も兼ねます |
+| `MOODLE_TIMEZONE` | — | 自動 / `UTC` | タイムスタンプ表示に使う IANA タイムゾーン名（`Asia/Taipei`）。デフォルトでは Moodle があなたに適用しているタイムゾーンを検出します：サイトの強制タイムゾーン、次にプロファイルのタイムゾーン（サイトで非表示にされていない場合）、最後にサイトのデフォルトタイムゾーン（サイト側の 2 つの設定は Moodle 4.2+ が必要です）。どれも取得できなければ UTC を使います |
 | `MOODLE_READ_ONLY` | — | オフ | `1` を指定すると、書き込み・アップロード系ツール（`create_forum_discussion`、`reply_to_discussion`、`submit_assignment`、`send_message`、`upload_file`、`call_ws_function`）をツール一覧から非表示にします — 読み取り専用の LLM アクセス |
 | `MOODLE_DISABLE_TOOLS` | — | — | 追加で非表示にするツール名のカンマ区切りリスト（例: `send_message,upload_file`）。不明な名前は起動時に警告されます |
 | `RUST_LOG` | — | `info` | ログフィルタ（ログは stderr、stdout は MCP プロトコル通信） |
