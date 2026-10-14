@@ -647,3 +647,45 @@ async fn legitimate_json_file_is_not_flagged_as_error() {
     assert_eq!(std::fs::read_to_string(&save_to).unwrap(), body);
     std::fs::remove_file(&save_to).ok();
 }
+
+/// mod_forum_get_discussion_posts attachments carry the link in `url`
+/// (stored_file_exporter, 3.7+); reading `fileurl` dropped it entirely (#6).
+#[tokio::test]
+async fn discussion_post_attachments_read_url_field() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/webservice/rest/server.php"))
+        .and(body_string_contains(
+            "wsfunction=mod_forum_get_discussion_posts",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "posts": [{
+                "id": 101,
+                "subject": "Lecture notes",
+                "message": "<p>see attachment</p>",
+                "author": {"id": 5, "fullname": "Prof Lin"},
+                "timecreated": 1760851200,
+                "attachments": [{
+                    "filename": "week3.pdf",
+                    "filenameshort": "week3.pdf",
+                    "filesize": 1234,
+                    "url": "/pluginfile.php/26/mod_forum/attachment/101/week3.pdf"
+                }]
+            }],
+            "warnings": []
+        })))
+        .mount(&server)
+        .await;
+    expect_no_other_calls().mount(&server).await;
+
+    let client = client_for(&server).await;
+    let out = moodle_mcp::tools::forums::get_discussion_posts(&client, 42)
+        .await
+        .expect("posts");
+    let att = &out["posts"][0]["attachments"][0];
+    assert_eq!(att["filename"], json!("week3.pdf"));
+    assert_eq!(
+        att["fileurl"],
+        json!("/pluginfile.php/26/mod_forum/attachment/101/week3.pdf")
+    );
+}

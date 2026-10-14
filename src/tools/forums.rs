@@ -105,9 +105,19 @@ pub async fn get_discussion_posts(
                 .unwrap_or_default()
                 .into_iter()
                 .map(|a| {
+                    // stored_file_exporter (3.7+ — verified) exposes the link as
+                    // `url`, a plain /pluginfile.php URL that only works after
+                    // the client-side webservice rewrite; `fileurl` never
+                    // exists on this response. It is kept as a defensive
+                    // fallback for unseen shapes. The output key stays
+                    // `fileurl` for output-shape stability.
                     json!({
                         "filename": a.get("filename").cloned().unwrap_or(Value::Null),
-                        "fileurl": a.get("fileurl").cloned().unwrap_or(Value::Null),
+                        "fileurl": a
+                            .get("url")
+                            .or_else(|| a.get("fileurl"))
+                            .cloned()
+                            .unwrap_or(Value::Null),
                     })
                 })
                 .collect();
