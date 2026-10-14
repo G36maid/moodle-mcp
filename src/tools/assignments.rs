@@ -128,7 +128,7 @@ pub async fn get_assignment(
     let mut onlinetext: Option<String> = None;
     for plugin in plugins_of(&submission) {
         if plugin_type(&plugin) == "onlinetext" {
-            onlinetext = text_from_plugin(&plugin).map(|t| decode_entities(&t));
+            onlinetext = text_from_plugin(&plugin).map(|t| html_to_markdown(&t));
         } else {
             sub_files.extend(files_from_plugin(&plugin));
         }
@@ -162,7 +162,7 @@ pub async fn get_assignment(
     let mut fb_files: Vec<Value> = Vec::new();
     for plugin in plugins_of(&feedback) {
         if plugin_type(&plugin).contains("comment") {
-            fb_comment = text_from_plugin(&plugin).map(|t| decode_entities(&t));
+            fb_comment = text_from_plugin(&plugin).map(|t| html_to_markdown(&t));
         } else if plugin_type(&plugin).contains("file") {
             fb_files.extend(files_from_plugin(&plugin));
         }

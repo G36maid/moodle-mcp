@@ -688,8 +688,9 @@ async fn discussion_post_attachments_read_url_field() {
     );
 }
 
-/// Gradebook-graded assignments keep feedback.grade.grade at the -1 sentinel;
-/// the real grade is in gradefordisplay (#3).
+// Gradebook-graded assignments keep feedback.grade.grade at the -1 sentinel;
+// the real grade is in gradefordisplay. Plugin HTML (online text, feedback
+// comment) renders as markdown.
 #[tokio::test]
 async fn assignment_grade_shows_display_not_sentinel() {
     let server = MockServer::start().await;
@@ -720,11 +721,26 @@ async fn assignment_grade_shows_display_not_sentinel() {
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
             "assignments": [{
                 "gradingstatus": "graded",
-                "submission": {"status": "submitted", "attemptnumber": 0, "plugins": []},
+                "submissions": [{
+                    "status": "submitted", "attemptnumber": 0,
+                    "plugins": [{
+                        "type": "onlinetext",
+                        "editorfields": [{
+                            "name": "onlinetext",
+                            "text": "<p>our <strong>lab notes</strong><br /></p>"
+                        }]
+                    }]
+                }],
                 "feedback": {
                     "grade": {"grade": "-1.00000", "gradeddate": 1760851200},
                     "gradefordisplay": "75.00&nbsp;/&nbsp;100.00",
-                    "plugins": []
+                    "plugins": [{
+                        "type": "comments",
+                        "editorfields": [{
+                            "name": "comment",
+                            "text": "<p><span>111/115<br />良好</span><br /></p>"
+                        }]
+                    }]
                 },
                 "previousattempts": []
             }],
@@ -745,7 +761,21 @@ async fn assignment_grade_shows_display_not_sentinel() {
         "sentinel must not surface"
     );
     assert_eq!(structured["grade_display"], json!("75.00 / 100.00"));
+    // #12: plugin HTML becomes markdown in both channels — tags gone,
+    // structure kept (line breaks, bold).
+    assert_eq!(
+        structured["submission"]["onlinetext"],
+        json!("our **lab notes**")
+    );
+    let fb = structured["feedback_comment"].as_str().unwrap_or_default();
+    assert!(
+        fb.contains("111/115") && fb.contains("良好") && !fb.contains('<'),
+        "feedback_comment: {fb}"
+    );
     assert!(md.contains("**Grade**: 75.00 / 100.00"), "{md}");
+    assert!(md.contains("**lab notes**"), "{md}");
+    assert!(md.contains("111/115"), "{md}");
+    assert!(!md.contains("<span>"), "{md}");
     assert!(!md.contains("-1.00000"), "{md}");
     assert!(!md.contains("\"75.00"), "no JSON quotes in markdown: {md}");
 }
