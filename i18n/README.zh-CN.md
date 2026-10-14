@@ -220,6 +220,8 @@ env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "your-toke
 | `MOODLE_TOKEN` | ✔ | — | Web Service Token |
 | `MOODLE_TIMEOUT_SECS` | — | `60` | 单次请求超时秒数 |
 | `MOODLE_TIMEZONE` | — | 自动 / `UTC` | 渲染时间戳用的 IANA 时区名（`Asia/Taipei`）；默认自动检测 Moodle 用户的时区偏好，失败则使用 UTC |
+| `MOODLE_READ_ONLY` | — | 关 | `1` 从工具列表中隐藏所有写入/上传类工具（`create_forum_discussion`、`reply_to_discussion`、`submit_assignment`、`send_message`、`upload_file`、`call_ws_function`）— 只读 LLM 访问 |
+| `MOODLE_DISABLE_TOOLS` | — | — | 额外隐藏的工具名，逗号分隔（如 `send_message,upload_file`）；未知名称会在启动时警告 |
 | `RUST_LOG` | — | `info` | 日志过滤级别（日志输出到 stderr；stdout 专用于 MCP 交互） |
 
 ## 💬 Prompt 示例

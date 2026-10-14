@@ -220,6 +220,8 @@ env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "your-toke
 | `MOODLE_TOKEN` | ✔ | — | Web サービストークン |
 | `MOODLE_TIMEOUT_SECS` | — | `60` | リクエストごとのタイムアウト秒数 |
 | `MOODLE_TIMEZONE` | — | 自動 / `UTC` | タイムスタンプ表示に使う IANA タイムゾーン名（`Asia/Taipei`）。デフォルトは Moodle ユーザーのタイムゾーン設定を自動検出し、取得できない場合は UTC |
+| `MOODLE_READ_ONLY` | — | オフ | `1` を指定すると、書き込み・アップロード系ツール（`create_forum_discussion`、`reply_to_discussion`、`submit_assignment`、`send_message`、`upload_file`、`call_ws_function`）をツール一覧から非表示にします — 読み取り専用の LLM アクセス |
+| `MOODLE_DISABLE_TOOLS` | — | — | 追加で非表示にするツール名のカンマ区切りリスト（例: `send_message,upload_file`）。不明な名前は起動時に警告されます |
 | `RUST_LOG` | — | `info` | ログフィルタ（ログは stderr、stdout は MCP プロトコル通信） |
 
 ## 💬 プロンプト例

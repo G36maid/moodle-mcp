@@ -220,6 +220,8 @@ env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "your-toke
 | `MOODLE_TOKEN` | ✔ | — | Web Service 存取權杖 |
 | `MOODLE_TIMEOUT_SECS` | — | `60` | 單次請求逾時秒數 |
 | `MOODLE_TIMEZONE` | — | 自動 / `UTC` | 呈現時間戳用的 IANA 時區名稱（`Asia/Taipei`）；預設自動偵測 Moodle 使用者的時區偏好，失敗則使用 UTC |
+| `MOODLE_READ_ONLY` | — | 關 | `1` 會從工具清單隱藏所有寫入/上傳類工具（`create_forum_discussion`、`reply_to_discussion`、`submit_assignment`、`send_message`、`upload_file`、`call_ws_function`）— 唯讀 LLM 存取 |
+| `MOODLE_DISABLE_TOOLS` | — | — | 額外隱藏的工具名稱，逗號分隔（如 `send_message,upload_file`）；未知名稱會在啟動時警告 |
 | `RUST_LOG` | — | `info` | 日誌過濾等級（日誌輸出至 stderr；stdout 為 MCP 通訊串流） |
 
 ## 💬 提示詞範例

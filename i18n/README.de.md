@@ -220,6 +220,8 @@ env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "dein-toke
 | `MOODLE_TOKEN` | ✔ | — | Web-Service-Token |
 | `MOODLE_TIMEOUT_SECS` | — | `60` | Timeout pro Anfrage in Sekunden |
 | `MOODLE_TIMEZONE` | — | auto / `UTC` | IANA-Zeitzone (`Asia/Taipei`) für die Anzeige von Zeitstempeln; Standard: automatisch aus der Zeitzoneneinstellung des Moodle-Nutzers erkannt, sonst UTC |
+| `MOODLE_READ_ONLY` | — | aus | `1` blendet alle Schreib-/Upload-Tools (`create_forum_discussion`, `reply_to_discussion`, `submit_assignment`, `send_message`, `upload_file`, `call_ws_function`) aus der Tool-Liste aus — schreibgeschützter LLM-Zugriff |
+| `MOODLE_DISABLE_TOOLS` | — | — | Kommagetrennte Tool-Namen, die zusätzlich ausgeblendet werden (z. B. `send_message,upload_file`); unbekannte Namen erzeugen beim Start eine Warnung |
 | `RUST_LOG` | — | `info` | Log-Filter (Logs gehen an stderr; stdout dient dem MCP-Protokoll) |
 
 ## 💬 Prompt-Beispiele
