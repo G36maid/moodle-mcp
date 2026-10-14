@@ -13,10 +13,6 @@ pub enum MoodleError {
     #[error("HTTP error: {0}")]
     Http(#[from] reqwest::Error),
 
-    /// Response body was not valid JSON (e.g. HTML error page, web services disabled).
-    #[error("Invalid JSON response from Moodle (are web services enabled?): {0}")]
-    Json(#[from] serde_json::Error),
-
     /// Response body was valid JSON but not the expected shape.
     #[error("{0}")]
     InvalidBody(String),
@@ -85,9 +81,6 @@ impl MoodleError {
                 format!("Moodle API error {code}: {message} (exception: {exception}){hint_block}")
             }
             MoodleError::Http(e) => scrub_token(&format!("HTTP request to Moodle failed: {e}")),
-            MoodleError::Json(e) => format!(
-                "Moodle returned a non-JSON response: {e}. Web services may be disabled on the site."
-            ),
             MoodleError::InvalidBody(e) => format!("Moodle returned an unexpected response: {e}"),
             MoodleError::NonJsonResponse(e) => {
                 format!("Non-JSON response from Moodle (web services may be disabled): {e}")

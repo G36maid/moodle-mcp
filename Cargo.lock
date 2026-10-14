@@ -1549,7 +1549,6 @@ name = "moodle-mcp"
 version = "0.1.1"
 dependencies = [
  "anydoc",
- "base64 0.22.1",
  "chrono",
  "chrono-tz",
  "htmd",

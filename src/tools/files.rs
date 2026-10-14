@@ -65,6 +65,21 @@ fn moodle_json_error(content_type: &str, bytes: &[u8]) -> Option<MoodleError> {
     })
 }
 
+/// The response's media type, normalized to `type/subtype` (parameters
+/// after `;` stripped, defaults to `application/octet-stream`). Shared by
+/// fetch_file and download_file.
+fn content_type_of(resp: &reqwest::Response) -> String {
+    resp.headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("application/octet-stream")
+        .split(';')
+        .next()
+        .unwrap_or("application/octet-stream")
+        .trim()
+        .to_string()
+}
+
 /// Fetch a Moodle file and return its content as **markdown** for the agent
 /// to read. PDF/DOCX/PPTX/XLSX/ODT/RTF/EPUB/CSV are converted with anydoc;
 /// plain text passes through; anything else (zip, images…) cannot be
@@ -73,16 +88,7 @@ fn moodle_json_error(content_type: &str, bytes: &[u8]) -> Option<MoodleError> {
 pub async fn fetch_file(client: &MoodleClient, url: &str) -> Result<Value, MoodleError> {
     let resp = client.download_file(url).await?;
     let status = resp.status().as_u16();
-    let content_type = resp
-        .headers()
-        .get(reqwest::header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("application/octet-stream")
-        .split(';')
-        .next()
-        .unwrap_or("application/octet-stream")
-        .trim()
-        .to_string();
+    let content_type = content_type_of(&resp);
 
     if !(200..300).contains(&status) {
         return Err(MoodleError::InvalidBody(format!(
@@ -221,16 +227,7 @@ pub async fn download_file(
 ) -> Result<Value, MoodleError> {
     let mut resp = client.download_file(url).await?;
     let status = resp.status().as_u16();
-    let content_type = resp
-        .headers()
-        .get(reqwest::header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("application/octet-stream")
-        .split(';')
-        .next()
-        .unwrap_or("application/octet-stream")
-        .trim()
-        .to_string();
+    let content_type = content_type_of(&resp);
 
     if !(200..300).contains(&status) {
         return Err(MoodleError::InvalidBody(format!(

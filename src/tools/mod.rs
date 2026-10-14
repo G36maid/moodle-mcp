@@ -250,7 +250,7 @@ pub struct MoodleMcp {
 /// operations, file upload (a read-only agent has no business staging files
 /// on the server), and the raw escape hatch — `call_ws_function` can invoke
 /// write functions directly and would bypass the restriction.
-pub const READ_ONLY_DISABLED_TOOLS: &[&str] = &[
+pub(crate) const READ_ONLY_DISABLED_TOOLS: &[&str] = &[
     "create_forum_discussion",
     "reply_to_discussion",
     "submit_assignment",
@@ -354,10 +354,6 @@ impl MoodleMcp {
 
 #[tool_router]
 impl MoodleMcp {
-    pub fn new(client: Arc<MoodleClient>) -> Self {
-        Self::new_with_policy(client, false, Vec::new())
-    }
-
     /// Build the server, optionally filtering the tool surface. Read-only
     /// mode hides the write/upload/escape-hatch tools
     /// ([READ_ONLY_DISABLED_TOOLS]); `disabled_tools` (MOODLE_DISABLE_TOOLS)
