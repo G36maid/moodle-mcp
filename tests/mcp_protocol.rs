@@ -495,3 +495,121 @@ async fn course_overview_renders_section_summaries_and_descriptions_in_full() {
     assert!(desc.contains("TAIL-MARKER-AFTER-300"), "{desc}");
     assert_eq!(sc["grades"]["items"], json!([["Lab 01", "90.00"]]));
 }
+
+#[tokio::test]
+async fn course_overview_marks_restricted_and_hidden_items() {
+    // Restricted activities must not read as freely usable: the course page
+    // greys them out with availabilityinfo text (real NTNU case — an exam
+    // sign-up "available from 2027-01-11").
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/webservice/rest/server.php"))
+        .and(body_string_contains("wsfunction=core_course_get_contents"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+            {
+                "id": 1,
+                "name": "Week 1",
+                "summary": "",
+                "availabilityinfo": "Available from <strong>1 October 2026</strong>"
+            },
+            {
+                "id": 2,
+                "name": "Week 2",
+                "summary": "",
+                "modules": [
+                    {
+                        "id": 10, "modname": "assign", "name": "Exam Sign-up",
+                        "description": "",
+                        "availabilityinfo": "自<strong>2027年01月11日,21:00</strong>起即可用",
+                        "uservisible": false, "visible": 1
+                    },
+                    {"id": 11, "modname": "forum", "name": "Announcements"}
+                ]
+            }
+        ])))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/webservice/rest/server.php"))
+        .and(body_string_contains(
+            "wsfunction=mod_assign_get_assignments",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "courses": [{"id": 1, "fullname": "Test Course", "assignments": []}]
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/webservice/rest/server.php"))
+        .and(body_string_contains(
+            "wsfunction=mod_quiz_get_quizzes_by_courses",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"courses": []})))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/webservice/rest/server.php"))
+        .and(body_string_contains(
+            "wsfunction=mod_forum_get_forums_by_courses",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!([])))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/webservice/rest/server.php"))
+        .and(body_string_contains(
+            "wsfunction=gradereport_user_get_grade_items",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"usergrades": []})))
+        .mount(&server)
+        .await;
+    site_info_mock().mount(&server).await;
+
+    let mcp = spawn_server(&server).await;
+    let result = mcp
+        .peer()
+        .call_tool(
+            CallToolRequestParams::new("get_course_overview")
+                .with_arguments(json!({"course_id": 1}).as_object().expect("object").clone()),
+        )
+        .await
+        .expect("call_tool");
+    assert!(!result.is_error.unwrap_or(false), "{result:?}");
+
+    let text = result
+        .content
+        .first()
+        .and_then(|c| c.as_text())
+        .map(|t| t.text.as_str())
+        .expect("text content");
+
+    // Section-level restriction line under the heading.
+    assert!(
+        text.contains("Restricted: Available from **1 October 2026**"),
+        "{text}"
+    );
+    // Module line carries the restriction and the unavailable marker.
+    assert!(
+        text.contains(
+            "- [assign] Exam Sign-up (module_id: 10) — restricted: 自**2027年01月11日,21:00**起即可用; unavailable"
+        ),
+        "{text}"
+    );
+    // Normal items stay quiet — no marks, no availability fields.
+    assert!(
+        text.contains("- [forum] Announcements (module_id: 11)\n"),
+        "{text}"
+    );
+
+    let sc = result.structured_content.as_ref().expect("structured");
+    assert_eq!(
+        sc["sections"][0]["availability_info"],
+        json!("Available from **1 October 2026**")
+    );
+    let exam = &sc["sections"][1]["modules"][0];
+    assert_eq!(exam["uservisible"], json!(false));
+    assert!(exam.get("visible").is_none(), "visible=1 must not appear");
+    let normal = &sc["sections"][1]["modules"][1];
+    assert!(normal.get("availability_info").is_none(), "{normal}");
+    assert!(normal.get("uservisible").is_none(), "{normal}");
+}

@@ -428,7 +428,7 @@ impl MoodleMcp {
     }
 
     #[tool(
-        description = "Get the full map of one course as a markdown document: every section with its summary text (lecture links, instructions, notices), activity descriptions (the assignment specs), files (download URLs included), plus assignments, quizzes, forums and graded items. The hub for anything about one course — assignment_id, quiz_id and forum_id for the per-item tools all come from here. course_id comes from list_courses.",
+        description = "Get the full map of one course as a markdown document: every section with its summary text (lecture links, instructions, notices), activity descriptions (the assignment specs), files (download URLs included), plus assignments, quizzes, forums and graded items. Restricted or hidden items are marked as such. The hub for anything about one course — assignment_id, quiz_id and forum_id for the per-item tools all come from here. course_id comes from list_courses.",
         annotations(read_only_hint = true)
     )]
     async fn get_course_overview(

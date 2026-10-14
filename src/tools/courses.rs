@@ -94,6 +94,23 @@ fn shape_module(m: &Value, assignments_by_cmid: &std::collections::HashMap<i64, 
     if !contents.is_empty() {
         entry["contents"] = Value::Array(contents);
     }
+    // The course page greys restricted items out with an explanation; without
+    // that text a locked activity is indistinguishable from a usable one
+    // (real case: an exam sign-up "available from 2027-01-11"). Only
+    // deviations from "plainly usable" are emitted to keep listings quiet.
+    if let Some(info) = m
+        .get("availabilityinfo")
+        .and_then(Value::as_str)
+        .filter(|t| !t.is_empty())
+    {
+        entry["availability_info"] = Value::String(html_to_markdown(info));
+    }
+    if m.get("uservisible").and_then(Value::as_bool) == Some(false) {
+        entry["uservisible"] = Value::Bool(false);
+    }
+    if m.get("visible").and_then(Value::as_bool) == Some(false) {
+        entry["visible"] = Value::Bool(false);
+    }
     entry
 }
 
@@ -273,7 +290,7 @@ pub async fn get_course_overview(
         .unwrap_or_default()
         .into_iter()
         .map(|s| {
-            json!({
+            let mut section = json!({
                 "section_id": s.get("id").cloned().unwrap_or(Value::Null),
                 "name": decode_entities(s.get("name").and_then(Value::as_str).unwrap_or_default()),
                 // Full summary, same no-per-field-cap rule as descriptions:
@@ -285,7 +302,26 @@ pub async fn get_course_overview(
                     .into_iter()
                     .map(|m| shape_module(&m, &assignments_by_cmid))
                     .collect::<Vec<_>>(),
-            })
+            });
+            // Same quiet-unless-deviating rule as modules: restricted/hidden
+            // sections exist for teachers and in greyed-out student views.
+            if let Some(info) = s
+                .get("availabilityinfo")
+                .and_then(Value::as_str)
+                .filter(|t| !t.is_empty())
+            {
+                section["availability_info"] = Value::String(html_to_markdown(info));
+            }
+            if s.get("visible").and_then(Value::as_bool) == Some(false) {
+                section["visible"] = Value::Bool(false);
+            }
+            if s.get("uservisible").and_then(Value::as_bool) == Some(false) {
+                section["uservisible"] = Value::Bool(false);
+            }
+            if s.get("hiddenbynumsections").and_then(Value::as_i64) == Some(1) {
+                section["hidden_beyond_course_end"] = Value::Bool(true);
+            }
+            section
         })
         .collect();
 
@@ -309,6 +345,9 @@ pub async fn get_course_overview(
             s["name"].as_str().unwrap_or("?"),
             s["section_id"],
         ));
+        if let Some(info) = s["availability_info"].as_str() {
+            md.push_str(&format!("\nRestricted: {info}\n"));
+        }
         if let Some(summary) = s["summary"]
             .as_str()
             .map(str::trim)
@@ -319,6 +358,21 @@ pub async fn get_course_overview(
             md.push_str("\n\n");
         }
         for m in s["modules"].as_array().unwrap_or(&Vec::new()) {
+            let mut marks: Vec<String> = Vec::new();
+            if let Some(info) = m["availability_info"].as_str() {
+                marks.push(format!("restricted: {info}"));
+            }
+            if m["visible"].as_bool() == Some(false) {
+                marks.push("hidden".into());
+            }
+            if m["uservisible"].as_bool() == Some(false) {
+                marks.push("unavailable".into());
+            }
+            let marks_suffix = if marks.is_empty() {
+                String::new()
+            } else {
+                format!(" — {}", marks.join("; "))
+            };
             md.push_str(&format!(
                 "- [{}] {} (module_id: {}{}\n",
                 m["type"].as_str().unwrap_or("?"),
@@ -326,7 +380,8 @@ pub async fn get_course_overview(
                 m["module_id"],
                 m.get("assignment_id")
                     .map(|a| format!(", assignment_id: {a})"))
-                    .unwrap_or_else(|| ")".into()),
+                    .unwrap_or_else(|| ")".into())
+                    + &marks_suffix,
             ));
             if let Some(desc) = m["description"]
                 .as_str()
