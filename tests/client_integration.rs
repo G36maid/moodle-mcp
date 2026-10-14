@@ -499,3 +499,151 @@ async fn upload_success_records_still_report_item_id() {
     assert_eq!(out["filesize"], json!(8));
     std::fs::remove_file(&tmp).ok();
 }
+
+// ---- File downloads: rewrite + non-file response detection (#5) ----
+
+/// Plain /pluginfile.php URLs (what the browser shows) must be rewritten to
+/// the token-aware /webservice/pluginfile.php before fetching.
+#[tokio::test]
+async fn download_rewrites_plain_pluginfile_to_webservice() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path(
+            "/webservice/pluginfile.php/26/mod_assign/introattachment/0/HW1.pdf",
+        ))
+        .and(wiremock::matchers::query_param("token", "testtoken"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string("%PDF-1.4 fake")
+                .append_header("content-type", "application/pdf"),
+        )
+        .mount(&server)
+        .await;
+    expect_no_other_calls().mount(&server).await;
+
+    let client = client_for(&server).await;
+    let plain = format!(
+        "{}/pluginfile.php/26/mod_assign/introattachment/0/HW1.pdf",
+        server.uri()
+    );
+    let resp = client
+        .download_file(&plain)
+        .await
+        .expect("rewritten download");
+    assert_eq!(resp.status().as_u16(), 200);
+    assert_eq!(
+        resp.url().path(),
+        "/webservice/pluginfile.php/26/mod_assign/introattachment/0/HW1.pdf"
+    );
+}
+
+/// A redirect that ends on the login page must be an error, not a saved
+/// HTML "file" — for both fetch_file and download_file.
+#[tokio::test]
+async fn login_page_redirect_is_an_error_not_a_file() {
+    let server = MockServer::start().await;
+    let login = format!("{}/login/index.php", server.uri());
+    Mock::given(method("GET"))
+        .and(path("/webservice/pluginfile.php/1/bad/n.txt"))
+        .respond_with(ResponseTemplate::new(303).append_header("location", login.as_str()))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/login/index.php"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string("<html><body>please log in</body></html>")
+                .append_header("content-type", "text/html"),
+        )
+        .mount(&server)
+        .await;
+
+    let client = client_for(&server).await;
+    let url = format!("{}/webservice/pluginfile.php/1/bad/n.txt", server.uri());
+    let err = moodle_mcp::tools::files::fetch_file(&client, &url)
+        .await
+        .expect_err("login redirect must fail fetch");
+    assert!(err.to_string().contains("login page"), "{err:?}");
+
+    let save_to =
+        std::env::temp_dir().join(format!("moodle-mcp-login-{}.html", std::process::id()));
+    let err = moodle_mcp::tools::files::download_file(&client, &url, save_to.to_str().unwrap())
+        .await
+        .expect_err("login redirect must fail download");
+    assert!(err.to_string().contains("login page"), "{err:?}");
+    assert!(!save_to.exists(), "no file should be written");
+}
+
+/// webservice/pluginfile.php replies HTTP 200 + JSON error when the token is
+/// invalid — that payload must become an error, never the "file" content.
+#[tokio::test]
+async fn json_error_body_is_an_error_not_content() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/webservice/pluginfile.php/1/notes.txt"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({
+                    "error": "Invalid token - token not found",
+                    "errorcode": "invalidtoken",
+                    "stacktrace": null,
+                    "debuginfo": null,
+                    "reproductionlink": null
+                }))
+                .append_header("content-type", "application/json"),
+        )
+        .mount(&server)
+        .await;
+    expect_no_other_calls().mount(&server).await;
+
+    let client = client_for(&server).await;
+    let url = format!("{}/webservice/pluginfile.php/1/notes.txt", server.uri());
+    let err = moodle_mcp::tools::files::fetch_file(&client, &url)
+        .await
+        .expect_err("JSON error must fail fetch");
+    match &err {
+        MoodleError::Api { errorcode, .. } => assert_eq!(errorcode, "invalidtoken"),
+        other => panic!("expected Api error, got {other:?}"),
+    }
+
+    let save_to =
+        std::env::temp_dir().join(format!("moodle-mcp-jsonerr-{}.txt", std::process::id()));
+    let err = moodle_mcp::tools::files::download_file(&client, &url, save_to.to_str().unwrap())
+        .await
+        .expect_err("JSON error must fail download");
+    assert!(err.to_string().contains("invalidtoken"), "{err:?}");
+    assert!(!save_to.exists(), "no file should be written");
+}
+
+/// A legitimate JSON attachment (no errorcode key) still downloads fine.
+#[tokio::test]
+async fn legitimate_json_file_is_not_flagged_as_error() {
+    let server = MockServer::start().await;
+    let body = r#"{"grades": [75, 100, 65]}"#;
+    Mock::given(method("GET"))
+        .and(path("/webservice/pluginfile.php/1/data.json"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string(body)
+                .append_header("content-type", "application/json"),
+        )
+        .mount(&server)
+        .await;
+    expect_no_other_calls().mount(&server).await;
+
+    let client = client_for(&server).await;
+    let url = format!("{}/webservice/pluginfile.php/1/data.json", server.uri());
+    let out = moodle_mcp::tools::files::fetch_file(&client, &url)
+        .await
+        .expect("legitimate JSON is a file, not an error");
+    assert_eq!(out["content"], json!(body));
+
+    let save_to =
+        std::env::temp_dir().join(format!("moodle-mcp-jsonok-{}.json", std::process::id()));
+    let out = moodle_mcp::tools::files::download_file(&client, &url, save_to.to_str().unwrap())
+        .await
+        .expect("legitimate JSON downloads");
+    assert_eq!(out["size_bytes"], json!(body.len()));
+    assert_eq!(std::fs::read_to_string(&save_to).unwrap(), body);
+    std::fs::remove_file(&save_to).ok();
+}

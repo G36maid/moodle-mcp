@@ -21,6 +21,50 @@ const MAX_TEXT_BYTES: usize = 1_000_000; // 1 MB
 /// the check avoids buffering an absurd file into RAM before the server
 /// would reject it anyway.
 const MAX_UPLOAD_BYTES: u64 = 100_000_000; // 100 MB
+/// Upper bound for buffering a JSON response in download_file to decide
+/// whether it is a Moodle error payload. Legitimate (non-error) JSON files
+/// up to this size are written in one go; larger ones stream as usual.
+const MAX_JSON_SNIFF_BYTES: u64 = 1_000_000;
+
+/// A redirect that ended on the Moodle login page means the URL was not
+/// accessible with the web-service token (e.g. a stale plain
+/// `/pluginfile.php` link that escaped the rewrite) — report it instead of
+/// saving the login page as the "file".
+fn ensure_not_login_page(resp: &reqwest::Response) -> Result<(), MoodleError> {
+    if resp.url().path().contains("/login/") {
+        return Err(MoodleError::InvalidBody(
+            "the file request was redirected to the Moodle login page — the URL is not \
+             accessible with the web-service token; use the file URL exactly as returned \
+             by get_course_overview / get_assignment / get_discussion_posts"
+                .into(),
+        ));
+    }
+    Ok(())
+}
+
+/// `webservice/pluginfile.php` answers with HTTP 200 and a JSON error body
+/// (`{"error":…,"errorcode":…}`) when the token is invalid/expired or the
+/// service forbids file downloads — detect it so the error payload is never
+/// mistaken for the file's content. Legitimate JSON attachments (no
+/// `errorcode` key) pass through.
+fn moodle_json_error(content_type: &str, bytes: &[u8]) -> Option<MoodleError> {
+    if !content_type.starts_with("application/json") {
+        return None;
+    }
+    let v: Value = serde_json::from_slice(bytes).ok()?;
+    let errorcode = v.get("errorcode")?.as_str()?.to_string();
+    let error = v
+        .get("error")
+        .and_then(Value::as_str)
+        .unwrap_or("Moodle rejected the file request")
+        .to_string();
+    Some(MoodleError::Api {
+        exception: "webservice".into(),
+        errorcode,
+        message: error,
+    })
+}
+
 /// Fetch a Moodle file and return its content as **markdown** for the agent
 /// to read. PDF/DOCX/PPTX/XLSX/ODT/RTF/EPUB/CSV are converted with anydoc;
 /// plain text passes through; anything else (zip, images…) cannot be
@@ -45,6 +89,7 @@ pub async fn fetch_file(client: &MoodleClient, url: &str) -> Result<Value, Moodl
             "file fetch returned HTTP {status}; the URL may be expired or the file inaccessible"
         )));
     }
+    ensure_not_login_page(&resp)?;
     // Size guard BEFORE buffering: reject anything the declared size says is
     // too big. Unknown/chunked lengths are enforced mid-stream by read_capped
     // below (a missing Content-Length must not become a full in-RAM buffer).
@@ -58,6 +103,9 @@ pub async fn fetch_file(client: &MoodleClient, url: &str) -> Result<Value, Moodl
     }
     let bytes = read_capped(resp, MAX_FETCH_INPUT_BYTES).await?;
     let size = bytes.len();
+    if let Some(e) = moodle_json_error(&content_type, &bytes) {
+        return Err(e);
+    }
 
     // Documents → markdown via anydoc. Errors are transparent (encrypted /
     // needs OCR / unsupported), telling the agent to download instead.
@@ -188,6 +236,37 @@ pub async fn download_file(
         return Err(MoodleError::InvalidBody(format!(
             "download returned HTTP {status}; the URL may be expired or the file inaccessible"
         )));
+    }
+    ensure_not_login_page(&resp)?;
+    // Small JSON responses are buffered and checked against Moodle's error
+    // payload shape before anything hits the disk; a real (non-error) JSON
+    // file of ≤1 MB is then written in one go.
+    if content_type.starts_with("application/json")
+        && resp
+            .content_length()
+            .is_some_and(|l| l <= MAX_JSON_SNIFF_BYTES)
+    {
+        let bytes = read_capped(resp, MAX_JSON_SNIFF_BYTES).await?;
+        if let Some(e) = moodle_json_error(&content_type, &bytes) {
+            return Err(e);
+        }
+        use tokio::io::AsyncWriteExt;
+        let mut file = tokio::fs::File::create(save_to)
+            .await
+            .map_err(|e| MoodleError::Config(format!("failed to create {save_to}: {e}")))?;
+        file.write_all(&bytes)
+            .await
+            .map_err(|e| MoodleError::Config(format!("failed to write {save_to}: {e}")))?;
+        file.flush()
+            .await
+            .map_err(|e| MoodleError::Config(format!("failed to flush {save_to}: {e}")))?;
+        return Ok(json!({
+            "url": url,
+            "status": status,
+            "content_type": content_type,
+            "size_bytes": bytes.len(),
+            "saved_to": save_to,
+        }));
     }
     // Stream to disk in chunks (no full-body buffering) with a hard cap;
     // a mid-stream overage aborts and removes the partial file.

@@ -184,8 +184,13 @@ impl MoodleClient {
             .map_err(MoodleError::from)
     }
 
-    /// Build the final download URL: same-site `pluginfile.php` URLs get the
-    /// token injected; everything else is passed through untouched.
+    /// Build the final download URL. Same-site `pluginfile.php` URLs are
+    /// rewritten to the token-aware `webservice/pluginfile.php` endpoint
+    /// (the official Moodle app does the same — plain `pluginfile.php`
+    /// only authenticates browser sessions and 303-redirects to the login
+    /// page, which would otherwise be downloaded as the "file"), then the
+    /// token is injected if missing. Everything else passes through
+    /// untouched.
     pub(crate) fn prepare_download_url(&self, file_url: &str) -> Result<url::Url, MoodleError> {
         let mut url = url::Url::parse(file_url)
             .map_err(|e| MoodleError::Config(format!("invalid file URL: {e}")))?;
@@ -194,6 +199,9 @@ impl MoodleClient {
         let same_site = url.scheme() == base.scheme()
             && url.host_str() == base.host_str()
             && url.port_or_known_default() == base.port_or_known_default();
+        if same_site && let Some(rewritten) = rewrite_pluginfile_segment(url.path()) {
+            url.set_path(&rewritten);
+        }
         if same_site
             && !url.query_pairs().any(|(k, _)| k == "token")
             && url.path().contains("pluginfile.php")
@@ -278,6 +286,26 @@ impl MoodleClient {
     }
 }
 
+/// Rewrite `/pluginfile.php/<args…>` into `/webservice/pluginfile.php/<args…>`
+/// in a URL path. Works for sites installed at the web root and in
+/// subdirectories; leaves paths that already go through
+/// `/webservice/pluginfile.php` (or `draftfile.php`, a browser-only area)
+/// untouched. Returns `None` when there is nothing to rewrite.
+fn rewrite_pluginfile_segment(path: &str) -> Option<String> {
+    let segs: Vec<&str> = path.split('/').collect();
+    for i in 0..segs.len().saturating_sub(1) {
+        if segs[i] == "pluginfile.php"
+            && !segs[i + 1].is_empty()
+            && segs.get(i.wrapping_sub(1)).copied().unwrap_or("") != "webservice"
+        {
+            let mut rewritten = segs.clone();
+            rewritten[i] = "webservice/pluginfile.php";
+            return Some(rewritten.join("/"));
+        }
+    }
+    None
+}
+
 /// Flatten a JSON object into `key=value` pairs using PHP bracket notation,
 /// e.g. `{"courseids":[2,5],"filter":{"k":"v"}}` →
 /// `courseids[0]=2`, `courseids[1]=5`, `filter[k]=v`.
@@ -317,6 +345,53 @@ fn truncate(s: &str, max: usize) -> &str {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn download_url_rewrites_plain_pluginfile() {
+        let client = MoodleClient::new(Config {
+            base_url: "https://moodle.example.com".into(),
+            token: "secret".into(),
+            timeout_secs: 10,
+        })
+        .unwrap();
+
+        // Plain root-level pluginfile URL → rewritten + token injected.
+        let u = client
+            .prepare_download_url(
+                "https://moodle.example.com/pluginfile.php/26/mod_assign/intro/0/HW1.pdf",
+            )
+            .unwrap();
+        assert_eq!(
+            u.path(),
+            "/webservice/pluginfile.php/26/mod_assign/intro/0/HW1.pdf"
+        );
+        assert!(u.query_pairs().any(|(k, v)| k == "token" && v == "secret"));
+
+        // Site installed in a subdirectory still rewrites.
+        let sub = MoodleClient::new(Config {
+            base_url: "https://example.com/campus".into(),
+            token: "secret".into(),
+            timeout_secs: 10,
+        })
+        .unwrap();
+        let u = sub
+            .prepare_download_url("https://example.com/campus/pluginfile.php/1/f.pdf")
+            .unwrap();
+        assert_eq!(u.path(), "/campus/webservice/pluginfile.php/1/f.pdf");
+
+        // Already the webservice endpoint: untouched (no double rewrite).
+        let u = client
+            .prepare_download_url("https://moodle.example.com/webservice/pluginfile.php/1/f.pdf")
+            .unwrap();
+        assert_eq!(u.path(), "/webservice/pluginfile.php/1/f.pdf");
+
+        // External host: never rewritten (token-leak protection).
+        let u = client
+            .prepare_download_url("https://evil.example.com/pluginfile.php/1/f.pdf")
+            .unwrap();
+        assert_eq!(u.path(), "/pluginfile.php/1/f.pdf");
+        assert!(!u.query_pairs().any(|(k, _)| k == "token"));
+    }
 
     #[test]
     fn download_url_token_rules() {
