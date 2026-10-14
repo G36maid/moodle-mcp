@@ -3,3 +3,8 @@
 .env.*
 *.local
 *mcp.json
+
+# astro site
+site/node_modules/
+site/dist/
+site/.astro/
