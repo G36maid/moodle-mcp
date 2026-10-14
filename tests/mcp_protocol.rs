@@ -246,7 +246,7 @@ async fn raw_call_rejects_unknown_function_with_suggestion() {
     assert!(text.contains("mod_forum_get_forum_discussions"));
 }
 
-// ---- Read-only / tool filtering (#10) ----
+// ---- Read-only / tool filtering ----
 
 /// MOODLE_READ_ONLY must hide the 4 write tools + upload_file +
 /// call_ws_function (the escape hatch could otherwise invoke write

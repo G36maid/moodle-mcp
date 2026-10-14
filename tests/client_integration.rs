@@ -26,7 +26,7 @@ fn expect_no_other_calls() -> Mock {
         .respond_with(ResponseTemplate::new(500).set_body_string("UNEXPECTED CALL"))
 }
 
-/// 3.7 regression: `core_user_get_users` is enabled but rejects the `search`
+/// On 3.7 `core_user_get_users` is enabled but rejects the `search`
 /// criteria key (added in 3.8) with `invalidparameter` — the tool must
 /// transparently retry with `core_message_message_search_users`.
 #[tokio::test]
@@ -80,8 +80,7 @@ async fn submit_assignment_rejects_blank_text() {
     assert_eq!(server.received_requests().await.unwrap().len(), 0);
 }
 
-/// HTML resources render as markdown, not raw tags (live finding: an .html
-/// course resource used to come back as a raw `<div>…` blob).
+/// HTML resources render as markdown, not raw tags.
 #[tokio::test]
 async fn fetch_converts_html_to_markdown() {
     let server = MockServer::start().await;
@@ -108,7 +107,7 @@ async fn fetch_converts_html_to_markdown() {
     assert!(!md.contains("<table>"), "raw tags leaked: {md}");
 }
 
-/// 3.7 regression: the grades-overview API omits `coursename` — empty names
+/// On 3.7 the grades-overview API omits `coursename` — empty names
 /// are filled from the enrolled-course roster.
 #[tokio::test]
 async fn overview_course_names_are_enriched_from_roster() {
@@ -244,7 +243,7 @@ async fn non_json_body_is_reported() {
 }
 
 /// download_file must create missing parent directories for save_to —
-/// agents construct nested temp paths without mkdir-ing first (#1).
+/// agents construct nested temp paths without mkdir-ing first.
 #[tokio::test]
 async fn download_creates_missing_parent_directories() {
     let server = MockServer::start().await;
@@ -284,7 +283,7 @@ async fn download_creates_missing_parent_directories() {
 
 #[tokio::test]
 async fn exception_without_errorcode_is_still_detected() {
-    // Live 3.7 finding: mod_forum_get_discussion_posts returns
+    // mod_forum_get_discussion_posts can return
     // {exception: "Error", message: "…"} for some discussions — with NO
     // errorcode field at all.
     let server = MockServer::start().await;
@@ -307,13 +306,12 @@ async fn exception_without_errorcode_is_still_detected() {
     assert!(matches!(err, MoodleError::Api { .. }), "got: {err}");
 }
 
-// ---- Regression tests: issues found by agent e2e testing ----
+// ---- Version quirks and bad paths ----
 
 #[tokio::test]
 async fn schedule_sends_course_ids_and_time_window() {
-    // e2e finding: get_schedule used to ignore course_ids (events from other
-    // courses leaked in). 3.7 needs the nested params events[courseids] +
-    // options[timestart/timeend].
+    // get_schedule must scope the query to the requested courses only;
+    // 3.7 needs the nested params events[courseids] + options[timestart/timeend].
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(body_string_contains("events%5Bcourseids%5D%5B0%5D=102"))
@@ -339,7 +337,7 @@ async fn schedule_sends_course_ids_and_time_window() {
 
 #[tokio::test]
 async fn grades_always_send_own_userid_3_7_regression() {
-    // e2e finding: on 3.7, gradereport_user_get_grade_items without userid
+    // On 3.7, gradereport_user_get_grade_items without userid
     // takes the all-users path → required_capability_exception. The caller's
     // own userid must ALWAYS be sent.
     let server = MockServer::start().await;
@@ -367,8 +365,7 @@ async fn grades_always_send_own_userid_3_7_regression() {
 
 #[tokio::test]
 async fn null_submission_renders_as_not_submitted() {
-    // e2e finding: a never-submitted assignment (submission AND feedback
-    // both null) used to be misreported as "empty submission status" — it
+    // A never-submitted assignment (submission AND feedback both null)
     // is a legitimate state and must render as not submitted.
     let server = MockServer::start().await;
     // Broad mocks: any mod_assign call returns the matching shape.
@@ -411,7 +408,7 @@ async fn null_submission_renders_as_not_submitted() {
 
 /// upload.php replies HTTP 200 with a per-file error record (no exception
 /// key) when it cannot store the file — e.g. the name already exists in the
-/// draft area. That must surface as an error, not `uploaded: true` (#9).
+/// draft area. That must surface as an error, not `uploaded: true`.
 #[tokio::test]
 async fn upload_reports_per_file_error_records() {
     let server = MockServer::start().await;
@@ -460,7 +457,7 @@ async fn upload_reports_per_file_error_records() {
     assert!(msg.contains("already exists"), "{msg}");
     assert!(msg.contains("different filename"), "{msg}");
 
-    // The other errortype upload.php can report per-file (#9).
+    // fileoversized: the other per-file errortype upload.php reports.
     let err = moodle_mcp::tools::files::upload_file_from_path(
         &client,
         tmp.to_str().unwrap(),
@@ -477,7 +474,7 @@ async fn upload_reports_per_file_error_records() {
     std::fs::remove_file(&tmp).ok();
 }
 
-/// Successful upload records keep flowing through unchanged (#9 guard).
+/// Successful upload records pass through unchanged.
 #[tokio::test]
 async fn upload_success_records_still_report_item_id() {
     let server = MockServer::start().await;
@@ -506,7 +503,7 @@ async fn upload_success_records_still_report_item_id() {
     std::fs::remove_file(&tmp).ok();
 }
 
-// ---- File downloads: rewrite + non-file response detection (#5) ----
+// ---- File downloads: rewrite + non-file response detection ----
 
 /// Plain /pluginfile.php URLs (what the browser shows) must be rewritten to
 /// the token-aware /webservice/pluginfile.php before fetching.
@@ -582,7 +579,7 @@ async fn login_page_redirect_is_an_error_not_a_file() {
 
 /// webservice/pluginfile.php replies HTTP 200 + JSON when the token is
 /// invalid — that payload must become an error, while a legitimate JSON
-/// attachment (no errorcode key) still comes through as a file (#5).
+/// attachment (no errorcode key) still comes through as a file.
 #[tokio::test]
 async fn json_responses_split_moodle_errors_from_real_files() {
     let server = MockServer::start().await;
@@ -647,7 +644,7 @@ async fn json_responses_split_moodle_errors_from_real_files() {
 }
 
 /// mod_forum_get_discussion_posts attachments carry the link in `url`
-/// (stored_file_exporter, 3.7+); reading `fileurl` dropped it entirely (#6).
+/// (stored_file_exporter, 3.7+); `fileurl` alone is not reliable there.
 #[tokio::test]
 async fn discussion_post_attachments_read_url_field() {
     let server = MockServer::start().await;
@@ -781,7 +778,7 @@ async fn assignment_grade_shows_display_not_sentinel() {
 }
 
 /// Moodle 4.0+: omitting `read` sends a single read=2 ("both") call, so the
-/// unread half is not dropped; the read flag is derived from timeread (#2).
+/// unread half is not dropped; the read flag is derived from timeread.
 #[tokio::test]
 async fn notifications_omitted_read_sends_both_on_modern_sites() {
     let server = MockServer::start().await;
@@ -827,7 +824,7 @@ async fn notifications_omitted_read_sends_both_on_modern_sites() {
 }
 
 /// Up to 3.11 (or an unreadable release) `read` is a boolean with no "both"
-/// value: omitting it must merge read=0 + read=1, deduped by id (#2).
+/// value: omitting it must merge read=0 + read=1, deduped by id.
 #[tokio::test]
 async fn notifications_omitted_read_merges_two_calls_on_legacy_sites() {
     let server = MockServer::start().await;

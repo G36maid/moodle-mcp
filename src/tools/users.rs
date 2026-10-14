@@ -46,7 +46,7 @@ pub async fn get_user_by_field(
 /// `core_message_message_search_users` (3.x mobile service). Both may be
 /// permission-denied for students — the tool error says so plainly.
 ///
-/// 3.7 regression guard: `core_user_get_users` is often *enabled* on 3.7 but
+/// On 3.7 `core_user_get_users` is often *enabled* but
 /// rejects the `search` criteria key (added in 3.8) with `invalidparameter`.
 /// On that error we transparently retry with `core_message_message_search_users`
 /// (available since 3.2 in the mobile service) instead of reporting a

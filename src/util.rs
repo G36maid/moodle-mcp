@@ -214,8 +214,8 @@ mod tests {
 
     #[test]
     fn html_double_encoded_and_nbsp() {
-        // 3.7 live finding: label fields are double-encoded (&amp;nbsp;)
-        // and htmd emits U+00A0 for &nbsp;.
+        // Label fields can arrive double-encoded (&amp;nbsp;) and htmd
+        // emits U+00A0 for &nbsp;.
         let md = html_to_markdown("Group 2 :&amp;nbsp;electricity");
         assert!(!md.contains("&nbsp;"), "{md}");
         assert!(!md.contains("&amp;"), "{md}");
