@@ -8,10 +8,14 @@ use wiremock::matchers::{body_string_contains, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 async fn client_for(server: &MockServer) -> MoodleClient {
+    client_with_timeout(server, 10)
+}
+
+fn client_with_timeout(server: &MockServer, timeout_secs: u64) -> MoodleClient {
     MoodleClient::new(Config {
         base_url: server.uri(),
         token: "testtoken".into(),
-        timeout_secs: 10,
+        timeout_secs,
         timezone: None,
         read_only: false,
         disabled_tools: Vec::new(),
@@ -1033,4 +1037,414 @@ async fn download_rejects_blank_save_to() {
     .await
     .expect_err("blank save_to must be rejected");
     assert!(err.to_string().contains("save_to is empty"), "{err:?}");
+}
+
+/// `tool_mobile_get_config` `locationsettings` as Moodle 4.2+ returns it.
+fn location_settings(timezone: &str, forcetimezone: &str) -> Value {
+    json!({
+        "settings": [
+            {"name": "timezone", "value": timezone},
+            {"name": "forcetimezone", "value": forcetimezone}
+        ],
+        "warnings": []
+    })
+}
+
+/// Budget for tests not about the budget, long enough never to run out.
+const BUDGET: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// Exact field values; `body_string_contains` would match `=5` inside `=50`.
+struct FormFields(Vec<(String, String)>);
+
+impl wiremock::Match for FormFields {
+    fn matches(&self, request: &wiremock::Request) -> bool {
+        // PHP keeps the last value of a repeated key, so compare against that.
+        let sent: std::collections::HashMap<String, String> =
+            url::form_urlencoded::parse(&request.body)
+                .into_owned()
+                .collect();
+        self.0
+            .iter()
+            .all(|(key, value)| sent.get(key) == Some(value))
+    }
+}
+
+fn form(function: &str, fields: &[(&str, &str)]) -> FormFields {
+    let mut all = vec![("wsfunction".to_string(), function.to_string())];
+    all.extend(fields.iter().map(|(k, v)| (k.to_string(), v.to_string())));
+    FormFields(all)
+}
+
+/// The server checks `expect(1)` on drop, so a missed or repeated call fails.
+fn ws_call_once(function: &str, fields: &[(&str, &str)], response: Value) -> Mock {
+    Mock::given(method("POST"))
+        .and(form(function, fields))
+        .respond_with(ResponseTemplate::new(200).set_body_json(response))
+        .expect(1)
+}
+
+fn mobile_config_once(response: Value) -> Mock {
+    ws_call_once(
+        "tool_mobile_get_config",
+        &[("section", "locationsettings")],
+        response,
+    )
+}
+
+fn site_info_once() -> Mock {
+    ws_call_once("core_webservice_get_site_info", &[], json!({"userid": 5}))
+}
+
+fn users_by_field_once(response: Value) -> Mock {
+    ws_call_once(
+        "core_user_get_users_by_field",
+        &[("field", "id"), ("values[0]", "5")],
+        response,
+    )
+}
+
+/// With the profile timezone hidden, the site default is what is left.
+#[tokio::test]
+async fn detect_timezone_falls_back_to_site_default() {
+    let server = MockServer::start().await;
+    mobile_config_once(location_settings("Asia/Taipei", "99"))
+        .mount(&server)
+        .await;
+    site_info_once().mount(&server).await;
+    users_by_field_once(json!([{"id": 5, "fullname": "Student"}]))
+        .mount(&server)
+        .await;
+    expect_no_other_calls().expect(0).mount(&server).await;
+
+    let client = client_for(&server).await;
+    let (tz, source) = moodle_mcp::tools::site::detect_timezone(&client, BUDGET)
+        .await
+        .expect("site default detected");
+    assert_eq!(tz.name(), "Asia/Taipei");
+    assert_eq!(source, "site default");
+}
+
+/// As in `core_date`, a forced zone wins without reading the profile.
+#[tokio::test]
+async fn detect_timezone_prefers_forced_site_zone() {
+    let server = MockServer::start().await;
+    mobile_config_once(location_settings("Asia/Taipei", "Europe/Prague"))
+        .mount(&server)
+        .await;
+    expect_no_other_calls().expect(0).mount(&server).await;
+
+    let client = client_for(&server).await;
+    let (tz, source) = moodle_mcp::tools::site::detect_timezone(&client, BUDGET)
+        .await
+        .expect("forced zone detected");
+    assert_eq!(tz.name(), "Europe/Prague");
+    assert_eq!(source, "forced site zone");
+}
+
+/// Moodle keeps the zone forced and falls back to the site default:
+/// https://github.com/moodle/moodle/blob/v4.5.4/lib/classes/date.php#L154-L163
+#[tokio::test]
+async fn detect_timezone_skips_profile_when_forced_zone_is_unreadable() {
+    let server = MockServer::start().await;
+    mobile_config_once(location_settings("Asia/Taipei", "Mars/Olympus"))
+        .mount(&server)
+        .await;
+    expect_no_other_calls().expect(0).mount(&server).await;
+
+    let client = client_for(&server).await;
+    let (tz, source) = moodle_mcp::tools::site::detect_timezone(&client, BUDGET)
+        .await
+        .expect("site default kept");
+    assert_eq!(tz.name(), "Asia/Taipei");
+    assert_eq!(source, "site default");
+}
+
+#[tokio::test]
+async fn detect_timezone_prefers_profile_over_site_default() {
+    let server = MockServer::start().await;
+    mobile_config_once(location_settings("Asia/Taipei", "99"))
+        .mount(&server)
+        .await;
+    site_info_once().mount(&server).await;
+    users_by_field_once(json!([{"id": 5, "timezone": "America/New_York"}]))
+        .mount(&server)
+        .await;
+    expect_no_other_calls().expect(0).mount(&server).await;
+
+    let client = client_for(&server).await;
+    let (tz, source) = moodle_mcp::tools::site::detect_timezone(&client, BUDGET)
+        .await
+        .expect("profile zone detected");
+    assert_eq!(tz.name(), "America/New_York");
+    assert_eq!(source, "user profile");
+}
+
+/// Before 4.2 `locationsettings` is empty, so only the profile is left.
+#[tokio::test]
+async fn detect_timezone_reads_profile_before_moodle_4_2() {
+    let server = MockServer::start().await;
+    mobile_config_once(json!({"settings": [], "warnings": []}))
+        .mount(&server)
+        .await;
+    site_info_once().mount(&server).await;
+    users_by_field_once(json!([{"id": 5, "timezone": "America/New_York"}]))
+        .mount(&server)
+        .await;
+    expect_no_other_calls().expect(0).mount(&server).await;
+
+    let client = client_for(&server).await;
+    let (tz, source) = moodle_mcp::tools::site::detect_timezone(&client, BUDGET)
+        .await
+        .expect("profile zone detected");
+    assert_eq!(tz.name(), "America/New_York");
+    assert_eq!(source, "user profile");
+}
+
+/// A custom service may leave out `tool_mobile_get_config`.
+#[tokio::test]
+async fn detect_timezone_reads_profile_without_mobile_config() {
+    let server = MockServer::start().await;
+    mobile_config_once(json!({
+        "exception": "webservice_access_exception",
+        "errorcode": "accessexception",
+        "message": "Access control exception"
+    }))
+    .mount(&server)
+    .await;
+    site_info_once().mount(&server).await;
+    users_by_field_once(json!([{"id": 5, "timezone": "America/New_York"}]))
+        .mount(&server)
+        .await;
+    expect_no_other_calls().expect(0).mount(&server).await;
+
+    let client = client_for(&server).await;
+    let (tz, source) = moodle_mcp::tools::site::detect_timezone(&client, BUDGET)
+        .await
+        .expect("profile zone detected");
+    assert_eq!(tz.name(), "America/New_York");
+    assert_eq!(source, "user profile");
+}
+
+#[tokio::test]
+async fn detect_timezone_keeps_site_default_on_profile_error() {
+    let server = MockServer::start().await;
+    mobile_config_once(location_settings("Asia/Taipei", "99"))
+        .mount(&server)
+        .await;
+    site_info_once().mount(&server).await;
+    users_by_field_once(json!({
+        "exception": "webservice_access_exception",
+        "errorcode": "accessexception",
+        "message": "Access control exception"
+    }))
+    .mount(&server)
+    .await;
+    expect_no_other_calls().expect(0).mount(&server).await;
+
+    let client = client_for(&server).await;
+    let (tz, source) = moodle_mcp::tools::site::detect_timezone(&client, BUDGET)
+        .await
+        .expect("site default kept");
+    assert_eq!(tz.name(), "Asia/Taipei");
+    assert_eq!(source, "site default");
+}
+
+#[tokio::test]
+async fn detect_timezone_keeps_site_default_on_slow_profile() {
+    let server = MockServer::start().await;
+    mobile_config_once(location_settings("Asia/Taipei", "99"))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(form("core_webservice_get_site_info", &[]))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_delay(std::time::Duration::from_secs(3))
+                .set_body_json(json!({"userid": 5})),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    expect_no_other_calls().expect(0).mount(&server).await;
+
+    let client = client_for(&server).await;
+    let started = std::time::Instant::now();
+    let (tz, source) =
+        moodle_mcp::tools::site::detect_timezone(&client, std::time::Duration::from_secs(1))
+            .await
+            .expect("site default kept");
+    assert_eq!(tz.name(), "Asia/Taipei");
+    assert_eq!(source, "site default");
+    assert!(started.elapsed() < std::time::Duration::from_millis(2500));
+}
+
+/// The budget holds even when the request timeout (10 s here) is longer.
+#[tokio::test]
+async fn detect_timezone_stops_at_the_budget() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(form(
+            "tool_mobile_get_config",
+            &[("section", "locationsettings")],
+        ))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_delay(std::time::Duration::from_secs(3))
+                .set_body_json(location_settings("Asia/Taipei", "99")),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    expect_no_other_calls().expect(0).mount(&server).await;
+
+    let client = client_for(&server).await;
+    let started = std::time::Instant::now();
+    assert_eq!(
+        moodle_mcp::tools::site::detect_timezone(&client, std::time::Duration::from_secs(1)).await,
+        None
+    );
+    assert!(started.elapsed() < std::time::Duration::from_millis(2500));
+}
+
+/// Trying the profile would wait out another request timeout (1 s here).
+#[tokio::test]
+async fn detect_timezone_stops_when_moodle_does_not_answer() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(form(
+            "tool_mobile_get_config",
+            &[("section", "locationsettings")],
+        ))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_delay(std::time::Duration::from_secs(3))
+                .set_body_json(location_settings("Asia/Taipei", "99")),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    expect_no_other_calls().expect(0).mount(&server).await;
+
+    let client = client_with_timeout(&server, 1);
+    assert_eq!(
+        moodle_mcp::tools::site::detect_timezone(&client, BUDGET).await,
+        None
+    );
+}
+
+/// A proxy in front of Moodle may answer with an HTML error or login page.
+#[tokio::test]
+async fn detect_timezone_stops_on_an_html_answer() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(form(
+            "tool_mobile_get_config",
+            &[("section", "locationsettings")],
+        ))
+        .respond_with(ResponseTemplate::new(502).set_body_string("<html>Bad gateway</html>"))
+        .expect(1)
+        .mount(&server)
+        .await;
+    expect_no_other_calls().expect(0).mount(&server).await;
+
+    let client = client_for(&server).await;
+    assert_eq!(
+        moodle_mcp::tools::site::detect_timezone(&client, BUDGET).await,
+        None
+    );
+}
+
+/// The profile lookup gets what is left of the budget: site info answers
+/// after the shared 2 s deadline but before a fresh budget would end.
+#[tokio::test]
+async fn detect_timezone_shares_the_budget_across_lookups() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(form(
+            "tool_mobile_get_config",
+            &[("section", "locationsettings")],
+        ))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_delay(std::time::Duration::from_millis(1100))
+                .set_body_json(location_settings("Asia/Taipei", "99")),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(form("core_webservice_get_site_info", &[]))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_delay(std::time::Duration::from_millis(1200))
+                .set_body_json(json!({"userid": 5})),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(form(
+            "core_user_get_users_by_field",
+            &[("field", "id"), ("values[0]", "5")],
+        ))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!([{"id": 5, "timezone": "America/New_York"}])),
+        )
+        .mount(&server)
+        .await;
+    expect_no_other_calls().expect(0).mount(&server).await;
+
+    let client = client_for(&server).await;
+    let (tz, source) =
+        moodle_mcp::tools::site::detect_timezone(&client, std::time::Duration::from_secs(2))
+            .await
+            .expect("site default kept");
+    assert_eq!(tz.name(), "Asia/Taipei");
+    assert_eq!(source, "site default");
+}
+
+#[tokio::test]
+async fn detect_timezone_keeps_site_default_on_site_info_error() {
+    let server = MockServer::start().await;
+    mobile_config_once(location_settings("Asia/Taipei", "99"))
+        .mount(&server)
+        .await;
+    ws_call_once(
+        "core_webservice_get_site_info",
+        &[],
+        json!({
+            "exception": "webservice_access_exception",
+            "errorcode": "accessexception",
+            "message": "Access control exception"
+        }),
+    )
+    .mount(&server)
+    .await;
+    expect_no_other_calls().expect(0).mount(&server).await;
+
+    let client = client_for(&server).await;
+    let (tz, source) = moodle_mcp::tools::site::detect_timezone(&client, BUDGET)
+        .await
+        .expect("site default kept");
+    assert_eq!(tz.name(), "Asia/Taipei");
+    assert_eq!(source, "site default");
+}
+
+/// MOODLE_TIMEOUT_SECS may be set huge to mean "no limit".
+#[tokio::test]
+async fn detect_timezone_survives_a_huge_budget() {
+    let server = MockServer::start().await;
+    mobile_config_once(location_settings("Asia/Taipei", "Europe/Prague"))
+        .mount(&server)
+        .await;
+    expect_no_other_calls().expect(0).mount(&server).await;
+
+    let client = client_for(&server).await;
+    let (tz, source) =
+        moodle_mcp::tools::site::detect_timezone(&client, std::time::Duration::from_secs(u64::MAX))
+            .await
+            .expect("forced zone detected");
+    assert_eq!(tz.name(), "Europe/Prague");
+    assert_eq!(source, "forced site zone");
 }

@@ -35,16 +35,9 @@ fn load_config() -> Config {
     }
 }
 
-/// Resolve the timestamp-rendering timezone: an explicit MOODLE_TIMEZONE
-/// wins (already validated by Config); otherwise the user's Moodle timezone
-/// preference is consulted (its value may be '99' = site default, which no
-/// web service exposes, or otherwise unparseable) and anything unknown
-/// falls back to UTC with a log line.
-/// core_user_get_user_preferences is available to the mobile service on
-/// every supported version:
-/// https://github.com/moodle/moodle/blob/v3.7.0/lib/db/services.php#L1725
-/// https://github.com/moodle/moodle/blob/v4.5.4/lib/db/services.php#L1999
-async fn resolve_timezone(client: &MoodleClient, env_tz: Option<&str>) {
+/// Pick the zone timestamps render in: MOODLE_TIMEZONE if set (Config has
+/// validated it), else what `tools::site::detect_timezone` finds, else UTC.
+async fn resolve_timezone(client: &MoodleClient, env_tz: Option<&str>, timeout_secs: u64) {
     if let Some(name) = env_tz {
         let tz = moodle_mcp::util::parse_timezone(name)
             .expect("MOODLE_TIMEZONE validated at config load");
@@ -52,21 +45,14 @@ async fn resolve_timezone(client: &MoodleClient, env_tz: Option<&str>) {
         tracing::info!(%name, "timestamp timezone set from MOODLE_TIMEZONE");
         return;
     }
-    let detected = client
-        .call(
-            "core_user_get_user_preferences",
-            &serde_json::json!({ "name": "timezone" }),
-        )
-        .await
-        .ok()
-        .and_then(|v| moodle_mcp::util::timezone_from_preferences(&v));
-    match detected {
-        Some(tz) => {
+    let budget = std::time::Duration::from_secs(timeout_secs);
+    match moodle_mcp::tools::site::detect_timezone(client, budget).await {
+        Some((tz, source)) => {
             moodle_mcp::util::set_timezone(tz);
-            tracing::info!(timezone = %tz, "timestamp timezone detected from the Moodle user preference");
+            tracing::info!(timezone = %tz, source, "timestamp timezone detected from Moodle");
         }
         None => tracing::info!(
-            "timezone unknown (site default or not exposed) — rendering timestamps in UTC; \
+            "could not detect the Moodle timezone — rendering timestamps in UTC; \
              set MOODLE_TIMEZONE to override"
         ),
     }
@@ -95,7 +81,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let client = Arc::new(MoodleClient::new(cfg.clone())?);
-    resolve_timezone(&client, cfg.timezone.as_deref()).await;
+    resolve_timezone(&client, cfg.timezone.as_deref(), cfg.timeout_secs).await;
     if cfg.read_only {
         tracing::info!("read-only mode: write, upload and raw-call tools are disabled");
     }

@@ -27,18 +27,49 @@ pub fn parse_timezone(name: &str) -> Result<chrono_tz::Tz, String> {
         .map_err(|_| format!("'{name}' is not an IANA timezone name (e.g. Asia/Taipei)"))
 }
 
-/// Extract the timezone from a `core_user_get_user_preferences`
-/// (`name=timezone`) response. Moodle stores `99` (use the site default,
-/// which no WS exposes), an empty string, or legacy numeric offsets there —
-/// anything unparseable yields `None` so the caller can fall back.
-pub fn timezone_from_preferences(prefs: &Value) -> Option<chrono_tz::Tz> {
-    let value = prefs
-        .get("preferences")?
+/// Parse one Moodle timezone setting; `99` ("use the next level"), empty
+/// values and legacy numeric offsets give `None`.
+fn moodle_timezone(value: Option<&Value>) -> Option<chrono_tz::Tz> {
+    parse_timezone(value?.as_str()?).ok()
+}
+
+/// The site's `forcetimezone` as a web-service token sees it.
+#[derive(Debug, PartialEq)]
+pub(crate) enum Forced {
+    No,
+    Zone(chrono_tz::Tz),
+    /// Set, but not an IANA name (e.g. a legacy `8.0`).
+    Unreadable,
+}
+
+fn mobile_setting<'a>(config: &'a Value, name: &str) -> Option<&'a Value> {
+    config
+        .get("settings")?
         .as_array()?
         .iter()
-        .find(|p| p.get("name").and_then(Value::as_str) == Some("timezone"))
-        .and_then(|p| p.get("value").and_then(Value::as_str))?;
-    parse_timezone(value).ok()
+        .find(|s| s.get("name").and_then(Value::as_str) == Some(name))?
+        .get("value")
+}
+
+/// The site's `forcetimezone` and default `timezone`, in that order, from
+/// `tool_mobile_get_config`. Only Moodle 4.2+ returns them:
+/// https://github.com/moodle/moodle/blob/v4.5.4/admin/tool/mobile/classes/api.php#L376-L379
+pub(crate) fn timezones_from_mobile_config(config: &Value) -> (Forced, Option<chrono_tz::Tz>) {
+    let forced = match mobile_setting(config, "forcetimezone") {
+        None | Some(Value::Null) => Forced::No,
+        Some(v) if v.as_str().map(str::trim) == Some("99") || v.as_f64() == Some(99.0) => {
+            Forced::No
+        }
+        v => moodle_timezone(v).map_or(Forced::Unreadable, Forced::Zone),
+    };
+    (forced, moodle_timezone(mobile_setting(config, "timezone")))
+}
+
+/// The profile timezone from a `core_user_get_users_by_field` entry. Since
+/// 4.0.8 and 4.1.3 `hiddenuserfields` can hide it, even from its owner:
+/// https://github.com/moodle/moodle/blob/v4.5.4/user/lib.php#L467-L469
+pub(crate) fn timezone_from_user(user: &Value) -> Option<chrono_tz::Tz> {
+    moodle_timezone(user.get("timezone"))
 }
 
 /// Convert Moodle's HTML fragments (course descriptions, forum posts,
@@ -265,28 +296,62 @@ mod tests {
     }
 
     #[test]
-    fn timezone_preference_parsing() {
-        let prefs = json!({"preferences": [{"name": "timezone", "value": "Asia/Taipei"}]});
+    fn timezones_from_mobile_config_settings() {
+        let taipei = parse_timezone("Asia/Taipei").unwrap();
+        // forcetimezone 99 means nothing is forced.
+        let config = json!({"settings": [
+            {"name": "timezone", "value": "Asia/Taipei"},
+            {"name": "forcetimezone", "value": "99"}
+        ], "warnings": []});
         assert_eq!(
-            timezone_from_preferences(&prefs),
-            Some(parse_timezone("Asia/Taipei").unwrap())
+            timezones_from_mobile_config(&config),
+            (Forced::No, Some(taipei))
         );
-        // 99 = use site default (not exposed via WS) → None → caller falls
-        // back to UTC; same for legacy numeric offsets and missing entries.
+        let forced = json!({"settings": [
+            {"name": "timezone", "value": "99"},
+            {"name": "forcetimezone", "value": "Europe/Prague"}
+        ]});
         assert_eq!(
-            timezone_from_preferences(
-                &json!({"preferences": [{"name": "timezone", "value": "99"}]})
-            ),
+            timezones_from_mobile_config(&forced),
+            (Forced::Zone(parse_timezone("Europe/Prague").unwrap()), None)
+        );
+        let only_forced = |value: Value| {
+            timezones_from_mobile_config(&json!({"settings": [
+                {"name": "forcetimezone", "value": value}
+            ]}))
+            .0
+        };
+        for value in [json!(99), json!(null)] {
+            assert_eq!(only_forced(value), Forced::No);
+        }
+        // A legacy offset or a bad name is still forced, just unreadable.
+        for value in [json!("8.0"), json!("Mars/Olympus"), json!("")] {
+            assert_eq!(only_forced(value), Forced::Unreadable);
+        }
+        // Before 4.2 the section is empty.
+        assert_eq!(
+            timezones_from_mobile_config(&json!({"settings": []})),
+            (Forced::No, None)
+        );
+        assert_eq!(timezones_from_mobile_config(&json!({})), (Forced::No, None));
+    }
+
+    #[test]
+    fn timezone_from_user_profile() {
+        assert_eq!(
+            timezone_from_user(&json!({"id": 5, "timezone": "America/New_York"})),
+            Some(parse_timezone("America/New_York").unwrap())
+        );
+        // 99 (site default), a hidden field and a legacy offset give `None`.
+        assert_eq!(
+            timezone_from_user(&json!({"id": 5, "timezone": "99"})),
             None
         );
+        assert_eq!(timezone_from_user(&json!({"id": 5})), None);
         assert_eq!(
-            timezone_from_preferences(
-                &json!({"preferences": [{"name": "timezone", "value": "8.0"}]})
-            ),
+            timezone_from_user(&json!({"id": 5, "timezone": "8.0"})),
             None
         );
-        assert_eq!(timezone_from_preferences(&json!({"preferences": []})), None);
-        assert_eq!(timezone_from_preferences(&json!({})), None);
         assert!(parse_timezone("Not/A_Zone").is_err());
     }
 

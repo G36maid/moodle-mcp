@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versioning
 follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- timestamps render in the timezone Moodle itself uses for the user: the
+  site's forced timezone, then the user's profile timezone if the site
+  shows it, then the site default (the site-level values need Moodle 4.2+).
+  The 0.1.2 detection read a user preference, but Moodle keeps the timezone
+  in the user record, so without `MOODLE_TIMEZONE` stock sites fell back to
+  UTC (#8)
+
 ## [0.1.4] - 2026-10-15
 
 ### Fixed

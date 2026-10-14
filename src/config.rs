@@ -5,11 +5,9 @@ pub struct Config {
     pub base_url: String,
     /// Moodle web service token (`wstoken`).
     pub token: String,
-    /// Request timeout in seconds.
+    /// Request timeout in seconds; also caps the startup timezone lookup.
     pub timeout_secs: u64,
-    /// IANA timezone override for rendering timestamps (MOODLE_TIMEZONE).
-    /// Validated at load so a typo fails fast; `None` = auto-detect from the
-    /// user's Moodle timezone preference, falling back to UTC.
+    /// IANA name from MOODLE_TIMEZONE; typos fail at load. `None` = ask Moodle.
     pub timezone: Option<String>,
     /// Hide all write/upload/escape-hatch tools (MOODLE_READ_ONLY=1/true/
     /// yes/on) — read-only access for cautious setups.
