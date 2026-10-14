@@ -84,7 +84,20 @@ pub async fn search_users(
         .get("users")
         .and_then(Value::as_array)
         .cloned()
-        .unwrap_or_default()
+        .unwrap_or_else(|| {
+            // core_message_message_search_users answers with
+            // {contacts, noncontacts} (verified live on 3.7; 4.5 externallib
+            // defines the same shape) — merge both halves.
+            ["contacts", "noncontacts"]
+                .iter()
+                .flat_map(|k| {
+                    v.get(*k)
+                        .and_then(Value::as_array)
+                        .cloned()
+                        .unwrap_or_default()
+                })
+                .collect()
+        })
         .into_iter()
         .map(|u| {
             json!({

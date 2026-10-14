@@ -48,7 +48,8 @@ async fn search_users_falls_back_on_invalidparameter() {
         .and(body_string_contains("userid=5"))
         .and(body_string_contains("search=chen"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-            "users": [{"id": 9, "fullname": "Wang Chen", "username": "chen"}]
+            "contacts": [],
+            "noncontacts": [{"id": 9, "fullname": "Wang Chen"}]
         })))
         .mount(&server)
         .await;
