@@ -85,10 +85,28 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      # Only to read CHANGELOG.md for the release notes below.
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           merge-multiple: true
           path: dist
+
+      # Notes come verbatim from the tagged version's CHANGELOG.md section so
+      # the repo changelog and the GitHub release can never drift apart;
+      # --generate-notes produced near-empty bodies for tagged releases.
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v heading="## [$VERSION]" \
+            'index($0, heading) == 1 { found = 1; next }
+             found && /^## \[/ { exit }
+             found { print }' CHANGELOG.md > RELEASE_NOTES.md
+          grep -q '[^[:space:]]' RELEASE_NOTES.md || {
+            echo "::error::CHANGELOG.md has no section for $VERSION"
+            exit 1
+          }
 
       - name: Create release
         env:
@@ -97,7 +115,7 @@ jobs:
           gh release create "${{ github.ref_name }}" \
             --repo "${{ github.repository }}" \
             --title "moodle-mcp ${{ github.ref_name }}" \
-            --generate-notes \
+            --notes-file RELEASE_NOTES.md \
             dist/*
 
   # Publishes the crate via crates.io trusted publishing (OIDC): no long-lived
