@@ -135,11 +135,27 @@ pub async fn get_assignment(
     }
 
     // --- feedback ---
-    let grade = feedback
+    let raw_grade = feedback
         .get("grade")
         .and_then(|g| g.get("grade"))
         .cloned()
         .unwrap_or(Value::Null);
+    // gradefordisplay is Moodle's official display string: derived from the
+    // gradebook, correct for gradebook-only grades and scale grades alike
+    // (present since 3.7). feedback.grade.grade stays at -1 when the grade
+    // only lives in the gradebook — the sentinel Moodle renders as "-".
+    let grade_display: Option<String> = feedback
+        .get("gradefordisplay")
+        .and_then(Value::as_str)
+        .map(decode_entities);
+    // Expose the raw value only when it is a real grade (>= 0): -1 is the
+    // sentinel, and for scale grades the raw value is an index into the
+    // scale rather than a mark.
+    let grade = if raw_grade.as_f64().is_some_and(|g| g >= 0.0) {
+        raw_grade
+    } else {
+        Value::Null
+    };
     let mut fb_comment: Option<String> = None;
     let mut fb_files: Vec<Value> = Vec::new();
     for plugin in plugins_of(&feedback) {
@@ -149,7 +165,7 @@ pub async fn get_assignment(
             fb_files.extend(files_from_plugin(&plugin));
         }
     }
-    let graded = !grade.is_null();
+    let graded = grade_display.is_some() || !grade.is_null();
 
     // --- description & attachments ---
     let intro_md = assignment
@@ -221,6 +237,7 @@ pub async fn get_assignment(
         "graded": graded,
         "grading_status": gradingstatus,
         "grade": grade,
+        "grade_display": grade_display,
         "feedback_comment": fb_comment,
         "feedback_files": fb_files,
     });
@@ -286,7 +303,14 @@ pub async fn get_assignment(
     }
     if graded {
         md.push_str("## Grade & feedback\n\n");
-        md.push_str(&format!("**Grade**: {}\n\n", grade));
+        // Use the display string; fall back to the raw value, never the
+        // sentinel. (Also avoids printing the raw JSON quotes a `Value`
+        // would carry into format!.)
+        let grade_line = grade_display
+            .clone()
+            .or_else(|| grade.as_str().map(str::to_string))
+            .unwrap_or_else(|| "—".into());
+        md.push_str(&format!("**Grade**: {grade_line}\n\n"));
         if let Some(c) = &fb_comment {
             md.push_str(&format!("**Teacher's comment**: {c}\n\n"));
         }

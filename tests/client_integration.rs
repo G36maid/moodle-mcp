@@ -689,3 +689,65 @@ async fn discussion_post_attachments_read_url_field() {
         json!("/pluginfile.php/26/mod_forum/attachment/101/week3.pdf")
     );
 }
+
+/// Gradebook-graded assignments keep feedback.grade.grade at the -1 sentinel;
+/// the real grade is in gradefordisplay (#3).
+#[tokio::test]
+async fn assignment_grade_shows_display_not_sentinel() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/webservice/rest/server.php"))
+        .and(body_string_contains(
+            "wsfunction=mod_assign_get_assignments",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "courses": [{
+                "id": 3, "fullname": "Physics",
+                "assignments": [{
+                    "id": 7, "course": 3, "cmid": 71, "name": "Lab report",
+                    "allowsubmissionsfromdate": 0, "duedate": 0, "cutoffdate": 0,
+                    "submissiondraft": 0, "intro": "<p>write it up</p>",
+                    "introattachments": []
+                }]
+            }],
+            "warnings": []
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/webservice/rest/server.php"))
+        .and(body_string_contains(
+            "wsfunction=mod_assign_get_submission_status",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "assignments": [{
+                "gradingstatus": "graded",
+                "submission": {"status": "submitted", "attemptnumber": 0, "plugins": []},
+                "feedback": {
+                    "grade": {"grade": "-1.00000", "gradeddate": 1760851200},
+                    "gradefordisplay": "75.00&nbsp;/&nbsp;100.00",
+                    "plugins": []
+                },
+                "previousattempts": []
+            }],
+            "warnings": []
+        })))
+        .mount(&server)
+        .await;
+    expect_no_other_calls().mount(&server).await;
+
+    let client = client_for(&server).await;
+    let (md, structured) = moodle_mcp::tools::assignments::get_assignment(&client, 7)
+        .await
+        .expect("assignment");
+    assert_eq!(structured["graded"], json!(true));
+    assert_eq!(
+        structured["grade"],
+        Value::Null,
+        "sentinel must not surface"
+    );
+    assert_eq!(structured["grade_display"], json!("75.00 / 100.00"));
+    assert!(md.contains("**Grade**: 75.00 / 100.00"), "{md}");
+    assert!(!md.contains("-1.00000"), "{md}");
+    assert!(!md.contains("\"75.00"), "no JSON quotes in markdown: {md}");
+}
