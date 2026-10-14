@@ -192,6 +192,19 @@ pub async fn download_file(
     // Stream to disk in chunks (no full-body buffering) with a hard cap;
     // a mid-stream overage aborts and removes the partial file.
     use tokio::io::AsyncWriteExt;
+    // Agents freely construct nested save_to paths — create missing parent
+    // directories instead of failing with a bare os error 2.
+    if let Some(parent) = std::path::Path::new(save_to).parent()
+        && !parent.as_os_str().is_empty()
+    {
+        tokio::fs::create_dir_all(parent).await.map_err(|e| {
+            MoodleError::Config(format!(
+                "cannot create the directory for {save_to} ({}): {e} — \
+                 check the path and permissions, or create the directory first",
+                parent.display()
+            ))
+        })?;
+    }
     let mut file = tokio::fs::File::create(save_to)
         .await
         .map_err(|e| MoodleError::Config(format!("failed to create {save_to}: {e}")))?;

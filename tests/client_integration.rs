@@ -264,6 +264,43 @@ async fn download_injects_token_into_pluginfile_url() {
     assert_eq!(resp.bytes().await.expect("bytes"), "hello file");
 }
 
+/// download_file must create missing parent directories for save_to —
+/// agents construct nested temp paths without mkdir-ing first (#1).
+#[tokio::test]
+async fn download_creates_missing_parent_directories() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path(
+            "/webservice/pluginfile.php/12/course/section/notes.txt",
+        ))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string("hello file")
+                .append_header("content-type", "text/plain"),
+        )
+        .mount(&server)
+        .await;
+    expect_no_other_calls().mount(&server).await;
+
+    let client = client_for(&server).await;
+    let save_to = std::env::temp_dir().join(format!(
+        "moodle-mcp-test-{}/nested/deep/notes.txt",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(save_to.parent().unwrap());
+    let url = format!(
+        "{}/webservice/pluginfile.php/12/course/section/notes.txt",
+        server.uri()
+    );
+    let out = moodle_mcp::tools::files::download_file(&client, &url, save_to.to_str().unwrap())
+        .await
+        .expect("download with missing parents");
+    assert_eq!(out["saved_to"], json!(save_to.to_str().unwrap()));
+    assert_eq!(out["size_bytes"], json!(10));
+    assert_eq!(std::fs::read_to_string(&save_to).unwrap(), "hello file");
+    std::fs::remove_dir_all(save_to.parent().unwrap()).unwrap();
+}
+
 // ---- Regression tests: issues found on a live 3.7 site ----
 
 #[tokio::test]
