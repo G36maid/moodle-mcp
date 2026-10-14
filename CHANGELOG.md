@@ -11,6 +11,9 @@ follows [Semantic Versioning](https://semver.org/).
 - `get_course_overview` missed the content teachers put in section
   summaries or module descriptions instead of modules; that content is
   included now (#13)
+- `get_course_overview` surfaces section and module availability
+  restrictions and hidden states — a restricted item is no longer listed
+  as if freely available
 
 ## [0.1.3] - 2026-10-14
 
