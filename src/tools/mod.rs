@@ -110,14 +110,15 @@ pub struct SubmitAssignmentParams {
 
 #[derive(Deserialize, schemars::JsonSchema)]
 pub struct FetchFileParams {
-    /// Moodle file URL (from get_course_overview / get_assignment; the token
-    /// is injected automatically for pluginfile.php URLs)
+    /// Moodle file URL (from get_course_overview / get_assignment /
+    /// get_discussion_posts)
     url: String,
 }
 
 #[derive(Deserialize, schemars::JsonSchema)]
 pub struct DownloadFileParams {
-    /// Moodle file URL (token injected automatically for pluginfile.php)
+    /// Moodle file URL (from get_course_overview / get_assignment /
+    /// get_discussion_posts)
     url: String,
     /// Local path to write the content to
     save_to: String,
@@ -395,7 +396,8 @@ impl MoodleMcp {
     // ---------- identity ----------
 
     #[tool(
-        description = "Who the token belongs to (user_id, username, fullname) and which Moodle site/release it is connected to, plus the active timestamp timezone, read-only mode, and the server's own version. Also an implicit connectivity check: if this fails, every other tool will fail too."
+        description = "Identify the token owner (user_id, username, fullname) and the connected Moodle site/release, plus the active timestamp timezone, read-only mode, and this MCP server's version. Also a quick connectivity check: if this fails, the site URL or token is usually wrong.",
+        annotations(read_only_hint = true)
     )]
     async fn whoami(&self, Parameters(_): Parameters<Empty>) -> Result<CallToolResult, McpError> {
         let res = self.site_info_cached().await.map(|site| {
@@ -411,7 +413,8 @@ impl MoodleMcp {
     // ---------- courses ----------
 
     #[tool(
-        description = "List the courses you are enrolled in (course_id, name, dates, progress). Optionally filter by name."
+        description = "List the courses you are enrolled in (course_id, name, dates, progress), optionally filtered by name. The starting point of navigation: course_id feeds get_course_overview, course_ids feed get_schedule.",
+        annotations(read_only_hint = true)
     )]
     async fn list_courses(
         &self,
@@ -425,7 +428,8 @@ impl MoodleMcp {
     }
 
     #[tool(
-        description = "The full map of one course as a markdown document: assignments, quizzes, forums, graded items, and every section with its files (download URLs included). The entry point for anything about a specific course."
+        description = "Get the full map of one course as a markdown document: every section with its files (the syllabus, download URLs included), plus assignments, quizzes, forums and graded items. The hub for anything about one course — assignment_id, quiz_id and forum_id for the per-item tools all come from here. course_id comes from list_courses.",
+        annotations(read_only_hint = true)
     )]
     async fn get_course_overview(
         &self,
@@ -444,7 +448,8 @@ impl MoodleMcp {
     // ---------- forums ----------
 
     #[tool(
-        description = "List the discussions in one forum (subject, preview of the opening post, author, replies, pinned/locked). forum_id comes from get_course_overview."
+        description = "List the discussions in one forum (subject, preview of the opening post, author, replies, pinned/locked); each row's discussion_id opens get_discussion_posts and opening_post_id targets reply_to_discussion. forum_id comes from get_course_overview.",
+        annotations(read_only_hint = true)
     )]
     async fn get_forum_discussions(
         &self,
@@ -465,7 +470,8 @@ impl MoodleMcp {
     }
 
     #[tool(
-        description = "Read a whole discussion thread: the opening post and every reply in order, with author, timestamps, converted message text and post attachments."
+        description = "Read a whole discussion thread: the opening post and every reply in order, with author, timestamps, converted message text and post attachments. Each post's post_id is the reply target for reply_to_discussion; discussion_id comes from get_forum_discussions.",
+        annotations(read_only_hint = true)
     )]
     async fn get_discussion_posts(
         &self,
@@ -475,7 +481,8 @@ impl MoodleMcp {
     }
 
     #[tool(
-        description = "Start a new discussion in a forum. WRITE operation — confirm with the user before calling."
+        description = "Start a new discussion in a forum. WRITE operation — confirm with the user before calling.",
+        annotations(destructive_hint = false)
     )]
     async fn create_forum_discussion(
         &self,
@@ -488,7 +495,8 @@ impl MoodleMcp {
     }
 
     #[tool(
-        description = "Reply to a forum post (replying to the opening post = replying to the thread). WRITE operation — confirm with the user before calling."
+        description = "Reply to a forum post (replying to the opening post = replying to the thread). WRITE operation — confirm with the user before calling.",
+        annotations(destructive_hint = false)
     )]
     async fn reply_to_discussion(
         &self,
@@ -500,7 +508,8 @@ impl MoodleMcp {
     // ---------- assignments ----------
 
     #[tool(
-        description = "Everything about one assignment as a markdown document: times, draft/attempt state, full description, attachment files (with URLs), your submission (text/files), grade and teacher feedback. assignment_id comes from get_course_overview."
+        description = "Get everything about one assignment as a markdown document: times, draft/attempt state, full description, attachments (with URLs), your submission (text/files), grade and teacher feedback. Check draft_required here before submit_assignment — it decides whether finalize=true is needed. assignment_id comes from get_course_overview or get_grades.",
+        annotations(read_only_hint = true)
     )]
     async fn get_assignment(
         &self,
@@ -512,8 +521,11 @@ impl MoodleMcp {
         }
     }
 
+    // No annotations: the spec defaults (read_only=false, destructive=true)
+    // are the accurate, conservative claim — saving replaces the existing
+    // submission content.
     #[tool(
-        description = "Submit an assignment: online text and/or draft files (item_id from upload_file), optionally finalizing for grading. finalize is only needed when the assignment enables draft submissions (see get_assignment). WRITE operation — confirm with the user before calling."
+        description = "Submit an assignment: online text and/or draft files (item_id from upload_file). Set finalize=true only when the assignment enables draft submissions (see get_assignment). WRITE operation — confirm with the user before calling."
     )]
     async fn submit_assignment(
         &self,
@@ -534,7 +546,8 @@ impl MoodleMcp {
     // ---------- grades ----------
 
     #[tool(
-        description = "Grades. Without course_id: a cross-course summary of final grades. With course_id: every grade item of that course (quizzes, manual items, course total) with ranges, weights and teacher feedback."
+        description = "Get grades: without course_id, a cross-course summary of final grades; with course_id, every grade item of that course (quizzes, manual items, course total) with ranges, weights and teacher feedback. Assignment items carry assignment_id for direct chaining into get_assignment.",
+        annotations(read_only_hint = true)
     )]
     async fn get_grades(
         &self,
@@ -556,7 +569,8 @@ impl MoodleMcp {
     // ---------- schedule ----------
 
     #[tool(
-        description = "Your timeline: assignment due dates, quiz closes and calendar events in one merged list, sorted by time. Defaults to the next 30 days across all enrolled courses."
+        description = "Get your timeline of deadlines: assignment due dates, quiz closes and calendar events in a single list, sorted by time. Defaults to the next 30 days across all enrolled courses.",
+        annotations(read_only_hint = true)
     )]
     async fn get_schedule(
         &self,
@@ -590,7 +604,8 @@ impl MoodleMcp {
     // ---------- messaging ----------
 
     #[tool(
-        description = "Your recent notifications (announcements, grade releases, teacher messages)."
+        description = "Get your recent notifications (announcements, grade releases, teacher messages); for two-way conversations use get_conversations.",
+        annotations(read_only_hint = true)
     )]
     async fn get_notifications(
         &self,
@@ -639,7 +654,8 @@ impl MoodleMcp {
     }
 
     #[tool(
-        description = "Your messaging conversations (display name, unread state, last message, member ids for send_message)."
+        description = "Get your messaging conversations (display name, unread state, last message, member ids for send_message).",
+        annotations(read_only_hint = true)
     )]
     async fn get_conversations(
         &self,
@@ -654,7 +670,8 @@ impl MoodleMcp {
     }
 
     #[tool(
-        description = "Send a direct message to a user. WRITE operation — the message is sent as you; draft it and confirm with the user before calling."
+        description = "Send a direct message to a user. WRITE operation — the message is sent as you; draft it and confirm with the user before calling.",
+        annotations(destructive_hint = false)
     )]
     async fn send_message(
         &self,
@@ -666,7 +683,8 @@ impl MoodleMcp {
     // ---------- users ----------
 
     #[tool(
-        description = "Look up one user's profile by an exact id, username, email or idnumber (resolves ids found in conversations, notifications and forum posts into names/emails). Whether other students' profiles are visible is the site's privacy policy."
+        description = "Look up one user's profile by an exact id, username, email or idnumber — resolves ids from conversations, notifications and forum posts into names/emails; for keyword search use search_users. Whether other students' profiles are visible is the site's privacy policy.",
+        annotations(read_only_hint = true)
     )]
     async fn get_user(
         &self,
@@ -682,7 +700,8 @@ impl MoodleMcp {
     }
 
     #[tool(
-        description = "Search users by keyword. May be permission-denied for student accounts (the error will say so)."
+        description = "Search users by a keyword (a name or username fragment). May be permission-denied for student accounts (the error will say so); for exact-id lookups use get_user.",
+        annotations(read_only_hint = true)
     )]
     async fn search_users(
         &self,
@@ -713,7 +732,8 @@ impl MoodleMcp {
     // ---------- quizzes (read-only) ----------
 
     #[tool(
-        description = "Your attempts on a quiz: state, start/finish times, total marks. quiz_id comes from get_course_overview. Quiz-taking itself is intentionally not provided."
+        description = "Get your attempts on a quiz: state, start/finish times, total marks. quiz_id comes from get_course_overview. Quiz-taking itself is intentionally not provided.",
+        annotations(read_only_hint = true)
     )]
     async fn get_quiz_attempts(
         &self,
@@ -729,7 +749,8 @@ impl MoodleMcp {
     // ---------- files ----------
 
     #[tool(
-        description = "Fetch a Moodle file and return its content as markdown. PDF/DOCX/PPTX/XLSX/ODT/RTF/EPUB/CSV are converted with anydoc; plain text passes through. For non-convertible files (zip, images) use download_file instead. The web service token is injected automatically for pluginfile.php URLs."
+        description = "Fetch a Moodle file and return its content as markdown: documents (PDF, Word, PowerPoint, Excel, ODF, RTF, EPUB, CSV), HTML pages and plain text are returned inline; other binaries (zip, images) are rejected — use download_file instead.",
+        annotations(read_only_hint = true)
     )]
     async fn fetch_file(
         &self,
@@ -739,7 +760,8 @@ impl MoodleMcp {
     }
 
     #[tool(
-        description = "Download a Moodle file to a local path (metadata only — binary payloads never enter the conversation). The web service token is injected automatically for pluginfile.php URLs."
+        description = "Download a Moodle file to a local path (metadata only — binary payloads never enter the conversation).",
+        annotations(destructive_hint = false, idempotent_hint = true)
     )]
     async fn download_file(
         &self,
@@ -749,7 +771,8 @@ impl MoodleMcp {
     }
 
     #[tool(
-        description = "Upload a local file to the user's draft file area; returns the draft item_id referencing the uploaded file. Multiple files: call repeatedly with the same item_id."
+        description = "Upload a local file to the user's draft file area and return the draft item_id for submit_assignment. Multiple files: call repeatedly with the same item_id. WRITE operation — confirm with the user before calling.",
+        annotations(destructive_hint = false)
     )]
     async fn upload_file(
         &self,
@@ -764,6 +787,8 @@ impl MoodleMcp {
 
     // ---------- escape hatch ----------
 
+    // No annotations: the spec defaults (destructive=true) stay
+    // conservative for an arbitrary WS surface.
     #[tool(
         description = "Call any Moodle web service function by name with free-form JSON parameters (advanced escape hatch). Nested arrays/objects are flattened to Moodle's PHP bracket notation. The function must be enabled for this token — discover candidates with list_functions. WARNING: destructive functions (delete/block/reset) take effect immediately without confirmation — double-check with the user first."
     )]
@@ -794,7 +819,8 @@ impl MoodleMcp {
     }
 
     #[tool(
-        description = "Search the Moodle WS functions this token may call (case-insensitive substring, e.g. 'wiki', 'forum', 'assign'). Matches can then be executed via call_ws_function."
+        description = "Search the Moodle WS functions this token may call (case-insensitive substring, e.g. 'wiki', 'forum', 'assign'). Matches can then be executed via call_ws_function.",
+        annotations(read_only_hint = true)
     )]
     async fn list_functions(
         &self,
