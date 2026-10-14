@@ -270,16 +270,8 @@ async fn read_only_mode_hides_write_upload_and_escape_tools() {
     // list_functions stays — exploring what the token may call is harmless.
     assert!(names.contains(&"list_functions"));
     assert!(names.contains(&"get_assignment"));
-}
 
-/// A tool hidden by read-only mode must reject calls, not just vanish from
-/// the list.
-#[tokio::test]
-async fn read_only_mode_rejects_calls_to_hidden_tools() {
-    let server = MockServer::start().await;
-    site_info_mock().mount(&server).await;
-    let mcp = spawn_server_with(&server, true, Vec::new()).await;
-
+    // Calls to hidden tools are rejected by the router, not just unlisted.
     let result = mcp
         .peer()
         .call_tool(CallToolRequestParams::new("submit_assignment"))

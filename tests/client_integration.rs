@@ -243,32 +243,6 @@ async fn non_json_body_is_reported() {
     assert!(msg.to_lowercase().contains("web services"));
 }
 
-#[tokio::test]
-async fn download_injects_token_into_pluginfile_url() {
-    let server = MockServer::start().await;
-    Mock::given(method("GET"))
-        .and(path(
-            "/webservice/pluginfile.php/12/course/section/notes.txt",
-        ))
-        .and(wiremock::matchers::query_param("token", "testtoken"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_string("hello file")
-                .append_header("content-type", "text/plain"),
-        )
-        .mount(&server)
-        .await;
-
-    let client = client_for(&server).await;
-    let url = format!(
-        "{}/webservice/pluginfile.php/12/course/section/notes.txt",
-        server.uri()
-    );
-    let resp = client.download_file(&url).await.expect("download");
-    assert_eq!(resp.status().as_u16(), 200);
-    assert_eq!(resp.bytes().await.expect("bytes"), "hello file");
-}
-
 /// download_file must create missing parent directories for save_to —
 /// agents construct nested temp paths without mkdir-ing first (#1).
 #[tokio::test]
@@ -441,14 +415,27 @@ async fn null_submission_renders_as_not_submitted() {
 #[tokio::test]
 async fn upload_reports_per_file_error_records() {
     let server = MockServer::start().await;
+    // upload.php takes one POST per file; discriminate the scenarios by the
+    // multipart filename.
     Mock::given(method("POST"))
         .and(path("/webservice/upload.php"))
+        .and(body_string_contains("dup.txt"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!([{
             "filename": "dup.txt",
             "filepath": "/tmp/php7ikf5k",
             "size": 9,
             "errortype": "filenameexist",
             "error": "The file dup.txt already exists"
+        }])))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/webservice/upload.php"))
+        .and(body_string_contains("big.bin"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!([{
+            "filename": "big.bin",
+            "errortype": "fileoversized",
+            "error": "The file is too large"
         }])))
         .mount(&server)
         .await;
@@ -460,7 +447,7 @@ async fn upload_reports_per_file_error_records() {
     let err = moodle_mcp::tools::files::upload_file_from_path(
         &client,
         tmp.to_str().unwrap(),
-        None,
+        Some("dup.txt"),
         424242,
     )
     .await
@@ -472,6 +459,21 @@ async fn upload_reports_per_file_error_records() {
     let msg = err.to_tool_message();
     assert!(msg.contains("already exists"), "{msg}");
     assert!(msg.contains("different filename"), "{msg}");
+
+    // The other errortype upload.php can report per-file (#9).
+    let err = moodle_mcp::tools::files::upload_file_from_path(
+        &client,
+        tmp.to_str().unwrap(),
+        Some("big.bin"),
+        424243,
+    )
+    .await
+    .expect_err("oversize record must fail the upload");
+    match &err {
+        MoodleError::Api { errorcode, .. } => assert_eq!(errorcode, "fileoversized"),
+        other => panic!("expected Api error, got {other:?}"),
+    }
+    assert!(err.to_tool_message().contains("upload size limit"));
     std::fs::remove_file(&tmp).ok();
 }
 
@@ -578,10 +580,11 @@ async fn login_page_redirect_is_an_error_not_a_file() {
     assert!(!save_to.exists(), "no file should be written");
 }
 
-/// webservice/pluginfile.php replies HTTP 200 + JSON error when the token is
-/// invalid — that payload must become an error, never the "file" content.
+/// webservice/pluginfile.php replies HTTP 200 + JSON when the token is
+/// invalid — that payload must become an error, while a legitimate JSON
+/// attachment (no errorcode key) still comes through as a file (#5).
 #[tokio::test]
-async fn json_error_body_is_an_error_not_content() {
+async fn json_responses_split_moodle_errors_from_real_files() {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
         .and(path("/webservice/pluginfile.php/1/notes.txt"))
@@ -598,37 +601,12 @@ async fn json_error_body_is_an_error_not_content() {
         )
         .mount(&server)
         .await;
-    expect_no_other_calls().mount(&server).await;
-
-    let client = client_for(&server).await;
-    let url = format!("{}/webservice/pluginfile.php/1/notes.txt", server.uri());
-    let err = moodle_mcp::tools::files::fetch_file(&client, &url)
-        .await
-        .expect_err("JSON error must fail fetch");
-    match &err {
-        MoodleError::Api { errorcode, .. } => assert_eq!(errorcode, "invalidtoken"),
-        other => panic!("expected Api error, got {other:?}"),
-    }
-
-    let save_to =
-        std::env::temp_dir().join(format!("moodle-mcp-jsonerr-{}.txt", std::process::id()));
-    let err = moodle_mcp::tools::files::download_file(&client, &url, save_to.to_str().unwrap())
-        .await
-        .expect_err("JSON error must fail download");
-    assert!(err.to_string().contains("invalidtoken"), "{err:?}");
-    assert!(!save_to.exists(), "no file should be written");
-}
-
-/// A legitimate JSON attachment (no errorcode key) still downloads fine.
-#[tokio::test]
-async fn legitimate_json_file_is_not_flagged_as_error() {
-    let server = MockServer::start().await;
-    let body = r#"{"grades": [75, 100, 65]}"#;
+    let legit = r#"{"grades": [75, 100, 65]}"#;
     Mock::given(method("GET"))
         .and(path("/webservice/pluginfile.php/1/data.json"))
         .respond_with(
             ResponseTemplate::new(200)
-                .set_body_string(body)
+                .set_body_string(legit)
                 .append_header("content-type", "application/json"),
         )
         .mount(&server)
@@ -636,20 +614,36 @@ async fn legitimate_json_file_is_not_flagged_as_error() {
     expect_no_other_calls().mount(&server).await;
 
     let client = client_for(&server).await;
-    let url = format!("{}/webservice/pluginfile.php/1/data.json", server.uri());
-    let out = moodle_mcp::tools::files::fetch_file(&client, &url)
+    let bad = format!("{}/webservice/pluginfile.php/1/notes.txt", server.uri());
+    let good = format!("{}/webservice/pluginfile.php/1/data.json", server.uri());
+
+    // Error payload → tool error on both paths, nothing written.
+    let fetch_err = moodle_mcp::tools::files::fetch_file(&client, &bad)
+        .await
+        .expect_err("JSON error must fail fetch");
+    let save_bad =
+        std::env::temp_dir().join(format!("moodle-mcp-jsonerr-{}.txt", std::process::id()));
+    let dl_err = moodle_mcp::tools::files::download_file(&client, &bad, save_bad.to_str().unwrap())
+        .await
+        .expect_err("JSON error must fail download");
+    for e in [&fetch_err, &dl_err] {
+        assert!(e.to_string().contains("invalidtoken"), "{e:?}");
+    }
+    assert!(!save_bad.exists(), "no file should be written");
+
+    // Real JSON file → inline content / bytes on disk, flagged as neither.
+    let out = moodle_mcp::tools::files::fetch_file(&client, &good)
         .await
         .expect("legitimate JSON is a file, not an error");
-    assert_eq!(out["content"], json!(body));
+    assert_eq!(out["content"], json!(legit));
 
-    let save_to =
-        std::env::temp_dir().join(format!("moodle-mcp-jsonok-{}.json", std::process::id()));
-    let out = moodle_mcp::tools::files::download_file(&client, &url, save_to.to_str().unwrap())
+    let save = std::env::temp_dir().join(format!("moodle-mcp-jsonok-{}.json", std::process::id()));
+    let out = moodle_mcp::tools::files::download_file(&client, &good, save.to_str().unwrap())
         .await
         .expect("legitimate JSON downloads");
-    assert_eq!(out["size_bytes"], json!(body.len()));
-    assert_eq!(std::fs::read_to_string(&save_to).unwrap(), body);
-    std::fs::remove_file(&save_to).ok();
+    assert_eq!(out["size_bytes"], json!(legit.len()));
+    assert_eq!(std::fs::read_to_string(&save).unwrap(), legit);
+    std::fs::remove_file(&save).ok();
 }
 
 /// mod_forum_get_discussion_posts attachments carry the link in `url`
@@ -857,4 +851,112 @@ async fn notifications_omitted_read_merges_two_calls_on_legacy_sites() {
     );
     assert_eq!(out["notifications"][1]["id"], json!(2));
     assert_eq!(out["notifications"][1]["read"], json!(true));
+}
+
+/// The primary search function (core_user_get_users) sends the 3.8+ `search`
+/// criteria key and parses the {users} response — the fallback test only
+/// covers the message_search_users path.
+#[tokio::test]
+async fn search_users_primary_sends_criteria_key() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(body_string_contains("wsfunction=core_user_get_users"))
+        .and(body_string_contains("criteria%5B0%5D%5Bkey%5D=search"))
+        .and(body_string_contains("criteria%5B0%5D%5Bvalue%5D=chen"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "users": [{"id": 9, "fullname": "Wang Chen", "username": "chen", "email": "c@x.edu"}]
+        })))
+        .mount(&server)
+        .await;
+    expect_no_other_calls().mount(&server).await;
+
+    let client = client_for(&server).await;
+    let out =
+        moodle_mcp::tools::users::search_users(&client, "core_user_get_users", 5, Some("chen"), 20)
+            .await
+            .expect("primary search");
+    assert_eq!(out["count"], json!(1));
+    assert_eq!(out["users"][0]["username"], json!("chen"));
+}
+
+/// message_popup_get_popup_notifications accepts neither `read` nor
+/// `newestfirst`; the popup branch must send neither and pass the item's
+/// own `read` flag through.
+#[tokio::test]
+async fn popup_notifications_send_no_read_filter() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/webservice/rest/server.php"))
+        .and(body_string_contains(
+            "wsfunction=message_popup_get_popup_notifications",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "notifications": [
+                {"id": 5, "subject": "grade released", "read": true,
+                 "timecreated": 100, "smallmessage": "hi"},
+                {"id": 6, "subject": "new post", "read": false,
+                 "timecreated": 200, "smallmessage": "yo"}
+            ],
+            "warnings": []
+        })))
+        .mount(&server)
+        .await;
+    expect_no_other_calls().mount(&server).await;
+
+    let client = client_for(&server).await;
+    let out = moodle_mcp::tools::messaging::get_notifications(
+        &client,
+        "message_popup_get_popup_notifications",
+        5,
+        None,
+        20,
+        false,
+    )
+    .await
+    .expect("popup notifications");
+
+    let reqs = server.received_requests().await.unwrap();
+    let body = String::from_utf8_lossy(&reqs[0].body);
+    assert!(
+        !body.contains("read="),
+        "popup branch must not send read: {body}"
+    );
+    assert!(
+        !body.contains("newestfirst"),
+        "popup branch must not send newestfirst: {body}"
+    );
+
+    assert_eq!(out["count"], json!(2));
+    assert_eq!(
+        out["notifications"][0]["read"],
+        json!(true),
+        "popup read flag passes through"
+    );
+    assert_eq!(out["notifications"][1]["read"], json!(false));
+}
+
+/// Non-convertible binaries must fail with a pointer at download_file
+/// instead of stuffing bytes into the conversation.
+#[tokio::test]
+async fn fetch_rejects_non_convertible_binary() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/webservice/pluginfile.php/1/asset.zip"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_bytes([0x50u8, 0x4b, 0xff, 0xfe, 0x00, 0x01, 0x02])
+                .append_header("content-type", "application/zip"),
+        )
+        .mount(&server)
+        .await;
+    expect_no_other_calls().mount(&server).await;
+
+    let client = client_for(&server).await;
+    let err = moodle_mcp::tools::files::fetch_file(
+        &client,
+        &format!("{}/webservice/pluginfile.php/1/asset.zip", server.uri()),
+    )
+    .await
+    .expect_err("binary must be rejected");
+    assert!(err.to_string().contains("download_file"), "{err:?}");
 }

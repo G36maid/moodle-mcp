@@ -236,29 +236,32 @@ mod tests {
     }
 
     #[test]
-    fn unix_iso() {
+    fn unix_iso_rendering() {
+        // Global default is UTC until set_timezone runs (startup only).
         assert_eq!(unix_to_iso(json!(0)), Value::Null);
+        assert_eq!(unix_to_iso(json!(null)), Value::Null);
         assert_eq!(
             unix_to_iso(json!(1_700_000_000)),
             json!("2023-11-14T22:13:20Z")
         );
-    }
-
-    #[test]
-    fn unix_iso_in_timezone() {
         let taipei = parse_timezone("Asia/Taipei").unwrap();
         // UTC 2023-11-14T22:13:20Z → +08:00 crosses the date boundary — the
-        // exact off-by-a-day case from the issue.
+        // exact off-by-a-day case from issue #8.
         assert_eq!(
             unix_to_iso_with(taipei, json!(1_700_000_000)),
             json!("2023-11-15T06:13:20+08:00")
         );
-        // UTC keeps the Z suffix.
+        // Explicit UTC keeps the Z suffix; zero stays null in any zone.
         assert_eq!(
             unix_to_iso_with(chrono_tz::Tz::UTC, json!(1_700_000_000)),
             json!("2023-11-14T22:13:20Z")
         );
         assert_eq!(unix_to_iso_with(taipei, json!(0)), Value::Null);
+        // Out-of-range seconds fall back to the raw number as a string.
+        assert_eq!(
+            unix_to_iso_with(taipei, json!(i64::MAX)),
+            json!(i64::MAX.to_string())
+        );
     }
 
     #[test]

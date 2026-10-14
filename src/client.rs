@@ -344,112 +344,95 @@ fn truncate(s: &str, max: usize) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
 
     #[test]
-    fn download_url_rewrites_plain_pluginfile() {
-        let client = MoodleClient::new(Config {
-            base_url: "https://moodle.example.com".into(),
-            token: "secret".into(),
-            timeout_secs: 10,
-            timezone: None,
-            read_only: false,
-            disabled_tools: Vec::new(),
-        })
-        .unwrap();
+    fn prepare_download_url_rules() {
+        let mk = |base: &str| {
+            MoodleClient::new(Config {
+                base_url: base.into(),
+                token: "secret".into(),
+                timeout_secs: 10,
+                timezone: None,
+                read_only: false,
+                disabled_tools: Vec::new(),
+            })
+            .unwrap()
+        };
+        let client = mk("https://moodle.example.com");
+        let sub = mk("https://example.com/campus");
 
-        // Plain root-level pluginfile URL → rewritten + token injected.
-        let u = client
-            .prepare_download_url(
+        // (client, input URL, expected final path, token expected in query)
+        let cases: &[(&MoodleClient, &str, &str, bool)] = &[
+            // Plain root-level pluginfile URL → rewritten + token injected.
+            (
+                &client,
                 "https://moodle.example.com/pluginfile.php/26/mod_assign/intro/0/HW1.pdf",
-            )
-            .unwrap();
-        assert_eq!(
-            u.path(),
-            "/webservice/pluginfile.php/26/mod_assign/intro/0/HW1.pdf"
-        );
-        assert!(u.query_pairs().any(|(k, v)| k == "token" && v == "secret"));
+                "/webservice/pluginfile.php/26/mod_assign/intro/0/HW1.pdf",
+                true,
+            ),
+            // Site installed in a subdirectory still rewrites.
+            (
+                &sub,
+                "https://example.com/campus/pluginfile.php/1/f.pdf",
+                "/campus/webservice/pluginfile.php/1/f.pdf",
+                true,
+            ),
+            // Already the webservice endpoint: no double rewrite, token ensured.
+            (
+                &client,
+                "https://moodle.example.com/webservice/pluginfile.php/1/f.pdf",
+                "/webservice/pluginfile.php/1/f.pdf",
+                true,
+            ),
+            // A bare script with no file arguments is left alone (still a
+            // same-site pluginfile URL, so the token applies).
+            (
+                &client,
+                "https://moodle.example.com/pluginfile.php",
+                "/pluginfile.php",
+                true,
+            ),
+            // draftfile.php is a browser-only area — never rewritten, no token.
+            (
+                &client,
+                "https://moodle.example.com/draftfile.php/5/user/draft/12345/f.txt",
+                "/draftfile.php/5/user/draft/12345/f.txt",
+                false,
+            ),
+            // External host: never rewritten, never token-injected
+            // (token-leak protection), even with a pluginfile path.
+            (
+                &client,
+                "https://evil.example.com/pluginfile.php/1/f.pdf",
+                "/pluginfile.php/1/f.pdf",
+                false,
+            ),
+            // Off-site path without pluginfile: no token.
+            (
+                &client,
+                "https://cdn.example.com/files/f.pdf",
+                "/files/f.pdf",
+                false,
+            ),
+        ];
+        for (i, (cl, input, want_path, want_token)) in cases.iter().enumerate() {
+            let u = cl
+                .prepare_download_url(input)
+                .unwrap_or_else(|e| panic!("case {i}: {e}"));
+            assert_eq!(u.path(), *want_path, "case {i} path");
+            assert_eq!(
+                u.query_pairs().any(|(k, v)| k == "token" && v == "secret"),
+                *want_token,
+                "case {i} token"
+            );
+        }
 
-        // Site installed in a subdirectory still rewrites.
-        let sub = MoodleClient::new(Config {
-            base_url: "https://example.com/campus".into(),
-            token: "secret".into(),
-            timeout_secs: 10,
-            timezone: None,
-            read_only: false,
-            disabled_tools: Vec::new(),
-        })
-        .unwrap();
-        let u = sub
-            .prepare_download_url("https://example.com/campus/pluginfile.php/1/f.pdf")
-            .unwrap();
-        assert_eq!(u.path(), "/campus/webservice/pluginfile.php/1/f.pdf");
-
-        // Already the webservice endpoint: untouched (no double rewrite).
-        let u = client
-            .prepare_download_url("https://moodle.example.com/webservice/pluginfile.php/1/f.pdf")
-            .unwrap();
-        assert_eq!(u.path(), "/webservice/pluginfile.php/1/f.pdf");
-
-        // External host: never rewritten (token-leak protection).
-        let u = client
-            .prepare_download_url("https://evil.example.com/pluginfile.php/1/f.pdf")
-            .unwrap();
-        assert_eq!(u.path(), "/pluginfile.php/1/f.pdf");
-        assert!(!u.query_pairs().any(|(k, _)| k == "token"));
-    }
-
-    #[test]
-    fn download_url_token_rules() {
-        let client = MoodleClient::new(Config {
-            base_url: "https://moodle.example.com".into(),
-            token: "secret".into(),
-            timeout_secs: 10,
-            timezone: None,
-            read_only: false,
-            disabled_tools: Vec::new(),
-        })
-        .unwrap();
-
-        // Same-site pluginfile URL: token injected.
-        let u = client
-            .prepare_download_url("https://moodle.example.com/webservice/pluginfile.php/1/f.pdf")
-            .unwrap();
-        assert!(u.query_pairs().any(|(k, v)| k == "token" && v == "secret"));
-
-        // Token already present: never duplicated.
+        // Token already present: exactly one, never duplicated.
         let u = client
             .prepare_download_url(
                 "https://moodle.example.com/webservice/pluginfile.php/1/f.pdf?token=other",
             )
             .unwrap();
         assert_eq!(u.query_pairs().filter(|(k, _)| k == "token").count(), 1);
-
-        // External host: never inject, even if the path contains
-        // pluginfile.php (token-leak protection).
-        let u = client
-            .prepare_download_url("https://evil.example.com/pluginfile.php/1/f.pdf")
-            .unwrap();
-        assert!(!u.query_pairs().any(|(k, _)| k == "token"));
-
-        // Off-site path: never inject.
-        let u = client
-            .prepare_download_url("https://cdn.example.com/files/f.pdf")
-            .unwrap();
-        assert!(!u.query_pairs().any(|(k, _)| k == "token"));
-    }
-
-    #[test]
-    fn flattens_php_notation() {
-        let mut out = Vec::new();
-        flatten_json(
-            &json!({"courseids": [2, 5], "criteria": [{"key": "search", "value": "math"}]}),
-            "",
-            &mut out,
-        );
-        assert!(out.contains(&("courseids[0]".to_string(), "2".to_string())));
-        assert!(out.contains(&("courseids[1]".to_string(), "5".to_string())));
-        assert!(out.contains(&("criteria[0][key]".to_string(), "search".to_string())));
-        assert!(out.contains(&("criteria[0][value]".to_string(), "math".to_string())));
     }
 }
