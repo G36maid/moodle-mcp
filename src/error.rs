@@ -72,6 +72,8 @@ impl MoodleError {
                     "sitemaintenance" => "the site is under maintenance — try again later.".to_string(),
                     "invalidrecord" | "dml_missing_record_exception" => "the referenced record does not exist — double-check the id (a wrong-type id, e.g. a module id instead of an instance id, can also look like this).".to_string(),
                     "invalidparameter" | "invalid_parameter_exception" | "invalidresponse" => "check the parameter names, types and value formats against what the tool asked for.".to_string(),
+                    "filenameexist" => "a file with this name already exists in that draft area — upload under a different filename, or start a fresh draft with a new item_id.".to_string(),
+                    "fileoversized" => "the file exceeds the site's upload size limit — check the file or ask for a higher quota.".to_string(),
                     "toomanyrequests" | "ratelimit" => "rate limited — wait a moment and retry.".to_string(),
                     _ => String::new(),
                 };

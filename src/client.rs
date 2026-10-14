@@ -248,6 +248,32 @@ impl MoodleClient {
             });
             return Err(MoodleError::from_exception(exc));
         }
+        // upload.php ALSO reports per-file failures with HTTP 200 and an
+        // error record that has no `exception` key (`filenameexist`,
+        // `fileoversized`, …). A record carrying a non-empty `error` means
+        // the file was NOT stored — surfacing it keeps upload_file from
+        // reporting success while the draft area still holds the old file.
+        if let Some(records) = value.as_array()
+            && let Some(bad) = records.iter().find(|r| {
+                r.get("error")
+                    .and_then(Value::as_str)
+                    .is_some_and(|e| !e.is_empty())
+            })
+        {
+            return Err(MoodleError::Api {
+                exception: "upload_failed".into(),
+                errorcode: bad
+                    .get("errortype")
+                    .and_then(Value::as_str)
+                    .unwrap_or("uploaderror")
+                    .to_string(),
+                message: bad
+                    .get("error")
+                    .and_then(Value::as_str)
+                    .unwrap_or("upload rejected")
+                    .to_string(),
+            });
+        }
         Ok(value)
     }
 }

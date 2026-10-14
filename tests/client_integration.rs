@@ -429,3 +429,72 @@ async fn null_submission_renders_as_not_submitted() {
         json!("no submission yet")
     );
 }
+
+/// upload.php replies HTTP 200 with a per-file error record (no exception
+/// key) when it cannot store the file — e.g. the name already exists in the
+/// draft area. That must surface as an error, not `uploaded: true` (#9).
+#[tokio::test]
+async fn upload_reports_per_file_error_records() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/webservice/upload.php"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!([{
+            "filename": "dup.txt",
+            "filepath": "/tmp/php7ikf5k",
+            "size": 9,
+            "errortype": "filenameexist",
+            "error": "The file dup.txt already exists"
+        }])))
+        .mount(&server)
+        .await;
+    expect_no_other_calls().mount(&server).await;
+
+    let tmp = std::env::temp_dir().join(format!("moodle-mcp-upl-{}.txt", std::process::id()));
+    std::fs::write(&tmp, b"dup data").unwrap();
+    let client = client_for(&server).await;
+    let err = moodle_mcp::tools::files::upload_file_from_path(
+        &client,
+        tmp.to_str().unwrap(),
+        None,
+        424242,
+    )
+    .await
+    .expect_err("error record must fail the upload");
+    match &err {
+        MoodleError::Api { errorcode, .. } => assert_eq!(errorcode, "filenameexist"),
+        other => panic!("expected Api error, got {other:?}"),
+    }
+    let msg = err.to_tool_message();
+    assert!(msg.contains("already exists"), "{msg}");
+    assert!(msg.contains("different filename"), "{msg}");
+    std::fs::remove_file(&tmp).ok();
+}
+
+/// Successful upload records keep flowing through unchanged (#9 guard).
+#[tokio::test]
+async fn upload_success_records_still_report_item_id() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/webservice/upload.php"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!([{
+            "itemid": 77,
+            "filename": "notes.txt",
+            "filepath": "/",
+            "filesize": 8
+        }])))
+        .mount(&server)
+        .await;
+    expect_no_other_calls().mount(&server).await;
+
+    let tmp = std::env::temp_dir().join(format!("moodle-mcp-uplok-{}.txt", std::process::id()));
+    std::fs::write(&tmp, b"12345678").unwrap();
+    let client = client_for(&server).await;
+    let out =
+        moodle_mcp::tools::files::upload_file_from_path(&client, tmp.to_str().unwrap(), None, 77)
+            .await
+            .expect("successful upload");
+    assert_eq!(out["uploaded"], json!(true));
+    assert_eq!(out["item_id"], json!(77));
+    assert_eq!(out["filesize"], json!(8));
+    std::fs::remove_file(&tmp).ok();
+}
