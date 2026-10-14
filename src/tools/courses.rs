@@ -60,7 +60,6 @@ fn shape_module(m: &Value, assignments_by_cmid: &std::collections::HashMap<i64, 
         "description": m.get("description").and_then(Value::as_str)
             .map(|t| truncate_chars(&html_to_markdown(t), 300)),
     });
-    // Cross-link activities to their authoritative records.
     if modname.as_str() == Some("assign")
         && let Some(id) = m.get("id").and_then(Value::as_i64)
         && let Some(a) = assignments_by_cmid.get(&id)
@@ -108,7 +107,6 @@ pub async fn get_course_overview(
     let forum_params = json!({ "courseids": [course_id] });
     let grade_params = json!({ "courseid": course_id, "userid": user_id });
 
-    // Five sources, fetched concurrently.
     let (contents_r, assign_r, quiz_r, forum_r, grade_r) = tokio::join!(
         client.call("core_course_get_contents", &contents_params),
         client.call("mod_assign_get_assignments", &assign_params),
@@ -123,8 +121,8 @@ pub async fn get_course_overview(
         return Err(MoodleError::InvalidBody(e.to_tool_message()));
     }
 
-    // --- course meta (fullname from the assignments response; sections[0].name
-    // is the first section, NOT the course name) ---
+    // fullname comes from the assignments response; sections[0].name is the
+    // first section, NOT the course name.
     let fullname = assign_r
         .as_ref()
         .ok()
@@ -143,7 +141,6 @@ pub async fn get_course_overview(
         .map(|v| decode_entities(v.as_str().unwrap_or("?")))
         .unwrap_or(format!("course {course_id}"));
 
-    // --- assignments ---
     let mut assignments: Vec<Value> = Vec::new();
     let mut assignments_by_cmid: std::collections::HashMap<i64, Value> = Default::default();
     if let Ok(a) = assign_r.as_ref() {
@@ -184,7 +181,6 @@ pub async fn get_course_overview(
             .unwrap_or_default()
     });
 
-    // --- quizzes ---
     let quizzes_raw = quiz_r
         .as_ref()
         .ok()
@@ -206,7 +202,6 @@ pub async fn get_course_overview(
         })
         .collect();
 
-    // --- forums ---
     let forums: Vec<Value> = forum_r
         .as_ref()
         .map(|v| v.as_array().cloned().unwrap_or_default())
@@ -221,7 +216,6 @@ pub async fn get_course_overview(
         })
         .collect();
 
-    // --- grades (graded items only) ---
     let (grades_section_md, grades_structured): (String, Value) = match grade_r {
         Ok(g) => {
             let items: Vec<Value> = crate::util::first_of(&g, "usergrades")
@@ -270,7 +264,6 @@ pub async fn get_course_overview(
         ),
     };
 
-    // --- sections (with cross-linked ids) ---
     let sections: Vec<Value> = contents_r
         .as_ref()
         .map(|v| v.as_array().cloned().unwrap_or_default())
@@ -301,7 +294,6 @@ pub async fn get_course_overview(
         "sections": sections,
     });
 
-    // --- markdown rendering ---
     let mut md = String::new();
     md.push_str(&format!("# {fullname} (course_id: {course_id})\n\n"));
 

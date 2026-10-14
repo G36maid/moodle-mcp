@@ -58,7 +58,6 @@ pub async fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // Whatever the flags didn't supply is prompted for interactively.
     let base_url = match url {
         Some(u) => u.trim_end_matches('/').to_string(),
         None => prompt_url()?,

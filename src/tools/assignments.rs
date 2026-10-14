@@ -123,7 +123,6 @@ pub async fn get_assignment(
             ));
         };
 
-    // --- submission ---
     let mut sub_files: Vec<Value> = Vec::new();
     let mut onlinetext: Option<String> = None;
     for plugin in plugins_of(&submission) {
@@ -134,7 +133,6 @@ pub async fn get_assignment(
         }
     }
 
-    // --- feedback ---
     let raw_grade = feedback
         .get("grade")
         .and_then(|g| g.get("grade"))
@@ -169,7 +167,6 @@ pub async fn get_assignment(
     }
     let graded = grade_display.is_some() || !grade.is_null();
 
-    // --- description & attachments ---
     let intro_md = assignment
         .get("intro")
         .and_then(Value::as_str)
@@ -214,7 +211,6 @@ pub async fn get_assignment(
         .and_then(Value::as_array)
         .map_or(0, |a| a.len());
 
-    // --- structured ---
     let structured = json!({
         "assignment_id": assignment_id,
         "cmid": assignment.get("cmid").cloned().unwrap_or(Value::Null),
@@ -244,7 +240,6 @@ pub async fn get_assignment(
         "feedback_files": fb_files,
     });
 
-    // --- markdown ---
     let iso = |v: &Value| v.as_str().unwrap_or("—").to_string();
     let mut md = String::new();
     md.push_str(&format!(

@@ -76,8 +76,6 @@ async fn resolve_timezone(client: &MoodleClient, env_tz: Option<&str>) {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
 
-    // Subcommand dispatch. `auth` is the only real subcommand; `serve` (and
-    // nothing at all) runs the MCP server over stdio.
     match args.next().as_deref() {
         Some("auth") => return moodle_mcp::auth::run(&args.collect::<Vec<_>>()).await,
         Some("serve") | None => {}
