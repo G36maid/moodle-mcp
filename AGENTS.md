@@ -27,6 +27,8 @@ cargo test
 
 - **Never write to stdout** — it is the MCP JSON-RPC stream. Logs go to stderr via tracing (`RUST_LOG`).
 - Write tools carry `WRITE operation — confirm with the user before calling` in their descriptions; preserve this when editing. Drafts are preferred over finalizing submissions.
+- Tool annotations: read tools set `annotations(read_only_hint = true)`; additive write tools (create/reply/send/upload/download) set `destructive_hint = false`. Overwriting surfaces (`submit_assignment`, `call_ws_function`) intentionally keep the spec default (`destructive = true`). Preserve these when adding tools.
+- Tool descriptions use structured prose (2026-10 style): sentence 1 = purpose + what it returns; then workflow/boundary sentences only where a real confusion pair or gate exists ("for X use Y"); then upstream id chaining ("…_id comes from …"). No section labels, no examples, no implementation mechanism.
 - Quiz-taking is intentionally not provided — don't add it.
 - Error messages are plain-language and suggest the fix; keep that style.
 - Comments explain **why**, never narrate **what** the adjacent code does — version quirks, trade-offs, upstream Moodle source links. No step-by-step story comments or `// --- section ---` chapter markers; if a marker carries real why-content, demote it to one why-comment instead.
