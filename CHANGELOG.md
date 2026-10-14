@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versioning
 follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- `get_course_overview` missed the content teachers put in section
+  summaries or module descriptions instead of modules; that content is
+  included now (#13)
+
 ## [0.1.3] - 2026-10-14
 
 ### Changed
