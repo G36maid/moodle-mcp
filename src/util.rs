@@ -82,9 +82,17 @@ pub fn now_unix() -> i64 {
 }
 
 /// A unique integer suitable for Moodle draft-area item ids.
+///
+/// Combines the wall clock with a process-wide atomic counter: the counter
+/// guarantees uniqueness across concurrent calls (the old `nanos % 1_000`
+/// scheme kept only 10 distinct values per second on Windows' 100 ns clock,
+/// so parallel `fetch_file` calls could collide), and the clock keeps ids
+/// distinct across seconds and far apart in value space. A collision would
+/// need 1 000 000 calls within the same second.
 pub fn unique_item_id() -> i64 {
-    let nanos = chrono::Utc::now().timestamp_subsec_nanos() as i64;
-    now_unix() * 1_000 + (nanos % 1_000)
+    static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    now_unix() * 1_000_000 + ((n % 1_000_000) as i64)
 }
 
 /// Truncate a string to `max` characters, appending a neutral marker.
@@ -183,5 +191,26 @@ mod tests {
     fn digs() {
         let v = json!({"a": {"b": [1, 2]}});
         assert_eq!(dig(&v, "a.b"), Some(&json!([1, 2])));
+    }
+
+    #[test]
+    fn unique_item_ids_stay_unique_under_parallelism() {
+        // Regression for the Windows clock-resolution collision: many
+        // concurrent calls must never hand out the same id.
+        let ids = std::sync::Mutex::new(Vec::new());
+        std::thread::scope(|s| {
+            for _ in 0..8 {
+                ids.lock().unwrap().reserve(500);
+                s.spawn(|| {
+                    let local: Vec<i64> = (0..500).map(|_| unique_item_id()).collect();
+                    ids.lock().unwrap().extend(local);
+                });
+            }
+        });
+        let mut all = ids.into_inner().unwrap();
+        let total = all.len();
+        all.sort_unstable();
+        all.dedup();
+        assert_eq!(all.len(), total, "parallel unique_item_id calls collided");
     }
 }
