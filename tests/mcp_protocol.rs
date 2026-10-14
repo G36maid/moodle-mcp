@@ -8,7 +8,7 @@ use rmcp::ServiceExt;
 use rmcp::model::CallToolRequestParams;
 use serde_json::json;
 use std::sync::Arc;
-use wiremock::matchers::{method, path};
+use wiremock::matchers::{body_string_contains, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 async fn spawn_server(server: &MockServer) -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
@@ -231,6 +231,12 @@ async fn raw_call_rejects_unknown_function_with_suggestion() {
         .and_then(|c| c.as_text())
         .map(|t| t.text.as_str())
         .expect("text content");
+    // "this configuration" — the function may exist in Moodle but be absent
+    // from the service/site setup the token belongs to.
+    assert!(
+        text.contains("not enabled for this configuration"),
+        "{text}"
+    );
     // Did-you-mean: the 3.7-compatible variant is suggested.
     assert!(text.contains("Did you mean"), "{text}");
     assert!(text.contains("mod_forum_get_forum_discussions"));
@@ -307,4 +313,51 @@ async fn disable_tools_filters_individual_tools() {
         names.contains(&"submit_assignment"),
         "non-disabled write tools remain"
     );
+}
+
+/// limit=0 on the limiting tools means the default (20), not "one item" —
+/// the normalization lives in the tool layer, so this goes through the real
+/// MCP server.
+#[tokio::test]
+async fn limit_zero_means_default_twenty() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/webservice/rest/server.php"))
+        .and(body_string_contains(
+            "wsfunction=core_webservice_get_site_info",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "sitename": "Test Moodle",
+            "userid": 7,
+            "release": "4.5.4 (Build: 20250417)",
+            "functions": ["core_webservice_get_site_info", "core_message_get_messages"]
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/webservice/rest/server.php"))
+        .and(body_string_contains("wsfunction=core_message_get_messages"))
+        .and(body_string_contains("limitnum=20"))
+        .and(body_string_contains("read=2"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "messages": [
+                {"id": 1, "subject": "a", "timecreated": 300, "timeread": null},
+                {"id": 2, "subject": "b", "timecreated": 200, "timeread": null},
+                {"id": 3, "subject": "c", "timecreated": 100, "timeread": 50}
+            ],
+            "warnings": []
+        })))
+        .mount(&server)
+        .await;
+
+    let mcp = spawn_server(&server).await;
+    let args = json!({"limit": 0}).as_object().expect("object").clone();
+    let result = mcp
+        .peer()
+        .call_tool(CallToolRequestParams::new("get_notifications").with_arguments(args))
+        .await
+        .expect("call_tool");
+    assert!(!result.is_error.unwrap_or(false), "{result:?}");
+    // count is asserted via the mock having matched limitnum=20; shape check:
+    assert!(!result.content.is_empty());
 }

@@ -159,13 +159,13 @@ pub struct ScheduleParams {
 pub struct NotificationsParams {
     /// Filter by read state; omit for all
     read: Option<bool>,
-    /// Max notifications returned (default 20)
+    /// Max notifications returned (default 20; 0 counts as the default)
     limit: Option<u32>,
 }
 
 #[derive(Deserialize, schemars::JsonSchema)]
 pub struct ConversationsParams {
-    /// Max conversations returned (default 20)
+    /// Max conversations returned (default 20; 0 counts as the default)
     limit: Option<u32>,
 }
 
@@ -202,7 +202,7 @@ pub struct SearchUsersParams {
     /// omitted searches are rejected client-side (they would match every
     /// user on the site and time out)
     search: Option<String>,
-    /// Max users returned (default 20)
+    /// Max users returned (default 20; 0 counts as the default)
     limit: Option<u32>,
 }
 
@@ -623,7 +623,7 @@ impl MoodleMcp {
                         &f,
                         uid,
                         p.read,
-                        p.limit.unwrap_or(20),
+                        p.limit.filter(|l| *l > 0).unwrap_or(20),
                         read_both_supported,
                     )
                     .await
@@ -642,7 +642,7 @@ impl MoodleMcp {
         &self,
         Parameters(p): Parameters<ConversationsParams>,
     ) -> Result<CallToolResult, McpError> {
-        let limit = p.limit.unwrap_or(20);
+        let limit = p.limit.filter(|l| *l > 0).unwrap_or(20);
         let res = match self.current_user_id().await {
             Ok(uid) => messaging::get_conversations(&self.client, uid, limit).await,
             Err(e) => Err(e),
@@ -696,7 +696,7 @@ impl MoodleMcp {
                         &f,
                         uid,
                         p.search.as_deref(),
-                        p.limit.unwrap_or(20),
+                        p.limit.filter(|l| *l > 0).unwrap_or(20),
                     )
                     .await
                 }

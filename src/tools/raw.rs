@@ -20,7 +20,7 @@ pub async fn call_ws_function(
 ) -> Result<Value, MoodleError> {
     if !allowed.is_empty() && !allowed.iter().any(|f| f == wsfunction) {
         return Err(MoodleError::Config(format!(
-            "function '{wsfunction}' is not enabled for this token. {}",
+            "function '{wsfunction}' is not enabled for this configuration. {}",
             suggest_functions(wsfunction, allowed)
         )));
     }
