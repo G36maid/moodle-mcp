@@ -29,6 +29,7 @@ cargo test
 - Write tools carry `WRITE operation — confirm with the user before calling` in their descriptions; preserve this when editing. Drafts are preferred over finalizing submissions.
 - Quiz-taking is intentionally not provided — don't add it.
 - Error messages are plain-language and suggest the fix; keep that style.
+- Comments explain **why**, never narrate **what** the adjacent code does — version quirks, trade-offs, upstream Moodle source links. No step-by-step story comments or `// --- section ---` chapter markers; if a marker carries real why-content, demote it to one why-comment instead.
 - `*mcp.json` (e.g. `.pi/mcp.json`) is gitignored because it holds a real `MOODLE_TOKEN` — never commit tokens.
 
 ## Env (runtime, not tests)
