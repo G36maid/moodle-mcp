@@ -219,6 +219,7 @@ env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "your-toke
 | `MOODLE_URL` | ✔ | — | サイトのベース URL（末尾スラッシュなし） |
 | `MOODLE_TOKEN` | ✔ | — | Web サービストークン |
 | `MOODLE_TIMEOUT_SECS` | — | `60` | リクエストごとのタイムアウト秒数 |
+| `MOODLE_TIMEZONE` | — | 自動 / `UTC` | タイムスタンプ表示に使う IANA タイムゾーン名（`Asia/Taipei`）。デフォルトは Moodle ユーザーのタイムゾーン設定を自動検出し、取得できない場合は UTC |
 | `RUST_LOG` | — | `info` | ログフィルタ（ログは stderr、stdout は MCP プロトコル通信） |
 
 ## 💬 プロンプト例

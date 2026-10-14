@@ -219,6 +219,7 @@ env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "tu-token"
 | `MOODLE_URL` | ✔ | — | URL base del sitio, sin barra final |
 | `MOODLE_TOKEN` | ✔ | — | Token de servicio web |
 | `MOODLE_TIMEOUT_SECS` | — | `60` | Tiempo de espera por petición en segundos |
+| `MOODLE_TIMEZONE` | — | auto / `UTC` | Zona horaria IANA (`Asia/Taipei`) para mostrar las marcas de tiempo; por defecto se detecta automáticamente la preferencia de zona horaria del usuario de Moodle y, si no, se usa UTC |
 | `RUST_LOG` | — | `info` | Filtro de logs (los logs van a stderr; stdout es el canal MCP) |
 
 ## 💬 Ejemplos de prompts

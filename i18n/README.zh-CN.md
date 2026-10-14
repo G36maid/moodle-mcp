@@ -219,6 +219,7 @@ env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "your-toke
 | `MOODLE_URL` | ✔ | — | 站点基础 URL，末尾不加斜杠 |
 | `MOODLE_TOKEN` | ✔ | — | Web Service Token |
 | `MOODLE_TIMEOUT_SECS` | — | `60` | 单次请求超时秒数 |
+| `MOODLE_TIMEZONE` | — | 自动 / `UTC` | 渲染时间戳用的 IANA 时区名（`Asia/Taipei`）；默认自动检测 Moodle 用户的时区偏好，失败则使用 UTC |
 | `RUST_LOG` | — | `info` | 日志过滤级别（日志输出到 stderr；stdout 专用于 MCP 交互） |
 
 ## 💬 Prompt 示例

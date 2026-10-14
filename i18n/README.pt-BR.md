@@ -219,6 +219,7 @@ env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "seu-token
 | `MOODLE_URL` | ✔ | — | URL base do site, sem barra final |
 | `MOODLE_TOKEN` | ✔ | — | Token de serviço web |
 | `MOODLE_TIMEOUT_SECS` | — | `60` | Timeout por requisição em segundos |
+| `MOODLE_TIMEZONE` | — | automático / `UTC` | Fuso horário IANA (`Asia/Taipei`) usado para exibir marcações de tempo; por padrão detecta automaticamente o fuso horário preferido do usuário do Moodle e, caso contrário, usa UTC |
 | `RUST_LOG` | — | `info` | Nível de log (logs vão para stderr; stdout é o canal MCP) |
 
 ## 💬 Exemplos de prompts

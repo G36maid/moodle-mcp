@@ -219,6 +219,7 @@ env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "your-toke
 | `MOODLE_URL` | ✔ | — | 站點根網址，末端不加斜線 |
 | `MOODLE_TOKEN` | ✔ | — | Web Service 存取權杖 |
 | `MOODLE_TIMEOUT_SECS` | — | `60` | 單次請求逾時秒數 |
+| `MOODLE_TIMEZONE` | — | 自動 / `UTC` | 呈現時間戳用的 IANA 時區名稱（`Asia/Taipei`）；預設自動偵測 Moodle 使用者的時區偏好，失敗則使用 UTC |
 | `RUST_LOG` | — | `info` | 日誌過濾等級（日誌輸出至 stderr；stdout 為 MCP 通訊串流） |
 
 ## 💬 提示詞範例
