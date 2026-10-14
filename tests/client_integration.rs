@@ -242,10 +242,11 @@ async fn non_json_body_is_reported() {
     assert!(msg.to_lowercase().contains("web services"));
 }
 
-/// download_file must create missing parent directories for save_to —
-/// agents construct nested temp paths without mkdir-ing first.
+/// A missing save_to directory must fail with an error that names the
+/// directory and suggests the fix — never silently create directory
+/// structure on the agent's behalf (the filesystem-server convention).
 #[tokio::test]
-async fn download_creates_missing_parent_directories() {
+async fn download_missing_directory_names_it_and_suggests_the_fix() {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
         .and(path(
@@ -261,22 +262,25 @@ async fn download_creates_missing_parent_directories() {
     expect_no_other_calls().mount(&server).await;
 
     let client = client_for(&server).await;
-    let save_to = std::env::temp_dir().join(format!(
-        "moodle-mcp-test-{}/nested/deep/notes.txt",
+    let missing_dir = std::env::temp_dir().join(format!(
+        "moodle-mcp-absent-{}/nested/deep",
         std::process::id()
     ));
-    let _ = std::fs::remove_dir_all(save_to.parent().unwrap());
+    let save_to = missing_dir.join("notes.txt");
     let url = format!(
         "{}/webservice/pluginfile.php/12/course/section/notes.txt",
         server.uri()
     );
-    let out = moodle_mcp::tools::files::download_file(&client, &url, save_to.to_str().unwrap())
+    let err = moodle_mcp::tools::files::download_file(&client, &url, save_to.to_str().unwrap())
         .await
-        .expect("download with missing parents");
-    assert_eq!(out["saved_to"], json!(save_to.to_str().unwrap()));
-    assert_eq!(out["size_bytes"], json!(10));
-    assert_eq!(std::fs::read_to_string(&save_to).unwrap(), "hello file");
-    std::fs::remove_dir_all(save_to.parent().unwrap()).unwrap();
+        .expect_err("missing directory must fail");
+    assert!(err.to_string().contains("does not exist"), "{err:?}");
+    assert!(
+        err.to_string().contains("create the directory first"),
+        "{err:?}"
+    );
+    assert!(!save_to.exists(), "no file should be written");
+    assert!(!missing_dir.exists(), "no directory should be created");
 }
 
 // ---- Regression tests: issues found on a live 3.7 site ----

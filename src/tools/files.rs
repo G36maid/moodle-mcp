@@ -217,6 +217,20 @@ pub async fn fetch_file(client: &MoodleClient, url: &str) -> Result<Value, Moodl
     )))
 }
 
+fn save_create_err(save_to: &str, e: std::io::Error) -> MoodleError {
+    if e.kind() == std::io::ErrorKind::NotFound
+        && let Some(parent) = std::path::Path::new(save_to).parent()
+        && !parent.as_os_str().is_empty()
+    {
+        return MoodleError::Config(format!(
+            "cannot create {save_to}: the directory {} does not exist — \
+             create the directory first or save to an existing one",
+            parent.display()
+        ));
+    }
+    MoodleError::Config(format!("failed to create {save_to}: {e}"))
+}
+
 /// `download_file` — write a Moodle file to a local path. Uses the
 /// web-service token (injected into `pluginfile.php` URLs when missing).
 /// Returns metadata only; binary payloads never enter the conversation.
@@ -256,7 +270,7 @@ pub async fn download_file(
         use tokio::io::AsyncWriteExt;
         let mut file = tokio::fs::File::create(save_to)
             .await
-            .map_err(|e| MoodleError::Config(format!("failed to create {save_to}: {e}")))?;
+            .map_err(|e| save_create_err(save_to, e))?;
         file.write_all(&bytes)
             .await
             .map_err(|e| MoodleError::Config(format!("failed to write {save_to}: {e}")))?;
@@ -274,22 +288,9 @@ pub async fn download_file(
     // Stream to disk in chunks (no full-body buffering) with a hard cap;
     // a mid-stream overage aborts and removes the partial file.
     use tokio::io::AsyncWriteExt;
-    // Agents freely construct nested save_to paths — create missing parent
-    // directories instead of failing with a bare os error 2.
-    if let Some(parent) = std::path::Path::new(save_to).parent()
-        && !parent.as_os_str().is_empty()
-    {
-        tokio::fs::create_dir_all(parent).await.map_err(|e| {
-            MoodleError::Config(format!(
-                "cannot create the directory for {save_to} ({}): {e} — \
-                 check the path and permissions, or create the directory first",
-                parent.display()
-            ))
-        })?;
-    }
     let mut file = tokio::fs::File::create(save_to)
         .await
-        .map_err(|e| MoodleError::Config(format!("failed to create {save_to}: {e}")))?;
+        .map_err(|e| save_create_err(save_to, e))?;
     let mut downloaded: u64 = 0;
     loop {
         let chunk = match resp.chunk().await {

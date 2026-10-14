@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versioning
 follows [Semantic Versioning](https://semver.org/).
 
+## [0.1.3] - 2026-10-14
+
+### Changed
+
+- `download_file` no longer creates missing `save_to` parent directories
+  (introduced in 0.1.2). Following the explicit-action convention of the
+  official filesystem server, the download fails with an error naming the
+  missing directory and suggesting to create it first or save to an existing
+  one — no directory structure is created on the agent's behalf (#1)
+
 ## [0.1.2] - 2026-10-14
 
 ### Fixed
@@ -68,6 +78,7 @@ messaging, notifications and users, plus a `call_ws_function` +
 `list_functions` escape hatch reaching every web-service function the token
 can call. Verified against Moodle 3.7 and designed for 4.x/5.x.
 
+[0.1.3]: https://github.com/G36maid/moodle-mcp/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/G36maid/moodle-mcp/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/G36maid/moodle-mcp/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/G36maid/moodle-mcp/releases/tag/v0.1.0
