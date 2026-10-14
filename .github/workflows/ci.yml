@@ -9,7 +9,9 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  test:
+  # Lint once on Linux: rustfmt and clippy results are platform-independent,
+  # no need to pay for three runners.
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,6 +29,24 @@ jobs:
 
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
+
+  # Tests on every platform we ship binaries for — issue reporters run the
+  # Windows release binary, and path handling (temp dirs, save_to parents,
+  # download_file) is exactly where OS differences bite.
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
 
       - name: Test
         run: cargo test
