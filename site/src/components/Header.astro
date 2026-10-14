@@ -1,0 +1,30 @@
+---
+// zed.dev-style top bar: brand, mono links, search pill, theme toggle, download CTA.
+const REPO = 'https://github.com/G36maid/moodle-mcp';
+const RELEASES = REPO + '/releases/latest';
+---
+<div class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="/">
+      <img src="/assets/moodle-mcp-mark.svg" alt="moodle-mcp logo" width="28" height="28" />
+      <span class="word">moodle-mcp</span>
+    </a>
+    <nav class="topnav" aria-label="主導覽">
+      <a href="/tools">工具</a>
+      <a href="/#install">安裝</a>
+      <a href="/#changelog">更新日誌</a>
+      <a href={REPO} target="_blank" rel="noopener">GitHub <span class="ext">↗</span></a>
+    </nav>
+    <div class="topbar-right">
+      <a class="searchpill" href="/tools"><span>🔍</span> Ctrl K</a>
+      <button class="themetoggle" onclick="__toggleTheme()" aria-label="切換深淺色主題">
+        <span class="sun">☀</span><span class="moon">☾</span> <kbd>T</kbd>
+      </button>
+      <a class="btn btn-solid" href={RELEASES} target="_blank" rel="noopener">下載 <kbd>D</kbd></a>
+    </div>
+  </div>
+</div>
+<div class="news">
+  <span class="tag">最新</span>
+  <a href="/#changelog">v0.1.4 已發布 — get_course_overview 現在收錄章節摘要，並標示可用性限制。 <span class="arrow">→</span></a>
+</div>

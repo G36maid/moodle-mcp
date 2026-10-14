@@ -1,0 +1,73 @@
+---
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+const { title, description = 'moodle-mcp 讓 AI 代理直接操作真實的 Moodle LMS — 讀課程、繳作業、追時程，全部透過單一靜態執行檔。為師大生的學期節奏而生。' } = Astro.props;
+---
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content="/assets/moodle-mcp-banner.png" />
+    <meta name="theme-color" content="#f98012" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&family=Noto+Serif+TC:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script is:inline>
+      // Set theme before paint to avoid flash.
+      (() => {
+        const saved = localStorage.getItem('theme');
+        const dark = saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      })();
+    </script>
+  </head>
+  <body>
+    <Header />
+    <main>
+      <slot />
+    </main>
+    <Footer />
+    <script is:inline>
+      // Global keys: D → releases, G → GitHub, T → theme, Ctrl/⌘+K → tool reference.
+      const RELEASES = 'https://github.com/G36maid/moodle-mcp/releases/latest';
+      const REPO = 'https://github.com/G36maid/moodle-mcp';
+      const toggleTheme = () => {
+        const cur = document.documentElement.dataset.theme;
+        const next = cur === 'dark' ? 'light' : 'dark';
+        document.documentElement.dataset.theme = next;
+        localStorage.setItem('theme', next);
+      };
+      window.__toggleTheme = toggleTheme;
+      document.addEventListener('keydown', (e) => {
+        const t = e.target;
+        if (t && (t.matches('input, textarea, select') || t.isContentEditable)) return;
+        if (e.metaKey || e.ctrlKey || e.altKey) {
+          if (e.key.toLowerCase() === 'k') {
+            e.preventDefault();
+            location.href = '/tools';
+          }
+          return;
+        }
+        const k = e.key.toLowerCase();
+        if (k === 'd') location.href = RELEASES;
+        else if (k === 'g') location.href = REPO;
+        else if (k === 't') toggleTheme();
+      });
+    </script>
+  </body>
+</html>

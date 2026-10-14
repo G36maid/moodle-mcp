@@ -1,0 +1,57 @@
+---
+// zed.dev-style footer: solid accent block, serif column titles, mono links, giant watermark.
+const year = new Date().getFullYear();
+---
+<footer>
+  <div class="shell">
+    <div class="cols">
+      <div>
+        <div class="fbrand">moodle-mcp</div>
+        <div class="fslogan">以思考的速度學習。</div>
+        <ul>
+          <li>moodle-mcp © {year}</li>
+          <li><a href="https://github.com/G36maid/moodle-mcp/blob/main/LICENSE">MIT License</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>專案</h5>
+        <ul>
+          <li><a href="https://github.com/G36maid/moodle-mcp/releases/latest">下載 <span class="ext">↗</span></a></li>
+          <li><a href="/tools">工具參考</a></li>
+          <li><a href="/#changelog">更新日誌</a></li>
+          <li><a href="https://github.com/G36maid/moodle-mcp">GitHub <span class="ext">↗</span></a></li>
+          <li><a href="https://crates.io/crates/moodle-mcp">crates.io <span class="ext">↗</span></a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>資源</h5>
+        <ul>
+          <li><a href="https://modelcontextprotocol.io">MCP 規範 <span class="ext">↗</span></a></li>
+          <li><a href="https://docs.moodle.org/dev/Web_services">Web Services 文件 <span class="ext">↗</span></a></li>
+          <li><a href="https://moodle.ntnu.edu.tw">師大 Moodle <span class="ext">↗</span></a></li>
+          <li><a href="https://domain.ntnu.cc">domain.ntnu.cc <span class="ext">↗</span></a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>安全</h5>
+        <ul>
+          <li><a href="/#safety">安全性設計</a></li>
+          <li><a href="/tools#escape">唯讀模式</a></li>
+          <li><a href="https://moodle.com/trademarks">商標聲明 <span class="ext">↗</span></a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>社群</h5>
+        <ul>
+          <li><a href="https://github.com/G36maid/moodle-mcp/discussions">Discussions <span class="ext">↗</span></a></li>
+          <li><a href="https://github.com/G36maid/moodle-mcp/blob/main/CHANGELOG.md">CHANGELOG <span class="ext">↗</span></a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="legal">
+      <p>moodle-mcp 為獨立開源專案，與 Moodle Pty Ltd. 及國立臺灣師範大學皆無隸屬關係，亦非官方網站。</p>
+      <p>Moodle™ 為 Moodle Pty Ltd. 之註冊商標。本站為 NTNU 學生以 domain.ntnu.cc 申請之網域所維護的社群專案。</p>
+    </div>
+  </div>
+  <img class="watermark" src="/assets/moodle-raw.svg" alt="" aria-hidden="true" />
+</footer>
