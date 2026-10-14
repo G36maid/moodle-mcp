@@ -40,6 +40,10 @@ fn load_config() -> Config {
 /// preference is consulted (its value may be '99' = site default, which no
 /// web service exposes, or otherwise unparseable) and anything unknown
 /// falls back to UTC with a log line.
+/// core_user_get_user_preferences is available to the mobile service on
+/// every supported version:
+/// https://github.com/moodle/moodle/blob/v3.7.0/lib/db/services.php#L1725
+/// https://github.com/moodle/moodle/blob/v4.5.4/lib/db/services.php#L1999
 async fn resolve_timezone(client: &MoodleClient, env_tz: Option<&str>) {
     if let Some(name) = env_tz {
         let tz = moodle_mcp::util::parse_timezone(name)

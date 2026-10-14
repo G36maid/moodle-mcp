@@ -111,6 +111,8 @@ pub async fn get_discussion_posts(
                     // exists on this response. It is kept as a defensive
                     // fallback for unseen shapes. The output key stays
                     // `fileurl` for output-shape stability.
+                    // https://github.com/moodle/moodle/blob/v4.5.4/files/classes/external/stored_file_exporter.php#L131
+                    // https://github.com/moodle/moodle/blob/v3.7.0/files/classes/external/stored_file_exporter.php#L136
                     json!({
                         "filename": a.get("filename").cloned().unwrap_or(Value::Null),
                         "fileurl": a

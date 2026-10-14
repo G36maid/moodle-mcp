@@ -87,7 +87,8 @@ pub async fn search_users(
         .unwrap_or_else(|| {
             // core_message_message_search_users answers with
             // {contacts, noncontacts} (verified live on 3.7; 4.5 externallib
-            // defines the same shape) — merge both halves.
+            // defines the same shape) — merge both halves:
+            // https://github.com/moodle/moodle/blob/v4.5.4/message/externallib.php#L1181-L1185
             ["contacts", "noncontacts"]
                 .iter()
                 .flat_map(|k| {
@@ -129,7 +130,9 @@ async fn search_call(
         // core_message_message_search_users requires `userid` and `search`
         // (verified identical on 3.7 and 4.5+ — `searchtext` is rejected
         // with invalidparameter) and only lets the account search as
-        // itself, so always send the token owner's id.
+        // itself, so always send the token owner's id:
+        // https://github.com/moodle/moodle/blob/v4.5.4/message/externallib.php#L1123
+        // https://github.com/moodle/moodle/blob/v3.7.0/message/externallib.php#L1571
         json!({
             "userid": user_id,
             "search": search.unwrap_or(""),

@@ -4,7 +4,8 @@
 //! - `core_message_get_notifications` does not exist in any built-in
 //!   service (verified 3.6–5.0: absent from lib/db/services.php) → falls
 //!   back to `core_message_get_messages?type=notifications` (caller
-//!   resolves via `pick_function`)
+//!   resolves via `pick_function`):
+//!   https://github.com/moodle/moodle/blob/v4.5.4/lib/db/services.php
 //! - conversations: `unreadcount` is null on 3.7 → falls back to `isread`;
 //!   private chats have an empty `name` → display name taken from `members`
 
@@ -23,6 +24,10 @@ use crate::util::{html_to_markdown, truncate_chars, unix_to_iso};
 /// supported, otherwise two calls (`read=0` + `read=1`) merged by id — the
 /// function defaults to "read only" on every version, which would silently
 /// drop the unread half.
+/// - ≤3.11 PARAM_BOOL default true:
+///   https://github.com/moodle/moodle/blob/v3.11.0/message/externallib.php#L1966
+/// - ≥4.0 PARAM_INT default 1, 2 = both:
+///   https://github.com/moodle/moodle/blob/v4.0.0/message/externallib.php#L1966
 #[allow(clippy::too_many_arguments)]
 pub async fn get_notifications(
     client: &MoodleClient,
@@ -99,7 +104,8 @@ pub async fn get_notifications(
                     .map(|t| truncate_chars(&html_to_markdown(t), 500)),
                 "timecreated": unix_to_iso(n.get("timecreated").cloned().unwrap_or(Value::Null)),
                 // core_message_get_messages items carry `timeread` (null while
-                // unread) instead of a `read` key — derive the flag from it.
+                // unread) instead of a `read` key — derive the flag from it:
+                // https://github.com/moodle/moodle/blob/v4.5.4/message/externallib.php#L2184
                 "read": read_flag(&n),
             })
         })

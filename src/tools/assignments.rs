@@ -144,6 +144,8 @@ pub async fn get_assignment(
     // gradebook, correct for gradebook-only grades and scale grades alike
     // (present since 3.7). feedback.grade.grade stays at -1 when the grade
     // only lives in the gradebook — the sentinel Moodle renders as "-".
+    // https://github.com/moodle/moodle/blob/v4.5.4/mod/assign/locallib.php#L3977
+    // https://github.com/moodle/moodle/blob/v3.7.0/mod/assign/externallib.php#L2544
     let grade_display: Option<String> = feedback
         .get("gradefordisplay")
         .and_then(Value::as_str)

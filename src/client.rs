@@ -191,6 +191,11 @@ impl MoodleClient {
     /// page, which would otherwise be downloaded as the "file"), then the
     /// token is injected if missing. Everything else passes through
     /// untouched.
+    ///
+    /// Token handling in the webservice endpoint:
+    /// https://github.com/moodle/moodle/blob/v4.5.4/webservice/pluginfile.php#L47
+    /// The app's same-site rewrite:
+    /// https://github.com/moodlehq/moodleapp/blob/9d52da9b4e1decbaff1e4de89971b658e040be2e/src/core/static/url.ts#L671-L673
     pub(crate) fn prepare_download_url(&self, file_url: &str) -> Result<url::Url, MoodleError> {
         let mut url = url::Url::parse(file_url)
             .map_err(|e| MoodleError::Config(format!("invalid file URL: {e}")))?;
@@ -261,6 +266,8 @@ impl MoodleClient {
         // `fileoversized`, …). A record carrying a non-empty `error` means
         // the file was NOT stored — surfacing it keeps upload_file from
         // reporting success while the draft area still holds the old file.
+        // https://github.com/moodle/moodle/blob/v4.5.4/webservice/upload.php#L109
+        // https://github.com/moodle/moodle/blob/v4.5.4/webservice/upload.php#L159
         if let Some(records) = value.as_array()
             && let Some(bad) = records.iter().find(|r| {
                 r.get("error")
