@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 
 use crate::client::MoodleClient;
 use crate::error::MoodleError;
-use crate::util::{decode_entities, dig, html_to_markdown, truncate_chars, unix_to_iso};
+use crate::util::{decode_entities, dig, html_to_markdown, unix_to_iso};
 
 /// `list_courses` — courses the token owner is enrolled in, optionally
 /// filtered by name (client-side, case-insensitive).
@@ -57,8 +57,11 @@ fn shape_module(m: &Value, assignments_by_cmid: &std::collections::HashMap<i64, 
         "module_id": cmid,
         "type": modname,
         "name": decode_entities(m.get("name").and_then(Value::as_str).unwrap_or_default()),
+        // Descriptions carry the assignment specs; JSON is never truncated
+        // (see output.rs) — a per-field cap here silently dropped most of a
+        // real course page (#13).
         "description": m.get("description").and_then(Value::as_str)
-            .map(|t| truncate_chars(&html_to_markdown(t), 300)),
+            .map(html_to_markdown),
     });
     if modname.as_str() == Some("assign")
         && let Some(id) = m.get("id").and_then(Value::as_i64)
@@ -273,8 +276,10 @@ pub async fn get_course_overview(
             json!({
                 "section_id": s.get("id").cloned().unwrap_or(Value::Null),
                 "name": decode_entities(s.get("name").and_then(Value::as_str).unwrap_or_default()),
+                // Full summary, same no-per-field-cap rule as descriptions:
+                // teachers embed lecture links, instructions and notices here.
                 "summary": s.get("summary").and_then(Value::as_str)
-                    .map(|t| truncate_chars(&html_to_markdown(t), 300)),
+                    .map(html_to_markdown),
                 "modules": s.get("modules").and_then(Value::as_array)
                     .cloned().unwrap_or_default()
                     .into_iter()
@@ -304,6 +309,15 @@ pub async fn get_course_overview(
             s["name"].as_str().unwrap_or("?"),
             s["section_id"],
         ));
+        if let Some(summary) = s["summary"]
+            .as_str()
+            .map(str::trim)
+            .filter(|t| !t.is_empty())
+        {
+            md.push('\n');
+            md.push_str(&demote_headings(summary, 4));
+            md.push_str("\n\n");
+        }
         for m in s["modules"].as_array().unwrap_or(&Vec::new()) {
             md.push_str(&format!(
                 "- [{}] {} (module_id: {}{}\n",
@@ -314,6 +328,17 @@ pub async fn get_course_overview(
                     .map(|a| format!(", assignment_id: {a})"))
                     .unwrap_or_else(|| ")".into()),
             ));
+            if let Some(desc) = m["description"]
+                .as_str()
+                .map(str::trim)
+                .filter(|t| !t.is_empty())
+            {
+                // Indented continuation of the bullet item: keeps paragraphs,
+                // nested lists and the file lines below inside this module.
+                md.push('\n');
+                md.push_str(&indent_block(&headings_to_bold(desc), 2));
+                md.push_str("\n\n");
+            }
             for c in m["contents"].as_array().unwrap_or(&Vec::new()) {
                 let kind = if c["type"].as_str() == Some("file") {
                     "file"
@@ -377,4 +402,139 @@ pub async fn get_course_overview(
     md.push('\n');
 
     Ok((md, structured))
+}
+
+// Moodle injects summary/description HTML into the page unescaped — `noclean`
+// passthrough on 3.x, `{{{summarytext}}}` on 5.x — so the browser is the
+// renderer and the fidelity bar: text the browser shows must appear here, and
+// markup that renders as nothing (empty heading shells) must not. Converted
+// ATX headings get demoted under the `###` section heading in section blocks;
+// inside a list item (module description) they flatten to bold.
+fn demote_headings(md: &str, min_level: usize) -> String {
+    md.lines()
+        .filter_map(|line| match heading_text(line) {
+            Some(text) if text.is_empty() => None,
+            Some(text) => {
+                let src_level = line.bytes().take_while(|&b| b == b'#').count();
+                let level = (src_level + 2).clamp(min_level, 6);
+                Some(format!("{} {}", "#".repeat(level), text))
+            }
+            None => Some(line.to_string()),
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn headings_to_bold(md: &str) -> String {
+    md.lines()
+        .filter_map(|line| match heading_text(line) {
+            Some(text) if text.is_empty() => None,
+            // htmd renders heading content bold as-is (`### **title**`) or
+            // partially bold (`### **Do not** do x`); any `**` inside means
+            // the author's emphasis is already there — re-wrapping would
+            // only make four-star soup. Literal `*` arrives escaped as
+            // `\*`, so `**` here is always real emphasis.
+            Some(text) if text.contains("**") => Some(text),
+            Some(text) => Some(format!("**{text}**")),
+            None => Some(line.to_string()),
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// If `line` is an ATX heading, its text with any further leading hash groups
+/// stripped — htmd merges adjacent empty+real editor headings into lines like
+/// `#### #### Title`, and empty shells survive as bare `##`. `None` for
+/// non-heading lines (`#tag` included).
+fn heading_text(line: &str) -> Option<String> {
+    let hashes = line.bytes().take_while(|&b| b == b'#').count();
+    if hashes == 0 || hashes > 6 {
+        return None;
+    }
+    let rest = &line[hashes..];
+    if !rest.is_empty() && !rest.starts_with(' ') {
+        return None;
+    }
+    let mut text = rest.trim();
+    while let Some(stripped) = text.strip_prefix('#') {
+        text = stripped.trim_start();
+        if text.is_empty() {
+            break;
+        }
+    }
+    Some(text.to_string())
+}
+
+fn indent_block(md: &str, width: usize) -> String {
+    let pad = " ".repeat(width);
+    md.lines()
+        .map(|l| {
+            if l.is_empty() {
+                String::new()
+            } else {
+                format!("{pad}{l}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn demote_nests_under_section_heading() {
+        // Summaries sit under `###` in the document; nothing they carry may
+        // claim a higher outline level.
+        assert_eq!(demote_headings("## H\n\npara", 4), "#### H\n\npara");
+        assert_eq!(demote_headings("### H", 4), "##### H");
+        assert_eq!(demote_headings("# H", 4), "#### H");
+    }
+
+    #[test]
+    fn demote_caps_at_six_and_leaves_plain_text() {
+        assert_eq!(demote_headings("###### H", 4), "###### H");
+        // 7+ hashes and `#tag` without a space are not headings in CommonMark.
+        assert_eq!(demote_headings("####### H", 4), "####### H");
+        assert_eq!(demote_headings("#not-a-heading", 4), "#not-a-heading");
+    }
+
+    #[test]
+    fn descriptions_flatten_headings_to_bold() {
+        assert_eq!(headings_to_bold("### Title\nbody"), "**Title**\nbody");
+        // Empty headings are editor noise (`<h3><br></h3>`) — drop the line.
+        assert_eq!(headings_to_bold("### \nbody"), "body");
+    }
+
+    #[test]
+    fn merged_and_empty_heading_shells_collapse_to_visible_text() {
+        // Moodle's editor leaves empty `<h4>` shells next to real ones; htmd
+        // merges them into doubled hashes. The page only ever shows the text.
+        assert_eq!(
+            headings_to_bold("#### #### TCP variants"),
+            "**TCP variants**"
+        );
+        assert_eq!(headings_to_bold("##\nbody"), "body");
+        assert_eq!(
+            demote_headings("#### #### TCP variants", 4),
+            "###### TCP variants"
+        );
+    }
+
+    #[test]
+    fn already_bold_headings_are_not_rewrapped() {
+        // htmd emits `### **title**` for `<h3><b>title</b></h3>`; partial
+        // bold in the heading content stays as authored too.
+        assert_eq!(headings_to_bold("### **Already Bold**"), "**Already Bold**");
+        assert_eq!(
+            headings_to_bold("### **Do not** summarize the papers"),
+            "**Do not** summarize the papers"
+        );
+    }
+
+    #[test]
+    fn indent_keeps_blank_lines_blank() {
+        assert_eq!(indent_block("a\n\nb", 2), "  a\n\n  b");
+    }
 }

@@ -365,3 +365,133 @@ async fn limit_zero_means_default_twenty() {
     // count is asserted via the mock having matched limitnum=20; shape check:
     assert!(!result.content.is_empty());
 }
+
+#[tokio::test]
+async fn course_overview_renders_section_summaries_and_descriptions_in_full() {
+    // Regression for #13: the overview used to drop section summaries and
+    // activity descriptions (300-char per-field cap, never rendered in the
+    // markdown doc) — most of what a student sees on the course page.
+    let server = MockServer::start().await;
+    // wiremock is first-mounted-first-served: the catch-all site_info mock
+    // must come after every function-specific mock below.
+    Mock::given(method("POST"))
+        .and(path("/webservice/rest/server.php"))
+        .and(body_string_contains("wsfunction=core_course_get_contents"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+            {
+                "id": 1,
+                "name": "Week 1: Intro",
+                "summary": "<p><a href=\"https://example.com/syllabus.pdf\">Syllabus</a></p>\
+                            <h3>Prerequisites</h3><ul><li>Python</li><li>C++</li></ul>"
+            },
+            {
+                "id": 2,
+                "name": "Week 2: Protocols",
+                "summary": "",
+                "modules": [
+                    {
+                        "id": 10,
+                        "modname": "assign",
+                        "name": "Lab Assignment 01",
+                        "description": format!(
+                            "<p><b>Experiment</b></p><ul><li>{}</li><li>TAIL-MARKER-AFTER-300</li></ul>",
+                            "step ".repeat(80)
+                        ),
+                        "contents": [
+                            {"type": "file", "filename": "lab.pdf", "filesize": 123,
+                             "mimetype": "application/pdf",
+                             "fileurl": "https://example.com/pluginfile.php/lab.pdf"}
+                        ]
+                    }
+                ]
+            }
+        ])))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/webservice/rest/server.php"))
+        .and(body_string_contains(
+            "wsfunction=mod_assign_get_assignments",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "courses": [
+                {"id": 1, "fullname": "Test Course", "assignments": [
+                    {"id": 5, "cmid": 10, "name": "Lab Assignment 01",
+                     "duedate": 1_800_000_000, "submissiondraft": 1, "introattachments": []}
+                ]}
+            ]
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/webservice/rest/server.php"))
+        .and(body_string_contains(
+            "wsfunction=mod_quiz_get_quizzes_by_courses",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"courses": []})))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/webservice/rest/server.php"))
+        .and(body_string_contains(
+            "wsfunction=mod_forum_get_forums_by_courses",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+            {"id": 3, "name": "Announcements", "type": "news"}
+        ])))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/webservice/rest/server.php"))
+        .and(body_string_contains(
+            "wsfunction=gradereport_user_get_grade_items",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "usergrades": [
+                {"courseid": 1, "coursename": "Test Course",
+                 "gradeitems": [{"itemname": "Lab 01", "gradeformatted": "90.00"}]}
+            ]
+        })))
+        .mount(&server)
+        .await;
+    site_info_mock().mount(&server).await;
+
+    let mcp = spawn_server(&server).await;
+    let result = mcp
+        .peer()
+        .call_tool(
+            CallToolRequestParams::new("get_course_overview")
+                .with_arguments(json!({"course_id": 1}).as_object().expect("object").clone()),
+        )
+        .await
+        .expect("call_tool");
+    assert!(!result.is_error.unwrap_or(false), "{result:?}");
+
+    let text = result
+        .content
+        .first()
+        .and_then(|c| c.as_text())
+        .map(|t| t.text.as_str())
+        .expect("text content");
+
+    // Summary rendered in the doc with its link and demoted heading.
+    assert!(
+        text.contains("[Syllabus](https://example.com/syllabus.pdf)"),
+        "{text}"
+    );
+    assert!(text.contains("##### Prerequisites"), "{text}");
+    // not hijacking the outline: no line starts with a higher-level heading
+    assert!(!text.contains("\n### Prerequisites"), "{text}");
+    // Description rendered past where the old 300-char cap used to cut.
+    assert!(text.contains("TAIL-MARKER-AFTER-300"), "{text}");
+    // File listing still intact under the module bullet.
+    assert!(text.contains("- file: lab.pdf (123 bytes)"), "{text}");
+
+    // Structured JSON carries the full text too (never truncated).
+    let sc = result.structured_content.as_ref().expect("structured");
+    let desc = sc["sections"][1]["modules"][0]["description"]
+        .as_str()
+        .unwrap();
+    assert!(desc.contains("TAIL-MARKER-AFTER-300"), "{desc}");
+    assert_eq!(sc["grades"]["items"], json!([["Lab 01", "90.00"]]));
+}
