@@ -58,7 +58,19 @@ pub async fn search_users(
     search: Option<&str>,
     limit: u32,
 ) -> Result<Value, MoodleError> {
-    let v = search_call(client, wsfunction, user_id, search, limit).await;
+    // An empty/omitted query would ask Moodle to match EVERY user on the
+    // site — on a campus-sized install that means a multi-minute response
+    // (observed live: the 60 s request timeout fires and the error then
+    // misleadingly blames permissions). Reject it client-side instead.
+    let query = search.map(str::trim).filter(|s| !s.is_empty());
+    let Some(query) = query else {
+        return Err(MoodleError::Config(
+            "provide search keywords (a name or username fragment) — an empty \
+             search would match every user on the site and time out"
+                .into(),
+        ));
+    };
+    let v = search_call(client, wsfunction, user_id, query, limit).await;
     let v = match v {
         Err(MoodleError::Api { ref errorcode, .. })
             if errorcode == "invalidparameter" && wsfunction == "core_user_get_users" =>
@@ -67,7 +79,7 @@ pub async fn search_users(
                 client,
                 "core_message_message_search_users",
                 user_id,
-                search,
+                query,
                 limit,
             )
             .await
@@ -117,15 +129,14 @@ async fn search_call(
     client: &MoodleClient,
     wsfunction: &str,
     user_id: i64,
-    search: Option<&str>,
+    query: &str,
     limit: u32,
 ) -> Result<Value, MoodleError> {
     let params = if wsfunction == "core_user_get_users" {
-        let criteria = match search {
-            Some(q) => json!([{ "key": "search", "value": q }]),
-            None => json!([]),
-        };
-        json!({ "criteria": criteria, "limitnum": limit })
+        json!({
+            "criteria": [{ "key": "search", "value": query }],
+            "limitnum": limit,
+        })
     } else {
         // core_message_message_search_users requires `userid` and `search`
         // (verified identical on 3.7 and 4.5+ — `searchtext` is rejected
@@ -135,7 +146,7 @@ async fn search_call(
         // https://github.com/moodle/moodle/blob/v3.7.0/message/externallib.php#L1571
         json!({
             "userid": user_id,
-            "search": search.unwrap_or(""),
+            "search": query,
             "limitfrom": 0,
             "limitnum": limit,
         })

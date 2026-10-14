@@ -225,6 +225,12 @@ pub async fn download_file(
     url: &str,
     save_to: &str,
 ) -> Result<Value, MoodleError> {
+    // Fail fast on a blank destination — no point downloading first.
+    if save_to.trim().is_empty() {
+        return Err(MoodleError::Config(
+            "save_to is empty — provide the local file path to write the download to".into(),
+        ));
+    }
     let mut resp = client.download_file(url).await?;
     let status = resp.status().as_u16();
     let content_type = content_type_of(&resp);

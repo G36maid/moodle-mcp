@@ -960,3 +960,46 @@ async fn fetch_rejects_non_convertible_binary() {
     .expect_err("binary must be rejected");
     assert!(err.to_string().contains("download_file"), "{err:?}");
 }
+
+/// Empty or omitted search keywords are rejected client-side with zero HTTP
+/// traffic — an empty query makes Moodle match every user on the site and
+/// the request times out (observed live on NTNU 3.7: exactly 60 s, then a
+/// misleading permission error).
+#[tokio::test]
+async fn search_users_rejects_blank_queries_without_http() {
+    let server = MockServer::start().await;
+    expect_no_other_calls().mount(&server).await;
+    let client = client_for(&server).await;
+    for bad in [None, Some(""), Some("   \t ")] {
+        let err = moodle_mcp::tools::users::search_users(
+            &client,
+            "core_message_message_search_users",
+            5,
+            bad,
+            20,
+        )
+        .await
+        .expect_err("blank query must be rejected");
+        assert!(
+            err.to_string().contains("provide search keywords"),
+            "{err:?}"
+        );
+    }
+}
+
+/// A blank save_to fails with a plain-language message instead of the odd
+/// `failed to create : No such file or directory`.
+#[tokio::test]
+async fn download_rejects_blank_save_to() {
+    let server = MockServer::start().await;
+    expect_no_other_calls().mount(&server).await;
+    let client = client_for(&server).await;
+    let err = moodle_mcp::tools::files::download_file(
+        &client,
+        "https://moodle3.example.com/webservice/pluginfile.php/1/f.pdf",
+        "   ",
+    )
+    .await
+    .expect_err("blank save_to must be rejected");
+    assert!(err.to_string().contains("save_to is empty"), "{err:?}");
+}

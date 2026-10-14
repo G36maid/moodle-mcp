@@ -198,7 +198,9 @@ pub enum UserField {
 
 #[derive(Deserialize, schemars::JsonSchema)]
 pub struct SearchUsersParams {
-    /// Search keywords (name/username); omit to list
+    /// Search keywords — a name or username fragment. Required: empty or
+    /// omitted searches are rejected client-side (they would match every
+    /// user on the site and time out)
     search: Option<String>,
     /// Max users returned (default 20)
     limit: Option<u32>,
