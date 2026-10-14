@@ -1,4 +1,4 @@
-//! MCP tool surface — 22 tools.
+//! MCP tool surface — 22 tools (16 in read-only mode).
 //!
 //! All `#[tool]` methods live in the single `#[tool_router]` impl block
 //! required by rmcp; business logic lives in the per-domain modules.
@@ -236,7 +236,8 @@ const CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(600);
 /// A cached value with its fill time (see [`CACHE_TTL`]).
 type Cached<T> = Arc<RwLock<Option<(std::time::Instant, T)>>>;
 
-/// The MCP server: 22 tools for a student's Moodle.
+/// The MCP server: 22 tools for a student's Moodle (16 when read-only
+/// mode filters the write/upload/escape-hatch tools out of the router).
 #[derive(Clone)]
 pub struct MoodleMcp {
     client: Arc<MoodleClient>,

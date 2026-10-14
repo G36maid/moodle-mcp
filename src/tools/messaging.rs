@@ -1,9 +1,10 @@
 //! Messaging & notifications.
 //!
-//! NTNU 3.7 specifics handled internally:
-//! - `core_message_get_notifications` is absent on 3.7 → falls back to
-//!   `core_message_get_messages?type=notifications` (caller resolves via
-//!   `pick_function`)
+//! Moodle facts handled internally:
+//! - `core_message_get_notifications` does not exist in any built-in
+//!   service (verified 3.6–5.0: absent from lib/db/services.php) → falls
+//!   back to `core_message_get_messages?type=notifications` (caller
+//!   resolves via `pick_function`)
 //! - conversations: `unreadcount` is null on 3.7 → falls back to `isread`;
 //!   private chats have an empty `name` → display name taken from `members`
 
