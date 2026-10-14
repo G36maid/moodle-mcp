@@ -751,3 +751,106 @@ async fn assignment_grade_shows_display_not_sentinel() {
     assert!(!md.contains("-1.00000"), "{md}");
     assert!(!md.contains("\"75.00"), "no JSON quotes in markdown: {md}");
 }
+
+/// Moodle 4.0+: omitting `read` sends a single read=2 ("both") call, so the
+/// unread half is not dropped; the read flag is derived from timeread (#2).
+#[tokio::test]
+async fn notifications_omitted_read_sends_both_on_modern_sites() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/webservice/rest/server.php"))
+        .and(body_string_contains("wsfunction=core_message_get_messages"))
+        .and(body_string_contains("read=2"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "messages": [
+                {"id": 1, "subject": "unread one", "timecreated": 200, "timeread": null,
+                 "useridfrom": 3, "userfromfullname": "Prof Lin", "smallmessage": "hi"},
+                {"id": 2, "subject": "read one", "timecreated": 100, "timeread": 150,
+                 "useridfrom": 3, "userfromfullname": "Prof Lin", "smallmessage": "yo"}
+            ],
+            "warnings": []
+        })))
+        .mount(&server)
+        .await;
+    expect_no_other_calls().mount(&server).await;
+
+    let client = client_for(&server).await;
+    let out = moodle_mcp::tools::messaging::get_notifications(
+        &client,
+        "core_message_get_messages",
+        5,
+        None,
+        20,
+        true,
+    )
+    .await
+    .expect("notifications");
+    assert_eq!(out["count"], json!(2));
+    assert_eq!(
+        out["notifications"][0]["read"],
+        json!(false),
+        "timeread null = unread"
+    );
+    assert_eq!(
+        out["notifications"][1]["read"],
+        json!(true),
+        "timeread set = read"
+    );
+}
+
+/// Up to 3.11 (or an unreadable release) `read` is a boolean with no "both"
+/// value: omitting it must merge read=0 + read=1, deduped by id (#2).
+#[tokio::test]
+async fn notifications_omitted_read_merges_two_calls_on_legacy_sites() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/webservice/rest/server.php"))
+        .and(body_string_contains("wsfunction=core_message_get_messages"))
+        .and(body_string_contains("read=0"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "messages": [
+                {"id": 1, "subject": "unread one", "timecreated": 200, "timeread": null,
+                 "useridfrom": 3, "userfromfullname": "Prof Lin"}
+            ],
+            "warnings": []
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/webservice/rest/server.php"))
+        .and(body_string_contains("wsfunction=core_message_get_messages"))
+        .and(body_string_contains("read=1"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "messages": [
+                {"id": 2, "subject": "read one", "timecreated": 150, "timeread": 160,
+                 "useridfrom": 3, "userfromfullname": "Prof Lin"},
+                {"id": 1, "subject": "unread one (dup)", "timecreated": 200, "timeread": 180,
+                 "useridfrom": 3, "userfromfullname": "Prof Lin"}
+            ],
+            "warnings": []
+        })))
+        .mount(&server)
+        .await;
+    expect_no_other_calls().mount(&server).await;
+
+    let client = client_for(&server).await;
+    let out = moodle_mcp::tools::messaging::get_notifications(
+        &client,
+        "core_message_get_messages",
+        5,
+        None,
+        20,
+        false,
+    )
+    .await
+    .expect("notifications");
+    assert_eq!(out["count"], json!(2), "duplicate id must be deduped");
+    assert_eq!(out["notifications"][0]["id"], json!(1), "newest first");
+    assert_eq!(
+        out["notifications"][0]["read"],
+        json!(true),
+        "flag from merged read half"
+    );
+    assert_eq!(out["notifications"][1]["id"], json!(2));
+    assert_eq!(out["notifications"][1]["read"], json!(true));
+}

@@ -559,6 +559,19 @@ impl MoodleMcp {
                 "message_popup_get_popup_notifications",
             ])
             .await;
+        // read=2 ("both") exists since Moodle 4.0; up to 3.11 the param is
+        // a boolean and "omit for all" needs two merged calls.
+        let read_both_supported = self
+            .site_info_cached()
+            .await
+            .ok()
+            .and_then(|i| {
+                i.get("release")
+                    .and_then(Value::as_str)
+                    .map(crate::util::release_major)
+            })
+            .flatten()
+            .is_some_and(|major| major >= 4);
         let res = match wsfunction {
             Ok(f) => match self.current_user_id().await {
                 Ok(uid) => {
@@ -568,6 +581,7 @@ impl MoodleMcp {
                         uid,
                         p.read,
                         p.limit.unwrap_or(20),
+                        read_both_supported,
                     )
                     .await
                 }

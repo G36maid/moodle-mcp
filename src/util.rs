@@ -95,6 +95,14 @@ pub fn unique_item_id() -> i64 {
     now_unix() * 1_000_000 + ((n % 1_000_000) as i64)
 }
 
+/// Extract the major version from a Moodle `release` string, e.g.
+/// `"4.5.4+ (Build: 20250417)"` → `Some(4)`, `"3.7"` → `Some(3)`.
+/// Returns `None` for anything unparseable.
+pub fn release_major(release: &str) -> Option<u32> {
+    let digits: String = release.chars().take_while(|c| c.is_ascii_digit()).collect();
+    digits.parse().ok()
+}
+
 /// Truncate a string to `max` characters, appending a neutral marker.
 /// Callers that have a dedicated "full content" tool add their own pointer.
 pub fn truncate_chars(s: &str, max: usize) -> String {
@@ -191,6 +199,15 @@ mod tests {
     fn digs() {
         let v = json!({"a": {"b": [1, 2]}});
         assert_eq!(dig(&v, "a.b"), Some(&json!([1, 2])));
+    }
+
+    #[test]
+    fn parses_release_majors() {
+        assert_eq!(release_major("4.5.4+ (Build: 20250417)"), Some(4));
+        assert_eq!(release_major("3.7"), Some(3));
+        assert_eq!(release_major("5.0.2 (Build: 20250609)"), Some(5));
+        assert_eq!(release_major(""), None);
+        assert_eq!(release_major("unknown"), None);
     }
 
     #[test]
