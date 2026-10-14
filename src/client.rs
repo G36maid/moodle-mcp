@@ -353,6 +353,8 @@ mod tests {
             token: "secret".into(),
             timeout_secs: 10,
             timezone: None,
+            read_only: false,
+            disabled_tools: Vec::new(),
         })
         .unwrap();
 
@@ -374,6 +376,8 @@ mod tests {
             token: "secret".into(),
             timeout_secs: 10,
             timezone: None,
+            read_only: false,
+            disabled_tools: Vec::new(),
         })
         .unwrap();
         let u = sub
@@ -402,6 +406,8 @@ mod tests {
             token: "secret".into(),
             timeout_secs: 10,
             timezone: None,
+            read_only: false,
+            disabled_tools: Vec::new(),
         })
         .unwrap();
 

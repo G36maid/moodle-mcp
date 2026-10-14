@@ -33,4 +33,4 @@ cargo test
 
 ## Env (runtime, not tests)
 
-`MOODLE_URL`, `MOODLE_TOKEN` required; `MOODLE_TIMEOUT_SECS` (default 60), `RUST_LOG` (default info).
+`MOODLE_URL`, `MOODLE_TOKEN` required; `MOODLE_TIMEOUT_SECS` (default 60), `MOODLE_TIMEZONE` (IANA name; default auto-detect from the user's Moodle timezone preference, else UTC), `MOODLE_READ_ONLY` (`1` hides write/upload/escape-hatch tools), `MOODLE_DISABLE_TOOLS` (comma-separated extra tools to hide), `RUST_LOG` (default info).

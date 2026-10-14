@@ -243,7 +243,21 @@ pub struct MoodleMcp {
     site_cache: Cached<Value>,
     courses_cache: Cached<Vec<i64>>,
     tool_router: ToolRouter<Self>,
+    read_only: bool,
 }
+
+/// Tools hidden in read-only mode (MOODLE_READ_ONLY=1): the four WRITE
+/// operations, file upload (a read-only agent has no business staging files
+/// on the server), and the raw escape hatch — `call_ws_function` can invoke
+/// write functions directly and would bypass the restriction.
+pub const READ_ONLY_DISABLED_TOOLS: &[&str] = &[
+    "create_forum_discussion",
+    "reply_to_discussion",
+    "submit_assignment",
+    "send_message",
+    "upload_file",
+    "call_ws_function",
+];
 
 impl MoodleMcp {
     /// Cached `core_webservice_get_site_info` payload (identity, functions,
@@ -341,11 +355,41 @@ impl MoodleMcp {
 #[tool_router]
 impl MoodleMcp {
     pub fn new(client: Arc<MoodleClient>) -> Self {
+        Self::new_with_policy(client, false, Vec::new())
+    }
+
+    /// Build the server, optionally filtering the tool surface. Read-only
+    /// mode hides the write/upload/escape-hatch tools
+    /// ([READ_ONLY_DISABLED_TOOLS]); `disabled_tools` (MOODLE_DISABLE_TOOLS)
+    /// drops additional names on top — unknown names are warned about, not
+    /// fatal. Disabled tools vanish from `tools/list` and calls to them are
+    /// rejected by the router, so clients see the real capability surface.
+    pub fn new_with_policy(
+        client: Arc<MoodleClient>,
+        read_only: bool,
+        disabled_tools: Vec<String>,
+    ) -> Self {
+        let mut tool_router = Self::tool_router();
+        let mut names = disabled_tools;
+        if read_only {
+            names.extend(READ_ONLY_DISABLED_TOOLS.iter().map(|s| (*s).to_string()));
+        }
+        for name in names {
+            if !tool_router.has_route(&name) {
+                tracing::warn!(
+                    tool = %name,
+                    "MOODLE_DISABLE_TOOLS names a tool this server does not expose — ignored"
+                );
+                continue;
+            }
+            tool_router.disable_route(name);
+        }
         Self {
             client,
             site_cache: Arc::new(RwLock::new(None)),
             courses_cache: Arc::new(RwLock::new(None)),
-            tool_router: Self::tool_router(),
+            tool_router,
+            read_only,
         }
     }
 
@@ -762,15 +806,21 @@ impl MoodleMcp {
 #[tool_handler(router = self.tool_router.clone())]
 impl ServerHandler for MoodleMcp {
     fn get_info(&self) -> ServerConfig {
+        let mut instructions =
+            "Moodle MCP server: read and operate a Moodle site through its web services \
+             as the token owner. Navigation: list_courses → get_course_overview → \
+             per-item tools. All write operations (assignment submissions, forum posts, \
+             messages) act as the token owner — confirm intent with the user before \
+             submitting or sending."
+                .to_string();
+        if self.read_only {
+            instructions.push_str(
+                " Read-only mode is active: write, upload and raw-call tools are disabled.",
+            );
+        }
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new("moodle-mcp", env!("CARGO_PKG_VERSION")))
-            .with_instructions(
-                "Moodle MCP server: read and operate a Moodle site through its web services \
-                 as the token owner. Navigation: list_courses → get_course_overview → \
-                 per-item tools. All write operations (assignment submissions, forum posts, \
-                 messages) act as the token owner — confirm intent with the user before \
-                 submitting or sending.",
-            )
+            .with_instructions(instructions)
     }
 }
 

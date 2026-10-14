@@ -11,6 +11,12 @@ pub struct Config {
     /// Validated at load so a typo fails fast; `None` = auto-detect from the
     /// user's Moodle timezone preference, falling back to UTC.
     pub timezone: Option<String>,
+    /// Hide all write/upload/escape-hatch tools (MOODLE_READ_ONLY=1/true/
+    /// yes/on) — read-only access for cautious setups.
+    pub read_only: bool,
+    /// Additional tool names to hide (MOODLE_DISABLE_TOOLS, comma-separated);
+    /// unknown names warn at startup instead of failing it.
+    pub disabled_tools: Vec<String>,
 }
 
 impl Config {
@@ -42,11 +48,28 @@ impl Config {
                 tz
             ));
         }
+        let read_only = std::env::var("MOODLE_READ_ONLY").ok().is_some_and(|v| {
+            matches!(
+                v.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        });
+        let disabled_tools = std::env::var("MOODLE_DISABLE_TOOLS")
+            .ok()
+            .map(|v| {
+                v.split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect()
+            })
+            .unwrap_or_default();
         Ok(Self {
             base_url,
             token,
             timeout_secs,
             timezone,
+            read_only,
+            disabled_tools,
         })
     }
 }

@@ -94,7 +94,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let client = Arc::new(MoodleClient::new(cfg.clone())?);
     resolve_timezone(&client, cfg.timezone.as_deref()).await;
-    let server = MoodleMcp::new(client);
+    if cfg.read_only {
+        tracing::info!("read-only mode: write, upload and raw-call tools are disabled");
+    }
+    let server = MoodleMcp::new_with_policy(client, cfg.read_only, cfg.disabled_tools.clone());
 
     let running = server.serve(stdio()).await?;
     tracing::info!("moodle-mcp serving on stdio");

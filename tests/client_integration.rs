@@ -13,6 +13,8 @@ async fn client_for(server: &MockServer) -> MoodleClient {
         token: "testtoken".into(),
         timeout_secs: 10,
         timezone: None,
+        read_only: false,
+        disabled_tools: Vec::new(),
     })
     .expect("client")
 }

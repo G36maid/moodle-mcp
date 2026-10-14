@@ -418,6 +418,8 @@ mod tests {
             token: "t".into(),
             timeout_secs: 10,
             timezone: None,
+            read_only: false,
+            disabled_tools: Vec::new(),
         })
         .unwrap();
         let resp = client
