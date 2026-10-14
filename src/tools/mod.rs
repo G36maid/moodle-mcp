@@ -395,13 +395,16 @@ impl MoodleMcp {
     // ---------- identity ----------
 
     #[tool(
-        description = "Who the token belongs to (user_id, username, fullname) and which Moodle site/release it is connected to. Also an implicit connectivity check: if this fails, every other tool will fail too."
+        description = "Who the token belongs to (user_id, username, fullname) and which Moodle site/release it is connected to, plus the active timestamp timezone, read-only mode, and the server's own version. Also an implicit connectivity check: if this fails, every other tool will fail too."
     )]
     async fn whoami(&self, Parameters(_): Parameters<Empty>) -> Result<CallToolResult, McpError> {
-        let res = self
-            .site_info_cached()
-            .await
-            .map(|v| site::whoami_shape(&v));
+        let res = self.site_info_cached().await.map(|site| {
+            let mut v = site::whoami_shape(&site);
+            v["timezone"] = json!(crate::util::timezone().name());
+            v["read_only"] = json!(self.read_only);
+            v["mcp_version"] = json!(env!("CARGO_PKG_VERSION"));
+            v
+        });
         finish(res)
     }
 

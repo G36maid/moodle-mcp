@@ -127,6 +127,10 @@ async fn calls_whoami_over_mcp() {
         .expect("text content");
     assert!(text.contains("Test Moodle"));
     assert!(text.contains("student1"));
+    let sc = result.structured_content.as_ref().expect("structured");
+    assert_eq!(sc["timezone"], json!("UTC"));
+    assert_eq!(sc["read_only"], json!(false));
+    assert_eq!(sc["mcp_version"], json!(env!("CARGO_PKG_VERSION")));
 }
 
 #[tokio::test]
