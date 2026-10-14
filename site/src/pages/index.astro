@@ -1,0 +1,452 @@
+---
+import Base from '../layouts/Base.astro';
+
+const REPO = 'https://github.com/G36maid/moodle-mcp';
+const RELEASES = REPO + '/releases/latest';
+
+const tools22 = [
+  'whoami', 'list_courses', 'get_course_overview', 'get_assignment', 'submit_assignment',
+  'get_forum_discussions', 'get_discussion_posts', 'create_forum_discussion', 'reply_to_discussion',
+  'fetch_file', 'download_file', 'upload_file', 'get_grades', 'get_schedule', 'get_notifications',
+  'get_conversations', 'send_message', 'get_quiz_attempts', 'get_user', 'search_users',
+  'call_ws_function', 'list_functions',
+];
+const chips = [...tools22, ...tools22];
+
+const clients = [
+  { glyph: '$', name: 'Claude Code', desc: 'claude mcp add moodle 一行接入；.mcp.json 亦可用。', authors: '官方用戶端 · stdio' },
+  { glyph: '~', name: 'Codex', desc: '~/.codex/config.toml 加入 [mcp_servers.moodle] 區塊。', authors: '官方用戶端 · stdio' },
+  { glyph: '◇', name: 'OpenCode', desc: 'opencode.json 的 mcp 區塊宣告 command 與 environment。', authors: '官方用戶端 · stdio' },
+  { glyph: 'π', name: 'pi', desc: '.pi/mcp.json（專案）或 ~/.pi/agent/mcp.json（全域）。', authors: '官方用戶端 · stdio' },
+];
+---
+<Base title="moodle-mcp — 你最後的下一個助教">
+  <!-- ================= HERO ================= -->
+  <section class="hero">
+    <div class="ruler l" aria-hidden="true"></div>
+    <div class="ruler r" aria-hidden="true"></div>
+    <div class="shell">
+      <p class="eyebrow">國立臺灣師範大學 · 學生社群專案</p>
+      <h1>你最後的下一個助教
+        <span class="en">Your last next TA.</span>
+      </h1>
+      <p class="sub">moodle-mcp 讓 AI 代理直接操作你真實的 Moodle——讀課程、繳作業、追時程，全部透過單一靜態執行檔完成。</p>
+      <div class="cta">
+        <a class="btn btn-solid" href={RELEASES} target="_blank" rel="noopener">⬇&ensp;下載 <kbd>D</kbd></a>
+        <a class="btn btn-outline" href={REPO} target="_blank" rel="noopener">⭐&ensp;GitHub <kbd>G</kbd></a>
+      </div>
+      <p class="avail">支援 Moodle 3.7 → 5.x · macOS · Linux · Windows · 任何 stdio MCP 客戶端</p>
+    </div>
+    <div class="shell hero-shot">
+      <a class="btn btn-outline float-chip" href="#workflows">▶ 提示詞 → 成果</a>
+      <div class="term">
+        <div class="term-head">
+          <span class="term-dots"><i></i><i></i><i></i></span>
+          <span class="term-title">agent — moodle-mcp — Asia/Taipei</span>
+        </div>
+        <div class="term-body">
+          <div class="agentlog">
+            <span class="row c-user">❯ 接下來兩週有什麼截止？幫我排一份讀書計畫。</span>
+            <span class="gap"></span>
+            <span class="row"><span class="c-green">✓</span> <span class="c-tool">list_courses</span><span class="c-dim">() → 4 門課程</span></span>
+            <span class="row"><span class="c-green">✓</span> <span class="c-tool">get_schedule</span><span class="c-dim">(time_to: +14d) → 6 個期限</span></span>
+            <span class="row"><span class="c-green">✓</span> <span class="c-tool">get_course_overview</span><span class="c-dim">(course_id: 42 資料通訊) → 講義 ×12</span></span>
+            <span class="row"><span class="c-green">✓</span> <span class="c-tool">write</span> <span class="c-sky">study-plan.md</span> <span class="c-dim">→ 已存到磁碟</span></span>
+            <span class="gap"></span>
+            <span class="row c-dim">token 已遮蔽 · 僅同站 pluginfile 注入 · <span class="badge">MOODLE_READ_ONLY 未啟用</span></span>
+          </div>
+          <div class="mdpane">
+            <div class="c-sky" style="margin-bottom:6px"># 讀書計畫 — 未來兩週</div>
+            <table>
+              <tr><th>日期</th><th>課程</th><th>事項</th></tr>
+              <tr><td>10/20</td><td>資料通訊</td><td class="due">Lab 3 截止</td></tr>
+              <tr><td>10/23</td><td>資訊安全</td><td class="due">HW1 繳交</td></tr>
+              <tr><td>10/27</td><td>軟體工程</td><td>小組 Demo</td></tr>
+              <tr><td>10/30</td><td>資料通訊</td><td class="due">Quiz 4</td></tr>
+            </table>
+            <div class="c-dim" style="margin-top:8px">study-plan.md · markdown · 1.2 KB</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 3-COL STRIP ================= -->
+  <div class="strip">
+    <div class="shell crosses" style="padding-inline:0; max-width:1120px;">
+      <i>+</i><i>+</i><i>+</i><i>+</i>
+      <div class="grid3">
+        <div class="cell">
+          <h3>快</h3>
+          <p>以 Rust 從零打造：單一靜態執行檔（約 15 MB），無執行時期相依。</p>
+        </div>
+        <div class="cell">
+          <h3>代理原生</h3>
+          <p>22 個人性化工具，輸出內嵌下一步所需的 ID，代理自己串完整條鏈。</p>
+        </div>
+        <div class="cell">
+          <h3>預設安全</h3>
+          <p>寫入需確認、草稿優先於定稿；token 永不出現在輸出或錯誤訊息。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= ASCII ================= -->
+  <section class="section" style="text-align:center; padding-block:64px;">
+    <pre class="mono" style="display:inline-block; text-align:left; color:var(--ink-soft); font-size:clamp(0.7rem, 2.2vw, 1.15rem); line-height:1.25; letter-spacing:0.15em;">█   █  █████  █████
+██  ██ █     █   █
+█ █ █  █     █████
+█   █  █     █
+█   █  █     █
+█   █  █████ █</pre>
+    <p class="mono" style="color:var(--ink-faint); margin-top:18px;">Model Context Protocol — 任何 MCP 客戶端，都會成為你的 Moodle 分身。</p>
+  </section>
+
+  <div class="hatch"></div>
+
+  <!-- ================= PROMPTS ================= -->
+  <section class="section" id="prompts">
+    <div class="shell">
+      <div style="text-align:center; margin-bottom:44px;">
+        <h2 style="font-size:clamp(1.7rem,3.4vw,2.35rem); margin:0 0 12px;">一條提示，整段旅程</h2>
+        <p class="mono" style="color:var(--ink-soft); max-width:520px; margin:0 auto;">不需要指令、不需要外掛——你說目的，代理自己找到路。</p>
+      </div>
+      <div class="prompts">
+        <div class="pcard side">
+          幫我完成資訊安全 HW1：讀作業說明與附件 PDF，解出題目，並繳交草稿。
+          <div class="chain"><code>get_assignment</code><span class="arr">→</span><code>fetch_file</code><span class="arr">→</span><code>upload_file</code><span class="arr">→</span><code>submit_assignment</code></div>
+        </div>
+        <div class="pcard center">
+          <div class="who"><span class="dotlogo">m</span> moodle.ntnu.cc</div>
+          <p class="q">「接下來兩週有什麼<mark>截止</mark>？請幫我規劃這段期間的<mark>讀書計畫</mark>。」</p>
+          <div class="chain"><code>get_schedule</code><span class="arr">→</span><code>get_course_overview</code><span class="arr">→</span><code>study-plan.md</code></div>
+        </div>
+        <div class="pcard side">
+          我錯過了這週資料通訊的進度——幫我整理摘要更新。
+          <div class="chain"><code>get_notifications</code><span class="arr">→</span><code>get_forum_discussions</code><span class="arr">→</span><code>get_discussion_posts</code></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="hatch"></div>
+
+  <!-- ================= JUST WORKS ================= -->
+  <section class="section">
+    <div class="shell">
+      <div class="section-head">
+        <div>
+          <h2>moodle-mcp 開箱即用</h2>
+          <p class="lede">開箱即得難以置信的完整性——而且每週都有新版本，持續變得更好。</p>
+        </div>
+        <div class="actions"><a class="btn btn-outline" href="/tools">工具參考 ›</a></div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:14px;">
+        <div class="mini-shot">
+          <div class="bar">get_course_overview → course.md</div>
+          <span class="md-h"># 資料通訊</span> <span class="md-dim">(course_id 42)</span><br />
+          <span class="md-b">## 第 7 週 — 講義</span><br />
+          - lecture07-slides.pdf <span class="md-id">fileurl 已內嵌</span><br />
+          - lab3-spec.pdf <span class="md-dim">due 10/20</span><br />
+          <span class="md-b">## 討論區</span><br />
+          - <span class="md-b">#f12</span> 作業三澄清 <span class="md-ok">2 則新回覆</span>
+        </div>
+        <div class="mini-shot">
+          <div class="bar">fetch_file → HW1.pdf → markdown</div>
+          <span class="md-h">## 資訊安全 HW1</span><br />
+          1. 給定 RSA n=…，求 d <span class="md-dim">(10%)</span><br />
+          2. 分析 CBC padding oracle <span class="md-dim">(15%)</span><br />
+          <span class="md-ok">→ 已轉換 6,214 字</span> <span class="md-dim">· anydoc</span>
+        </div>
+        <div class="mini-shot">
+          <div class="bar">get_grades(course_id: 42)</div>
+          <span class="md-b">| 項目&nbsp;&nbsp;&nbsp;| 權重 | 成績 |</span><br />
+          | Lab 1&nbsp;&nbsp;| 10%&nbsp; | <span class="md-ok">95</span> |<br />
+          | HW1&nbsp;&nbsp;&nbsp;&nbsp;| 15%&nbsp; | <span class="md-orange">88</span> |<br />
+          | 期中考&nbsp;&nbsp;| 30%&nbsp; | <span class="md-dim">未公布</span> |<br />
+          <span class="md-dim">· 評語已轉為 markdown</span>
+        </div>
+      </div>
+
+      <div class="grid3 celles">
+        <div class="cell">
+          <h4>課程全貌，一次呼叫</h4>
+          <p>get_course_overview 將五個端點併成單份 Markdown 文件——章節、檔案、作業、測驗、討論區，ID 全部內嵌。</p>
+        </div>
+        <div class="cell">
+          <h4>PDF → Markdown</h4>
+          <p>作業說明與講義經 anydoc 轉為可讀需求；HTML 說明透過 htmd 保留表格。</p>
+        </div>
+        <div class="cell">
+          <h4>版本自適應</h4>
+          <p>實測 Moodle 3.7，為 4.x / 5.x 設計——函式名稱、分頁與回傳結構差異自動吸收。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= OPEN SOURCE PANEL ================= -->
+  <section class="section" style="padding-block:30px 84px;">
+    <div class="shell">
+      <div class="panel">
+        <h2>開源</h2>
+        <p class="lede">moodle-mcp 由全球社群打造——以 MIT 授權釋出，歡迎審查每一行程式碼。</p>
+        <div class="chipmarquee" aria-hidden="true">
+          <div class="in">{chips.map((t) => <span>{t}</span>)}</div>
+        </div>
+        <div class="stats">
+          <div class="st"><div class="num">22</div><div class="lab">專屬工具</div></div>
+          <div class="st"><div class="num">350+</div><div class="lab">可呼叫 WS 函式</div></div>
+          <div class="st"><div class="num">39</div><div class="lab">離線測試</div></div>
+          <div class="st"><div class="num">~15 MB</div><div class="lab">單一執行檔</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="hatch"></div>
+
+  <!-- ================= WORKFLOWS ================= -->
+  <section class="section" id="workflows">
+    <div class="shell">
+      <div class="section-head">
+        <div>
+          <h2>代理自己串工具鏈</h2>
+          <p class="lede">moodle-mcp 不鎖定任何模型——它給你與任何代理協作的最快方式。</p>
+        </div>
+        <div class="actions"><a class="btn btn-outline" href={REPO + '#-prompt-examples'} target="_blank" rel="noopener">更多範例 ›</a></div>
+      </div>
+      <div class="workflows">
+        <div class="wf-list" role="tablist" aria-label="工具鏈旅程">
+          <div class="wf-item open" data-wf="hw">
+            <button class="wf-btn" role="tab" aria-selected="true">作業繳交<span class="plus">＋</span></button>
+            <div class="wf-desc">get_assignment 取得說明與附件 → fetch_file 把 PDF 轉成 Markdown → 解題寫檔 → upload_file → submit_assignment(finalize: false) → get_assignment 回讀驗證。<a class="more" href="/tools">工具參考</a></div>
+          </div>
+          <div class="wf-item" data-wf="plan">
+            <button class="wf-btn" role="tab" aria-selected="false">時程規劃<span class="plus">＋</span></button>
+            <div class="wf-desc">get_schedule 合併作業截止、測驗結束與課程活動 → 逐日計畫，與每門課的教材對齊。<a class="more" href="/tools">工具參考</a></div>
+          </div>
+          <div class="wf-item" data-wf="forum">
+            <button class="wf-btn" role="tab" aria-selected="false">討論區追蹤<span class="plus">＋</span></button>
+            <div class="wf-desc">get_forum_discussions → get_discussion_posts——整串討論轉成 Markdown，附件連結完整保留。<a class="more" href="/tools">工具參考</a></div>
+          </div>
+          <div class="wf-item" data-wf="grades">
+            <button class="wf-btn" role="tab" aria-selected="false">成績回顧<span class="plus">＋</span></button>
+            <div class="wf-desc">get_grades 跨課程彙總，或深入單門課的每個成績項目、權重與評語。<a class="more" href="/tools">工具參考</a></div>
+          </div>
+        </div>
+        <div class="wf-stage">
+          <div class="wf-panel term active" data-wf="hw">
+            <div class="term-head"><span class="term-dots"><i></i><i></i><i></i></span><span class="term-title">作業旅程 — agent</span></div>
+            <div class="term-body">
+              <span class="c-dim">$</span> <span class="c-tool">get_assignment</span>(assignment_id: <span class="c-sky">17</span>)<br />
+              <span class="c-dim">→ 說明 + 附件 ×1（HW1.pdf）</span><br />
+              <span class="c-dim">$</span> <span class="c-tool">fetch_file</span>(url) <span class="c-dim">→ markdown（數學公式完整保留）</span><br />
+              <span class="c-dim">$ …代理解題中</span> <span class="c-sky">solution.md</span><br />
+              <span class="c-dim">$</span> <span class="c-tool">upload_file</span>(<span class="c-sky">"solution.md"</span>) <span class="c-dim">→ 草稿區, item_id=88</span><br />
+              <span class="c-dim">$</span> <span class="c-tool">submit_assignment</span>(assignment_id: <span class="c-sky">17</span>, item_id: <span class="c-sky">88</span>, finalize: <span class="c-orange">false</span>)<br />
+              <span class="c-green">✓ 草稿已儲存</span> <span class="c-dim">— 定稿前再確認一次</span>
+            </div>
+          </div>
+          <div class="wf-panel term" data-wf="plan">
+            <div class="term-head"><span class="term-dots"><i></i><i></i><i></i></span><span class="term-title">get_schedule — 未來 14 天</span></div>
+            <div class="term-body">
+              <table>
+                <tr><th>日期</th><th>課程</th><th>事項</th></tr>
+                <tr><td>10/20</td><td>資料通訊</td><td class="due">Lab 3 截止</td></tr>
+                <tr><td>10/23</td><td>資訊安全</td><td class="due">HW1 繳交</td></tr>
+                <tr><td>10/25</td><td>軟體工程</td><td>Quiz 2 結束</td></tr>
+                <tr><td>10/30</td><td>資料通訊</td><td class="due">Quiz 4</td></tr>
+                <tr><td>11/02</td><td>資訊安全</td><td class="due">期中考</td></tr>
+              </table>
+              <div class="c-dim" style="margin-top:8px">→ 合併自作業、測驗與行事曆事件</div>
+            </div>
+          </div>
+          <div class="wf-panel term" data-wf="forum">
+            <div class="term-head"><span class="term-dots"><i></i><i></i><i></i></span><span class="term-title">get_discussion_posts — #301</span></div>
+            <div class="term-body">
+              <span class="c-dim">$</span> <span class="c-tool">get_forum_discussions</span>(forum_id: <span class="c-sky">12</span>)<br />
+              <span class="c-dim">→ 3 個討論串，最新 #301「作業三澄清」</span><br />
+              <span class="c-dim">$</span> <span class="c-tool">get_discussion_posts</span>(discussion_id: <span class="c-sky">301</span>)<br />
+              <span class="c-orange">**老師**</span>：第三題的假設請看附件 <span class="c-sky">hint.pdf</span><br />
+              <span class="c-dim">→ 附件連結已轉為 token 認證 URL</span><br />
+              <span class="c-green">✓</span> <span class="c-dim">整串轉為 markdown · 2 附件</span>
+            </div>
+          </div>
+          <div class="wf-panel term" data-wf="grades">
+            <div class="term-head"><span class="term-dots"><i></i><i></i><i></i></span><span class="term-title">get_grades() — 跨課程</span></div>
+            <div class="term-body">
+              <table>
+                <tr><th>課程</th><th>項目</th><th>成績</th></tr>
+                <tr><td>資料通訊</td><td>Lab 1</td><td class="due">95</td></tr>
+                <tr><td>資訊安全</td><td>HW1</td><td class="due">88</td></tr>
+                <tr><td>軟體工程</td><td>Proposal</td><td>92</td></tr>
+              </table>
+              <div class="c-dim" style="margin-top:8px">→ 評語一併回傳 · gradebook 分數（-1 哨兵已隱藏）</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= CLIENTS ================= -->
+  <section class="section" style="padding-top:20px;">
+    <div class="shell">
+      <div class="section-head">
+        <div>
+          <h2>連接你手邊的客戶端</h2>
+          <p class="lede">所有客戶端讀同一個 stdio 伺服器——設定 MOODLE_URL 與 MOODLE_TOKEN 即可上路。</p>
+        </div>
+      </div>
+      <div class="clients">
+        {clients.map((c) => (
+          <div class="client">
+            <div class="glyph">{c.glyph}</div>
+            <h4>{c.name}</h4>
+            <p>{c.desc}</p>
+            <div class="authors">{c.authors}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <div class="hatch"></div>
+
+  <!-- ================= SAFETY ================= -->
+  <section class="section" id="safety">
+    <div class="shell">
+      <div class="section-head">
+        <div>
+          <h2>安全，是設計出來的</h2>
+          <p class="lede">每一個預設都經過深思——低於這個標準的東西，不值得打造。</p>
+        </div>
+      </div>
+      <div class="safety">
+        <div class="cell"><h4>權杖遮蔽</h4><p>錯誤訊息中的 token 一律顯示為 [REDACTED]，絕不外洩。</p></div>
+        <div class="cell"><h4>同站重導向</h4><p>token 只注入同站 pluginfile.php；跨站重導向直接拒絕。</p></div>
+        <div class="cell"><h4>草稿優先</h4><p>submit_assignment 預設 finalize=false——定稿前永遠有回頭路。</p></div>
+        <div class="cell"><h4>唯讀模式</h4><p>MOODLE_READ_ONLY=1 隱藏所有寫入與上傳工具。</p></div>
+        <div class="cell"><h4>不代考</h4><p>刻意不提供測驗作答工具——學習的主導權在你手上。</p></div>
+        <div class="cell"><h4>傳輸上限</h4><p>內嵌 100 MB、串流下載 500 MB、上傳 100 MB；下載走串流不佔記憶體。</p></div>
+        <div class="cell"><h4>淺白錯誤</h4><p>錯誤訊息說人話，並直接建議修正方式。</p></div>
+        <div class="cell"><h4>安靜日誌</h4><p>stdout 是 MCP 串流；所有日誌走 stderr（RUST_LOG）。</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= LETTER ================= -->
+  <section class="section" style="padding-block:30px 84px;">
+    <div class="shell">
+      <div class="letter-wrap">
+        <div class="letter">
+          <svg class="stamp" viewBox="0 0 100 100" aria-hidden="true">
+            <defs>
+              <path id="stc" d="M50,50 m-35,0 a35,35 0 1,1 70,0 a35,35 0 1,1 -70,0" />
+            </defs>
+            <circle cx="50" cy="50" r="47" fill="none" stroke="#c8102e" stroke-width="2.5" />
+            <circle cx="50" cy="50" r="26" fill="none" stroke="#c8102e" stroke-width="1.2" />
+            <text font-size="9.5" fill="#c8102e" letter-spacing="1.6" font-family="IBM Plex Mono, monospace">
+              <textPath href="#stc">MOODLE-MCP · NTNU · MOODLE.NTNU.CC ·</textPath>
+            </text>
+            <text x="50" y="56" text-anchor="middle" font-size="15" fill="#c8102e" font-family="Noto Serif TC, serif" font-weight="600">師大</text>
+          </svg>
+          <div class="label">一封信</div>
+          <h3>來自維護者</h3>
+          <p>寫這個工具的起點很簡單：身為學生，我們的學期活在 Moodle 裡，但 AI 助手進不去。moodle-mcp 是那扇門——不是爬蟲、不是破解，而是 Moodle 官方 Web Services 的正門，與你手機上的官方 App 走同一條路。</p>
+          <p>我們相信學習的主導權在你手上：所以寫入需要確認、草稿永遠優先於定稿、代考測驗刻意不做。工具應該放大你的努力，而不是取代它。</p>
+          <div class="sig">
+            <div class="name">G36maid</div>
+            <div class="role">moodle-mcp maintainer · NTNU</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="hatch"></div>
+
+  <!-- ================= RELEASES ================= -->
+  <section class="section" id="changelog">
+    <div class="shell">
+      <div class="section-head">
+        <div>
+          <h2>最新版本</h2>
+          <p class="lede">看看最近的發布、設計取捨，以及其他幕後細節。</p>
+        </div>
+        <div class="actions"><a class="btn btn-outline" href={REPO + '/blob/main/CHANGELOG.md'} target="_blank" rel="noopener">完整日誌 ›</a></div>
+      </div>
+      <div class="releases">
+        <div class="release">
+          <div class="thumb">
+            <span class="c-dim" style="color:#64748b">get_course_overview →</span><br />
+            <span style="color:#ffad5a">sections[].summary ✓</span><br />
+            <span style="color:#7dd3fc">availability.restrictions ✓</span><br />
+            <span style="color:#64748b">hidden items → 標示而非列出</span>
+          </div>
+          <div class="in">
+            <h4>v0.1.4 — 課程全貌更完整</h4>
+            <p>get_course_overview 收錄章節摘要內容，並如實標示可用性限制與隱藏狀態。</p>
+            <div class="meta">2026-10-15 <span class="fresh">最新</span></div>
+          </div>
+        </div>
+        <div class="release">
+          <div class="thumb">
+            <span style="color:#64748b">download_file(save_to)</span><br />
+            <span style="color:#ffa3a3">✗ No such directory</span><br />
+            <span style="color:#7bf1a8">→ 建議：先建立目錄</span>
+          </div>
+          <div class="in">
+            <h4>v0.1.3 — 明確動作原則</h4>
+            <p>download_file 不再代建目錄，改以錯誤訊息指名缺失路徑並建議做法。</p>
+            <div class="meta">2026-10-14</div>
+          </div>
+        </div>
+        <div class="release">
+          <div class="thumb">
+            <span style="color:#64748b">upload.php</span><br />
+            <span style="color:#ffa3a3">✗ per-file error record</span><br />
+            <span style="color:#7bf1a8">→ 如實回報，不再誤報成功</span>
+          </div>
+          <div class="in">
+            <h4>v0.1.2 — 如實回報</h4>
+            <p>上傳錯誤如實呈現；pluginfile 改寫為 token 認證 URL 並偵測登入頁。</p>
+            <div class="meta">2026-10-14</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= CTA ================= -->
+  <section class="cta-section" id="install">
+    <div class="shell">
+      <div class="sticker"><img src="/assets/moodle-mcp-mark.svg" alt="moodle-mcp icon" width="64" height="64" /></div>
+      <h2>每天陪你上 Moodle</h2>
+      <p class="tagline">以思考的速度學習。</p>
+      <div class="cta" style="padding:0; display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+        <a class="btn btn-solid" href={RELEASES} target="_blank" rel="noopener">⬇&ensp;下載 <kbd>D</kbd></a>
+        <a class="btn btn-outline" href={REPO} target="_blank" rel="noopener">⭐&ensp;GitHub <kbd>G</kbd></a>
+      </div>
+      <p class="mono" style="color:var(--ink-faint); margin-top:26px;">cargo install moodle-mcp&ensp;<span style="opacity:.6"># 需要 Rust 1.88+；預編譯執行檔亦可用</span></p>
+    </div>
+  </section>
+
+  <script is:inline>
+    // Workflow accordion ↔ panel switcher.
+    document.querySelectorAll('.wf-item').forEach((item) => {
+      item.querySelector('.wf-btn').addEventListener('click', () => {
+        document.querySelectorAll('.wf-item').forEach((i) => {
+          i.classList.toggle('open', i === item);
+          i.querySelector('.wf-btn').setAttribute('aria-selected', i === item ? 'true' : 'false');
+        });
+        document.querySelectorAll('.wf-panel').forEach((p) => {
+          p.classList.toggle('active', p.dataset.wf === item.dataset.wf);
+        });
+      });
+    });
+  </script>
+</Base>
