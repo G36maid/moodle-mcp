@@ -37,7 +37,7 @@ jobs:
             archive: zip
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -76,7 +76,7 @@ jobs:
           Compress-Archive -Path $staging -DestinationPath "$staging.zip"
           "archive=$staging.zip" >> $env:GITHUB_ENV
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.target }}
           path: ${{ env.archive }}
@@ -86,9 +86,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Only to read CHANGELOG.md for the release notes below.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           merge-multiple: true
           path: dist
@@ -132,7 +132,7 @@ jobs:
       contents: read
       id-token: write # OIDC token, exchanged for a short-lived publish token
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
