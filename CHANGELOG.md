@@ -34,7 +34,7 @@ follows [Semantic Versioning](https://semver.org/).
   shows it, then the site default (the site-level values need Moodle 4.2+).
   The 0.1.2 detection read a user preference, but Moodle keeps the timezone
   in the user record, so without `MOODLE_TIMEZONE` stock sites fell back to
-  UTC (#8)
+  UTC (#8, fix by @thc1006)
 - `fetch_file` no longer writes a predictable temp file for document
   conversion (a symlink/TOCTOU hazard on multi-user machines) — documents
   are converted fully in memory, with one less disk round-trip
