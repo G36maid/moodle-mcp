@@ -233,12 +233,23 @@ pub async fn download_file(
     client: &MoodleClient,
     url: &str,
     save_to: &str,
+    overwrite: bool,
 ) -> Result<Value, MoodleError> {
     // Fail fast on a blank destination — no point downloading first.
     if save_to.trim().is_empty() {
         return Err(MoodleError::Config(
             "save_to is empty — provide the local file path to write the download to".into(),
         ));
+    }
+    // The overwrite is opt-in: an agent re-running a download (or picking
+    // the wrong save_to) must not destroy local files silently — the upload
+    // side already rejects same-name files (filenameexist), so the
+    // destructive direction gets the same guard.
+    if !overwrite && tokio::fs::try_exists(save_to).await.unwrap_or(false) {
+        return Err(MoodleError::Config(format!(
+            "{save_to} already exists — refusing to overwrite it; pick a new path, delete the \
+             existing file first, or pass overwrite=true to replace it intentionally"
+        )));
     }
     let mut resp = client.download_file(url).await?;
     let status = resp.status().as_u16();
@@ -453,5 +464,51 @@ mod tests {
             .unwrap();
         let err = read_capped(resp, 100).await.expect_err("must reject");
         assert!(err.to_string().contains("100"), "{err:?}");
+    }
+}
+
+#[cfg(test)]
+mod overwrite_tests {
+    use super::*;
+    use crate::client::MoodleClient;
+    use crate::config::Config;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    #[tokio::test]
+    async fn download_file_refuses_overwrite_unless_flagged() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/f.bin"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(b"payload".to_vec()))
+            .mount(&server)
+            .await;
+        let client = MoodleClient::new(Config {
+            base_url: server.uri(),
+            token: "t".into(),
+            timeout_secs: 10,
+            timezone: None,
+            read_only: false,
+            disabled_tools: Vec::new(),
+            user_agent: None,
+        })
+        .unwrap();
+        let dir = std::env::temp_dir().join(format!("mdl-ow-test-{}", std::process::id()));
+        tokio::fs::create_dir_all(&dir).await.unwrap();
+        let target = dir.join("existing.txt");
+        tokio::fs::write(&target, b"old").await.unwrap();
+        let url = format!("{}/f.bin", server.uri());
+
+        let err = download_file(&client, &url, target.to_str().unwrap(), false)
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("already exists"), "{err}");
+        assert_eq!(tokio::fs::read(&target).await.unwrap(), b"old");
+
+        download_file(&client, &url, target.to_str().unwrap(), true)
+            .await
+            .unwrap();
+        assert_eq!(tokio::fs::read(&target).await.unwrap(), b"payload");
+        tokio::fs::remove_dir_all(&dir).await.unwrap();
     }
 }

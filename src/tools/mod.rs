@@ -122,6 +122,8 @@ pub struct DownloadFileParams {
     url: String,
     /// Local path to write the content to
     save_to: String,
+    /// Replace save_to if it already exists (default: refuse to overwrite)
+    overwrite: Option<bool>,
 }
 
 #[derive(Deserialize, schemars::JsonSchema)]
@@ -760,14 +762,22 @@ impl MoodleMcp {
     }
 
     #[tool(
-        description = "Download a Moodle file to a local path (metadata only — binary payloads never enter the conversation).",
+        description = "Download a Moodle file to a local path (metadata only — binary payloads never enter the conversation). Refuses to overwrite an existing save_to unless overwrite=true.",
         annotations(destructive_hint = false, idempotent_hint = true)
     )]
     async fn download_file(
         &self,
         Parameters(p): Parameters<DownloadFileParams>,
     ) -> Result<CallToolResult, McpError> {
-        finish(files::download_file(&self.client, &p.url, &p.save_to).await)
+        finish(
+            files::download_file(
+                &self.client,
+                &p.url,
+                &p.save_to,
+                p.overwrite.unwrap_or(false),
+            )
+            .await,
+        )
     }
 
     #[tool(

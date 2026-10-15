@@ -272,9 +272,10 @@ async fn download_missing_directory_names_it_and_suggests_the_fix() {
         "{}/webservice/pluginfile.php/12/course/section/notes.txt",
         server.uri()
     );
-    let err = moodle_mcp::tools::files::download_file(&client, &url, save_to.to_str().unwrap())
-        .await
-        .expect_err("missing directory must fail");
+    let err =
+        moodle_mcp::tools::files::download_file(&client, &url, save_to.to_str().unwrap(), false)
+            .await
+            .expect_err("missing directory must fail");
     assert!(err.to_string().contains("does not exist"), "{err:?}");
     assert!(
         err.to_string().contains("create the directory first"),
@@ -575,9 +576,10 @@ async fn login_page_redirect_is_an_error_not_a_file() {
 
     let save_to =
         std::env::temp_dir().join(format!("moodle-mcp-login-{}.html", std::process::id()));
-    let err = moodle_mcp::tools::files::download_file(&client, &url, save_to.to_str().unwrap())
-        .await
-        .expect_err("login redirect must fail download");
+    let err =
+        moodle_mcp::tools::files::download_file(&client, &url, save_to.to_str().unwrap(), false)
+            .await
+            .expect_err("login redirect must fail download");
     assert!(err.to_string().contains("login page"), "{err:?}");
     assert!(!save_to.exists(), "no file should be written");
 }
@@ -625,9 +627,10 @@ async fn json_responses_split_moodle_errors_from_real_files() {
         .expect_err("JSON error must fail fetch");
     let save_bad =
         std::env::temp_dir().join(format!("moodle-mcp-jsonerr-{}.txt", std::process::id()));
-    let dl_err = moodle_mcp::tools::files::download_file(&client, &bad, save_bad.to_str().unwrap())
-        .await
-        .expect_err("JSON error must fail download");
+    let dl_err =
+        moodle_mcp::tools::files::download_file(&client, &bad, save_bad.to_str().unwrap(), false)
+            .await
+            .expect_err("JSON error must fail download");
     for e in [&fetch_err, &dl_err] {
         assert!(e.to_string().contains("invalidtoken"), "{e:?}");
     }
@@ -640,9 +643,10 @@ async fn json_responses_split_moodle_errors_from_real_files() {
     assert_eq!(out["content"], json!(legit));
 
     let save = std::env::temp_dir().join(format!("moodle-mcp-jsonok-{}.json", std::process::id()));
-    let out = moodle_mcp::tools::files::download_file(&client, &good, save.to_str().unwrap())
-        .await
-        .expect("legitimate JSON downloads");
+    let out =
+        moodle_mcp::tools::files::download_file(&client, &good, save.to_str().unwrap(), false)
+            .await
+            .expect("legitimate JSON downloads");
     assert_eq!(out["size_bytes"], json!(legit.len()));
     assert_eq!(std::fs::read_to_string(&save).unwrap(), legit);
     std::fs::remove_file(&save).ok();
@@ -1030,6 +1034,7 @@ async fn download_rejects_blank_save_to() {
         &client,
         "https://moodle3.example.com/webservice/pluginfile.php/1/f.pdf",
         "   ",
+        false,
     )
     .await
     .expect_err("blank save_to must be rejected");
