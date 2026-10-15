@@ -254,8 +254,12 @@ env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "your-toke
 | `MOODLE_TOKEN` | ✔ | — | Web service token |
 | `MOODLE_TIMEOUT_SECS` | — | `60` | Per-request timeout |
 | `MOODLE_TIMEZONE` | — | auto / `UTC` | IANA name (`Asia/Taipei`) for rendering timestamps; default auto-detects the Moodle user's timezone preference and falls back to UTC |
+| `MOODLE_ALLOW_EXTERNAL_FETCH` | — | off | Lets `fetch_file`/`download_file` fetch URLs outside the configured site (off: only same-site Moodle file URLs) |
+| `MOODLE_ALLOW_HTTP` | — | off | `1` allows a plain-http `MOODLE_URL` (loopback hosts are always exempt) — otherwise http is rejected to protect the token |
 | `MOODLE_READ_ONLY` | — | off | `1` hides all write/upload tools (`create_forum_discussion`, `reply_to_discussion`, `submit_assignment`, `send_message`, `upload_file`, `call_ws_function`) from the tool list — read-only LLM access |
 | `MOODLE_DISABLE_TOOLS` | — | — | Comma-separated tool names to hide on top (e.g. `send_message,upload_file`); unknown names warn at startup |
+| `MOODLE_LOG_LEVEL` | — | `info` | Log verbosity: `error`/`warn`/`info`/`debug`/`trace` (invalid values fall back to `info`); `trace` logs response-body snippets — avoid on shared machines |
+| `MOODLE_UA` | — | `moodle-mcp/{version}` | User-Agent override for institutional-filtering edge cases |
 | `RUST_LOG` | — | `info` | Log filter (logs → stderr; stdout is the MCP stream) |
 
 ## 💬 Prompt examples

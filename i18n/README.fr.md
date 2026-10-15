@@ -220,8 +220,12 @@ env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "votre-tok
 | `MOODLE_TOKEN` | ✔ | — | Jeton d'accès de service web |
 | `MOODLE_TIMEOUT_SECS` | — | `60` | Délai d'attente par requête en secondes |
 | `MOODLE_TIMEZONE` | — | auto / `UTC` | Fuseau horaire IANA (`Asia/Taipei`) pour l'affichage des horodatages ; par défaut, détecte automatiquement le fuseau horaire de l'utilisateur Moodle et, sinon, utilise UTC |
+| `MOODLE_ALLOW_EXTERNAL_FETCH` | — | désactivé | Permet à `fetch_file`/`download_file` de récupérer des URL hors du site configuré (désactivé : uniquement les URL de fichiers Moodle du même site) |
+| `MOODLE_ALLOW_HTTP` | — | désactivé | `1` autorise `MOODLE_URL` en http clair (les hôtes loopback sont toujours exemptés) — sinon http est refusé pour protéger le token |
 | `MOODLE_READ_ONLY` | — | désactivé | `1` masque de la liste d'outils tous les outils d'écriture/téléversement (`create_forum_discussion`, `reply_to_discussion`, `submit_assignment`, `send_message`, `upload_file`, `call_ws_function`) — accès LLM en lecture seule |
 | `MOODLE_DISABLE_TOOLS` | — | — | Noms d'outils séparés par des virgules à masquer en plus (p. ex. `send_message,upload_file`) ; les noms inconnus déclenchent un avertissement au démarrage |
+| `MOODLE_LOG_LEVEL` | — | `info` | Niveau de journalisation : `error`/`warn`/`info`/`debug`/`trace` (les valeurs invalides retombent sur `info`) ; `trace` journalise des extraits de corps de réponse — à éviter sur une machine partagée |
+| `MOODLE_UA` | — | `moodle-mcp/{version}` | Substitution du User-Agent pour les cas de filtrage institutionnel |
 | `RUST_LOG` | — | `info` | Niveau de journalisation (logs vers stderr ; stdout réservé au protocole MCP) |
 
 ## 💬 Exemples de requêtes

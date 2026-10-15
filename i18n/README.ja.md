@@ -220,8 +220,12 @@ env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "your-toke
 | `MOODLE_TOKEN` | ✔ | — | Web サービストークン |
 | `MOODLE_TIMEOUT_SECS` | — | `60` | リクエストごとのタイムアウト秒数 |
 | `MOODLE_TIMEZONE` | — | 自動 / `UTC` | タイムスタンプ表示に使う IANA タイムゾーン名（`Asia/Taipei`）。デフォルトは Moodle ユーザーのタイムゾーン設定を自動検出し、取得できない場合は UTC |
+| `MOODLE_ALLOW_EXTERNAL_FETCH` | — | オフ | `fetch_file`/`download_file` が設定サイト外の URL を取得することを許可（オフ：同一サイトの Moodle ファイル URL のみ） |
+| `MOODLE_ALLOW_HTTP` | — | オフ | `1` で平文 http の `MOODLE_URL` を許可（ループバックホストは常に免除）— 未指定時はトークン保護のため http を拒否 |
 | `MOODLE_READ_ONLY` | — | オフ | `1` を指定すると、書き込み・アップロード系ツール（`create_forum_discussion`、`reply_to_discussion`、`submit_assignment`、`send_message`、`upload_file`、`call_ws_function`）をツール一覧から非表示にします — 読み取り専用の LLM アクセス |
 | `MOODLE_DISABLE_TOOLS` | — | — | 追加で非表示にするツール名のカンマ区切りリスト（例: `send_message,upload_file`）。不明な名前は起動時に警告されます |
+| `MOODLE_LOG_LEVEL` | — | `info` | ログの詳細度: `error`/`warn`/`info`/`debug`/`trace`（不正な値は `info` にフォールバック）；`trace` はレスポンス本文の断片を記録するため共用マシンでは避けること |
+| `MOODLE_UA` | — | `moodle-mcp/{version}` | User-Agent の上書き（機関側フィルタリングへの対処用） |
 | `RUST_LOG` | — | `info` | ログフィルタ（ログは stderr、stdout は MCP プロトコル通信） |
 
 ## 💬 プロンプト例

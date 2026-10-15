@@ -220,8 +220,12 @@ env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "dein-toke
 | `MOODLE_TOKEN` | ✔ | — | Web-Service-Token |
 | `MOODLE_TIMEOUT_SECS` | — | `60` | Timeout pro Anfrage in Sekunden |
 | `MOODLE_TIMEZONE` | — | auto / `UTC` | IANA-Zeitzone (`Asia/Taipei`) für die Anzeige von Zeitstempeln; Standard: automatisch aus der Zeitzoneneinstellung des Moodle-Nutzers erkannt, sonst UTC |
+| `MOODLE_ALLOW_EXTERNAL_FETCH` | — | aus | Erlaubt `fetch_file`/`download_file`, URLs außerhalb der konfigurierten Site abzurufen (aus: nur Moodle-Datei-URLs derselben Site) |
+| `MOODLE_ALLOW_HTTP` | — | aus | `1` erlaubt Klartext-`MOODLE_URL` (Loopback-Hosts sind immer ausgenommen) — andernfalls wird http abgelehnt, um das Token zu schützen |
 | `MOODLE_READ_ONLY` | — | aus | `1` blendet alle Schreib-/Upload-Tools (`create_forum_discussion`, `reply_to_discussion`, `submit_assignment`, `send_message`, `upload_file`, `call_ws_function`) aus der Tool-Liste aus — schreibgeschützter LLM-Zugriff |
 | `MOODLE_DISABLE_TOOLS` | — | — | Kommagetrennte Tool-Namen, die zusätzlich ausgeblendet werden (z. B. `send_message,upload_file`); unbekannte Namen erzeugen beim Start eine Warnung |
+| `MOODLE_LOG_LEVEL` | — | `info` | Log-Ausführlichkeit: `error`/`warn`/`info`/`debug`/`trace` (ungültige Werte fallen auf `info` zurück); `trace` protokolliert Ausschnitte des Antwortkörpers — auf gemeinsam genutzten Rechnern vermeiden |
+| `MOODLE_UA` | — | `moodle-mcp/{version}` | User-Agent-Override für Fälle institutioneller Filterung |
 | `RUST_LOG` | — | `info` | Log-Filter (Logs gehen an stderr; stdout dient dem MCP-Protokoll) |
 
 ## 💬 Prompt-Beispiele
