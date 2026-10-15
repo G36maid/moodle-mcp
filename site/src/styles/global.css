@@ -461,8 +461,8 @@ html:not([data-theme="dark"]) .mcp-logo.dark { display: none; }
 /* ---------- CTA ---------- */
 
 .cta-section { text-align: center; padding: 96px 0 110px; position: relative; }
-.cta-section .sticker { width: 96px; height: 96px; margin: 0 auto 26px; border-radius: 22px; background: var(--card); border: 1px solid var(--hairline-soft); box-shadow: var(--shadow); display: flex; align-items: center; justify-content: center; }
-.cta-section .sticker img { width: 64px; height: 64px; }
+.cta-section .sticker { width: 80px; height: 80px; margin: 0 auto 26px; }
+.cta-section .sticker img { width: 80px; height: 80px; border-radius: 18px; box-shadow: var(--shadow); }
 .cta-section h2 { font-size: clamp(1.9rem, 4vw, 2.6rem); color: var(--navy); margin: 0 0 10px; }
 .cta-section .tagline { font-family: var(--mono); color: var(--ink-soft); font-size: 1rem; margin: 0 0 30px; }
 
