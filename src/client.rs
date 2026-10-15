@@ -133,13 +133,14 @@ impl MoodleClient {
         if self.allow_external_fetch {
             return Ok(());
         }
-        let url = url::Url::parse(file_url).map_err(|e| {
-            MoodleError::Config(format!("invalid file URL '{file_url}': {e}"))
-        })?;
+        let url = url::Url::parse(file_url)
+            .map_err(|e| MoodleError::Config(format!("invalid file URL '{file_url}': {e}")))?;
         let target = Self::host_key(&url).unwrap_or_else(|| "unknown host".into());
         let allowed = [
             self.base_host_key(),
-            siteurl.and_then(|s| url::Url::parse(s).ok()).and_then(|u| Self::host_key(&u)),
+            siteurl
+                .and_then(|s| url::Url::parse(s).ok())
+                .and_then(|u| Self::host_key(&u)),
         ];
         if allowed.contains(&Some(target.clone())) {
             return Ok(());
@@ -682,27 +683,40 @@ mod same_site_tests {
     fn file_urls_must_be_same_site_unless_opted_out() {
         let strict = client_for("https://moodle.example.com", false);
         // Same host: OK.
-        assert!(strict
-            .ensure_same_site("https://moodle.example.com/pluginfile.php/1/f.pdf", None)
-            .is_ok());
+        assert!(
+            strict
+                .ensure_same_site("https://moodle.example.com/pluginfile.php/1/f.pdf", None)
+                .is_ok()
+        );
         // Canonical wwwroot host (alias-configured sites): OK.
-        assert!(strict
-            .ensure_same_site(
-                "https://wwwroot.example.org/pluginfile.php/1/f.pdf",
-                Some("https://wwwroot.example.org")
-            )
-            .is_ok());
+        assert!(
+            strict
+                .ensure_same_site(
+                    "https://wwwroot.example.org/pluginfile.php/1/f.pdf",
+                    Some("https://wwwroot.example.org")
+                )
+                .is_ok()
+        );
         // Foreign host: rejected even when a siteurl is known.
-        assert!(strict
-            .ensure_same_site("https://evil.example.com/x", Some("https://wwwroot.example.org"))
-            .is_err());
+        assert!(
+            strict
+                .ensure_same_site(
+                    "https://evil.example.com/x",
+                    Some("https://wwwroot.example.org")
+                )
+                .is_err()
+        );
         // Scheme-lenient: http target against an https base is still same-site.
-        assert!(strict
-            .ensure_same_site("http://moodle.example.com/pluginfile.php/1/f.pdf", None)
-            .is_ok());
+        assert!(
+            strict
+                .ensure_same_site("http://moodle.example.com/pluginfile.php/1/f.pdf", None)
+                .is_ok()
+        );
         // Opt-out allows anything.
-        assert!(client_for("https://moodle.example.com", true)
-            .ensure_same_site("https://evil.example.com/x", None)
-            .is_ok());
+        assert!(
+            client_for("https://moodle.example.com", true)
+                .ensure_same_site("https://evil.example.com/x", None)
+                .is_ok()
+        );
     }
 }
