@@ -129,31 +129,26 @@ pub async fn fetch_file(client: &MoodleClient, url: &str) -> Result<Value, Moodl
         .to_lowercase();
 
     if convertable.contains(&ext.as_str()) {
-        let tmp = format!(
-            "{}/moodle-fetch-{}.{}",
-            std::env::temp_dir().display(),
-            crate::util::unique_item_id(),
-            ext
-        );
-        // Conversion (write + anydoc + cleanup) is synchronous — run it on
-        // the blocking pool so it never stalls the async workers.
-        let conv = tokio::task::spawn_blocking({
-            let bytes = bytes.clone();
-            let tmp = tmp.clone();
-            move || -> Result<String, MoodleError> {
-                let out = (|| -> Result<String, MoodleError> {
-                    std::fs::write(&tmp, &bytes).map_err(|e| {
-                        MoodleError::Config(format!("failed to buffer download: {e}"))
-                    })?;
-                    anydoc::to_markdown(&tmp).map_err(|e| {
-                        MoodleError::InvalidBody(format!(
-                            "document conversion failed ({e}) — use download_file to save the original"
-                        ))
-                    })
-                })();
-                let _ = std::fs::remove_file(&tmp);
-                out
-            }
+        // Conversion is CPU-bound and synchronous — run it on the blocking
+        // pool. Anydoc is in-memory regardless (its path API is just
+        // fs::read + to_markdown_bytes), so the bytes move straight in: no
+        // temp file (a predictable name is a symlink/TOCTOU hazard on
+        // multi-user machines), no clone, no disk round-trip. The extension
+        // fallback covers signature-less formats (CSV).
+        let detected =
+            anydoc::Format::from_bytes(&bytes).or_else(|| anydoc::Format::from_extension(&ext));
+        let ext_owned = ext.clone();
+        let conv = tokio::task::spawn_blocking(move || -> Result<String, MoodleError> {
+            let format = detected.ok_or_else(|| {
+                MoodleError::InvalidBody(format!(
+                    "unrecognized document content (.{ext_owned}) — use download_file to save the original"
+                ))
+            })?;
+            anydoc::to_markdown_bytes(&bytes, format).map_err(|e| {
+                MoodleError::InvalidBody(format!(
+                    "document conversion failed ({e}) — use download_file to save the original"
+                ))
+            })
         })
         .await
         .map_err(|e| MoodleError::Config(format!("conversion task failed: {e}")))??;
@@ -403,6 +398,31 @@ mod tests {
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     use crate::config::Config;
+
+    #[tokio::test]
+    async fn fetch_file_converts_csv_in_memory() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/report.csv"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("name,score\nalice,98\n"))
+            .mount(&server)
+            .await;
+        let client = MoodleClient::new(Config {
+            base_url: server.uri(),
+            token: "t".into(),
+            timeout_secs: 10,
+            timezone: None,
+            read_only: false,
+            disabled_tools: Vec::new(),
+            user_agent: None,
+        })
+        .unwrap();
+        let out = fetch_file(&client, &format!("{}/report.csv", server.uri()))
+            .await
+            .unwrap();
+        assert_eq!(out["format"], "csv");
+        assert!(out["markdown"].as_str().unwrap().contains("alice"));
+    }
 
     #[tokio::test]
     async fn read_capped_rejects_oversized_stream() {
