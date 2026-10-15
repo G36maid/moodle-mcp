@@ -16,6 +16,7 @@ async fn client_for(server: &MockServer) -> MoodleClient {
         read_only: false,
         disabled_tools: Vec::new(),
         user_agent: None,
+        allow_external_fetch: false,
     })
     .expect("client")
 }

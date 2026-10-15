@@ -426,6 +426,7 @@ mod tests {
             read_only: false,
             disabled_tools: Vec::new(),
             user_agent: None,
+            allow_external_fetch: false,
         })
         .unwrap();
         let out = fetch_file(&client, &format!("{}/report.csv", server.uri()))
@@ -456,6 +457,7 @@ mod tests {
             read_only: false,
             disabled_tools: Vec::new(),
             user_agent: None,
+            allow_external_fetch: false,
         })
         .unwrap();
         let resp = client
@@ -491,6 +493,7 @@ mod overwrite_tests {
             read_only: false,
             disabled_tools: Vec::new(),
             user_agent: None,
+            allow_external_fetch: false,
         })
         .unwrap();
         let dir = std::env::temp_dir().join(format!("mdl-ow-test-{}", std::process::id()));

@@ -28,6 +28,7 @@ async fn spawn_server_with(
         read_only: false,
         disabled_tools: Vec::new(),
         user_agent: None,
+        allow_external_fetch: false,
     })
     .expect("client");
 

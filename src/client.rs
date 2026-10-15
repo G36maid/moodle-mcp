@@ -21,6 +21,7 @@ pub struct MoodleClient {
     download_http: reqwest::Client,
     base_url: String,
     token: String,
+    allow_external_fetch: bool,
     /// Local cooldown gate after a 429/503: `Some((status, until epoch secs))`.
     /// While active, `call()` fails locally without touching the network —
     /// an agent's blind retry loop becomes fast local failures instead of a
@@ -84,6 +85,7 @@ impl MoodleClient {
             download_http,
             base_url: cfg.base_url,
             token: cfg.token,
+            allow_external_fetch: cfg.allow_external_fetch,
             cooldown: Arc::new(Mutex::new(None)),
         })
     }
@@ -95,6 +97,57 @@ impl MoodleClient {
     fn start_cooldown(&self, status: u16, retry_after: u64) {
         let until = crate::util::now_unix() + retry_after as i64;
         *self.cooldown.lock().unwrap() = Some((status, until));
+    }
+
+    /// Host identity for same-site checks: hostname plus the explicit port
+    /// when non-default. Scheme is ignored (old sites serve both), and
+    /// default ports normalize away (http:80 == https:443 host-wise).
+    fn host_key(url: &url::Url) -> Option<String> {
+        let host = url.host_str()?;
+        Some(match url.port() {
+            Some(p) => format!("{host}:{p}"),
+            None => host.to_string(),
+        })
+    }
+
+    /// Host identity of the configured site (host:port) for same-site checks.
+    pub fn base_host_key(&self) -> Option<String> {
+        Self::host_key(&url::Url::parse(&self.base_url).ok()?)
+    }
+
+    pub fn allow_external_fetch(&self) -> bool {
+        self.allow_external_fetch
+    }
+
+    /// The file tools only fetch from the Moodle site itself: the MCP
+    /// process makes requests the user's agent harness cannot see or gate,
+    /// so its network footprint stays inside the site — plus the canonical
+    /// wwwroot host (from site info) for alias-configured sites.
+    /// MOODLE_ALLOW_EXTERNAL_FETCH opts out. Scheme is not compared: older
+    /// sites may serve both http and https.
+    pub fn ensure_same_site(
+        &self,
+        file_url: &str,
+        siteurl: Option<&str>,
+    ) -> Result<(), MoodleError> {
+        if self.allow_external_fetch {
+            return Ok(());
+        }
+        let url = url::Url::parse(file_url).map_err(|e| {
+            MoodleError::Config(format!("invalid file URL '{file_url}': {e}"))
+        })?;
+        let target = Self::host_key(&url).unwrap_or_else(|| "unknown host".into());
+        let allowed = [
+            self.base_host_key(),
+            siteurl.and_then(|s| url::Url::parse(s).ok()).and_then(|u| Self::host_key(&u)),
+        ];
+        if allowed.contains(&Some(target.clone())) {
+            return Ok(());
+        }
+        Err(MoodleError::Config(format!(
+            "only same-site Moodle file URLs are supported ('{target}' is not part of this site) — \
+             for external links use your own web tooling, or set MOODLE_ALLOW_EXTERNAL_FETCH=1"
+        )))
     }
 
     /// Generate a web service token via `POST /login/token.php`.
@@ -428,6 +481,7 @@ mod tests {
                 read_only: false,
                 disabled_tools: Vec::new(),
                 user_agent: None,
+                allow_external_fetch: false,
             })
             .unwrap()
         };
@@ -526,6 +580,7 @@ mod backoff_tests {
             read_only: false,
             disabled_tools: Vec::new(),
             user_agent: None,
+            allow_external_fetch: false,
         })
         .unwrap()
     }
@@ -601,5 +656,53 @@ mod backoff_tests {
             assert!(err.to_string().contains("dberror"), "{err}");
         }
         // 500 is not a back-off signal: both calls reached the wire.
+    }
+}
+
+#[cfg(test)]
+mod same_site_tests {
+    use super::*;
+    use crate::config::Config;
+
+    fn client_for(base: &str, allow_external: bool) -> MoodleClient {
+        MoodleClient::new(Config {
+            base_url: base.into(),
+            token: "t".into(),
+            timeout_secs: 10,
+            timezone: None,
+            read_only: false,
+            disabled_tools: Vec::new(),
+            user_agent: None,
+            allow_external_fetch: allow_external,
+        })
+        .unwrap()
+    }
+
+    #[test]
+    fn file_urls_must_be_same_site_unless_opted_out() {
+        let strict = client_for("https://moodle.example.com", false);
+        // Same host: OK.
+        assert!(strict
+            .ensure_same_site("https://moodle.example.com/pluginfile.php/1/f.pdf", None)
+            .is_ok());
+        // Canonical wwwroot host (alias-configured sites): OK.
+        assert!(strict
+            .ensure_same_site(
+                "https://wwwroot.example.org/pluginfile.php/1/f.pdf",
+                Some("https://wwwroot.example.org")
+            )
+            .is_ok());
+        // Foreign host: rejected even when a siteurl is known.
+        assert!(strict
+            .ensure_same_site("https://evil.example.com/x", Some("https://wwwroot.example.org"))
+            .is_err());
+        // Scheme-lenient: http target against an https base is still same-site.
+        assert!(strict
+            .ensure_same_site("http://moodle.example.com/pluginfile.php/1/f.pdf", None)
+            .is_ok());
+        // Opt-out allows anything.
+        assert!(client_for("https://moodle.example.com", true)
+            .ensure_same_site("https://evil.example.com/x", None)
+            .is_ok());
     }
 }

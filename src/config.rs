@@ -21,6 +21,11 @@ pub struct Config {
     /// `moodle-mcp/{version}`; the override exists for institutional-filtering
     /// edge cases, not as a stealth feature.
     pub user_agent: Option<String>,
+    /// Allow the file tools to fetch URLs outside the configured site
+    /// (MOODLE_ALLOW_EXTERNAL_FETCH). Default off: the MCP process makes
+    /// requests the user's agent harness cannot see or gate, so its network
+    /// footprint stays inside the Moodle site.
+    pub allow_external_fetch: bool,
 }
 
 /// Normalize a site URL and enforce the https policy: schemeless input
@@ -102,6 +107,9 @@ impl Config {
             .ok()
             .map(|v| v.trim().to_string())
             .filter(|v| !v.is_empty());
+        let allow_external_fetch = std::env::var("MOODLE_ALLOW_EXTERNAL_FETCH")
+            .ok()
+            .is_some_and(|v| matches!(v.trim(), "1" | "true" | "yes" | "on"));
         Ok(Self {
             base_url,
             token,
@@ -110,6 +118,7 @@ impl Config {
             read_only,
             disabled_tools,
             user_agent,
+            allow_external_fetch,
         })
     }
 }
