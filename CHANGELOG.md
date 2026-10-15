@@ -26,16 +26,15 @@ follows [Semantic Versioning](https://semver.org/).
   `http://` is rejected unless the host is loopback or the escape hatch is
   set — the token (and on `auth`, the password) would otherwise travel in
   cleartext
-- `download_file` refuses to overwrite an existing `save_to` instead of
-  silently replacing it
-- HTTP responses are classified by status before parsing: 429/503/502/504
-  produce typed back-off errors honoring `Retry-After`, a 429/503 arms a
-  process-wide cooldown that fails further calls locally until it expires,
-  and a 429 whose JSON body is not a Moodle exception is no longer returned
-  as a successful response
 
 ### Fixed
 
+- timestamps render in the timezone Moodle itself uses for the user: the
+  site's forced timezone, then the user's profile timezone if the site
+  shows it, then the site default (the site-level values need Moodle 4.2+).
+  The 0.1.2 detection read a user preference, but Moodle keeps the timezone
+  in the user record, so without `MOODLE_TIMEZONE` stock sites fell back to
+  UTC (#8)
 - `fetch_file` no longer writes a predictable temp file for document
   conversion (a symlink/TOCTOU hazard on multi-user machines) — documents
   are converted fully in memory, with one less disk round-trip

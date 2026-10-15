@@ -218,10 +218,14 @@ env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "tu-token"
 |---|:---:|---|---|
 | `MOODLE_URL` | ✔ | — | URL base del sitio, sin barra final |
 | `MOODLE_TOKEN` | ✔ | — | Token de servicio web |
-| `MOODLE_TIMEOUT_SECS` | — | `60` | Tiempo de espera por petición en segundos |
-| `MOODLE_TIMEZONE` | — | auto / `UTC` | Zona horaria IANA (`Asia/Taipei`) para mostrar las marcas de tiempo; por defecto se detecta automáticamente la preferencia de zona horaria del usuario de Moodle y, si no, se usa UTC |
+| `MOODLE_TIMEOUT_SECS` | — | `60` | Tiempo de espera por petición en segundos; también es el tiempo total para detectar la zona horaria al iniciar |
+| `MOODLE_TIMEZONE` | — | auto / `UTC` | Zona horaria IANA (`Asia/Taipei`) para mostrar las marcas de tiempo; por defecto se detecta la zona que Moodle usa para el usuario: la zona forzada del sitio, después la del perfil (si el sitio no la oculta) y, por último, la zona por defecto del sitio (estos dos ajustes del sitio requieren Moodle 4.2+); si no, se usa UTC |
+| `MOODLE_ALLOW_EXTERNAL_FETCH` | — | desactivado | Permite que `fetch_file`/`download_file` obtengan URLs fuera del sitio configurado (desactivado: solo URL de archivos Moodle del mismo sitio) |
+| `MOODLE_ALLOW_HTTP` | — | desactivado | `1` permite `MOODLE_URL` en http plano (los hosts de loopback siempre están exentos); de lo contrario se rechaza http para proteger el token |
 | `MOODLE_READ_ONLY` | — | desactivado | `1` oculta de la lista de herramientas todas las de escritura/subida (`create_forum_discussion`, `reply_to_discussion`, `submit_assignment`, `send_message`, `upload_file`, `call_ws_function`) — acceso LLM de solo lectura |
 | `MOODLE_DISABLE_TOOLS` | — | — | Nombres de herramientas separados por comas para ocultar además (p. ej. `send_message,upload_file`); los nombres desconocidos generan un aviso al iniciar |
+| `MOODLE_LOG_LEVEL` | — | `info` | Nivel de registro: `error`/`warn`/`info`/`debug`/`trace` (los valores no válidos vuelven a `info`); `trace` incluye fragmentos del cuerpo de la respuesta — evítalo en máquinas compartidas |
+| `MOODLE_UA` | — | `moodle-mcp/{version}` | Anulación del User-Agent para casos de filtrado institucional |
 | `RUST_LOG` | — | `info` | Filtro de logs (los logs van a stderr; stdout es el canal MCP) |
 
 ## 💬 Ejemplos de prompts

@@ -218,10 +218,14 @@ env = { "MOODLE_URL" = "https://moodle.example.com", "MOODLE_TOKEN" = "your-toke
 |---|:---:|---|---|
 | `MOODLE_URL` | ✔ | — | 站點根網址，末端不加斜線 |
 | `MOODLE_TOKEN` | ✔ | — | Web Service 存取權杖 |
-| `MOODLE_TIMEOUT_SECS` | — | `60` | 單次請求逾時秒數 |
-| `MOODLE_TIMEZONE` | — | 自動 / `UTC` | 呈現時間戳用的 IANA 時區名稱（`Asia/Taipei`）；預設自動偵測 Moodle 使用者的時區偏好，失敗則使用 UTC |
+| `MOODLE_TIMEOUT_SECS` | — | `60` | 單次請求逾時秒數；也是啟動時偵測時區的總時限 |
+| `MOODLE_TIMEZONE` | — | 自動 / `UTC` | 呈現時間戳用的 IANA 時區名稱（`Asia/Taipei`）；預設偵測 Moodle 對你實際生效的時區：站點強制時區，其次是個人資料中的時區（站點未隱藏此欄位時），最後是站點預設時區（兩項站點設定需要 Moodle 4.2+），都取不到則使用 UTC |
+| `MOODLE_ALLOW_EXTERNAL_FETCH` | — | 關 | 允許 `fetch_file`/`download_file` 抓取設定站點之外的 URL（關：僅限同站 Moodle 檔案 URL） |
+| `MOODLE_ALLOW_HTTP` | — | 關 | `1` 允許明文 http 的 `MOODLE_URL`（回環主機一律豁免）——否則會拒絕 http 以保護存取權杖 |
 | `MOODLE_READ_ONLY` | — | 關 | `1` 會從工具清單隱藏所有寫入/上傳類工具（`create_forum_discussion`、`reply_to_discussion`、`submit_assignment`、`send_message`、`upload_file`、`call_ws_function`）— 唯讀 LLM 存取 |
 | `MOODLE_DISABLE_TOOLS` | — | — | 額外隱藏的工具名稱，逗號分隔（如 `send_message,upload_file`）；未知名稱會在啟動時警告 |
+| `MOODLE_LOG_LEVEL` | — | `info` | 日誌層級：`error`/`warn`/`info`/`debug`/`trace`（非法值回退為 `info`）；`trace` 會記錄回應內文片段——共用機器上避免使用 |
+| `MOODLE_UA` | — | `moodle-mcp/{version}` | User-Agent 覆寫（用於機構側過濾的邊緣情況） |
 | `RUST_LOG` | — | `info` | 日誌過濾等級（日誌輸出至 stderr；stdout 為 MCP 通訊串流） |
 
 ## 💬 提示詞範例
