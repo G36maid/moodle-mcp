@@ -4,6 +4,42 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versioning
 follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- file tools accept only same-site Moodle URLs — external links belong to the
+  agent's own web tooling (`MOODLE_ALLOW_EXTERNAL_FETCH=1` opts out)
+- `MOODLE_ALLOW_HTTP=1` / `auth --allow-http` allow plain-http sites (local
+  test instances on loopback hosts need no flags)
+- `MOODLE_UA` overrides the User-Agent on both HTTP clients (default stays
+  `moodle-mcp/{version}`)
+- `MOODLE_LOG_LEVEL` sets the log level (`error|warn|info|debug|trace`,
+  default `info`); `RUST_LOG` remains the advanced escape hatch
+- a `download_file` `overwrite` parameter (`false` by default) for
+  intentional re-downloads
+- a `cargo-audit` CI job failing the build on RustSec advisory matches
+
+### Changed
+
+- `MOODLE_URL` without a scheme now defaults to `https://`, and plain
+  `http://` is rejected unless the host is loopback or the escape hatch is
+  set — the token (and on `auth`, the password) would otherwise travel in
+  cleartext
+- `download_file` refuses to overwrite an existing `save_to` instead of
+  silently replacing it
+- HTTP responses are classified by status before parsing: 429/503/502/504
+  produce typed back-off errors honoring `Retry-After`, a 429/503 arms a
+  process-wide cooldown that fails further calls locally until it expires,
+  and a 429 whose JSON body is not a Moodle exception is no longer returned
+  as a successful response
+
+### Fixed
+
+- `fetch_file` no longer writes a predictable temp file for document
+  conversion (a symlink/TOCTOU hazard on multi-user machines) — documents
+  are converted fully in memory, with one less disk round-trip
+
 ## [0.1.4] - 2026-10-15
 
 ### Fixed
