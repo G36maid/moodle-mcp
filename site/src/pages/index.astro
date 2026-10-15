@@ -14,10 +14,10 @@ const tools22 = [
 const chips = [...tools22, ...tools22];
 
 const clients = [
-  { glyph: '$', name: 'Claude Code', desc: 'claude mcp add moodle 一行接入；.mcp.json 亦可用。', authors: '官方用戶端 · stdio' },
-  { glyph: '~', name: 'Codex', desc: '~/.codex/config.toml 加入 [mcp_servers.moodle] 區塊。', authors: '官方用戶端 · stdio' },
-  { glyph: '◇', name: 'OpenCode', desc: 'opencode.json 的 mcp 區塊宣告 command 與 environment。', authors: '官方用戶端 · stdio' },
-  { glyph: 'π', name: 'pi', desc: '.pi/mcp.json（專案）或 ~/.pi/agent/mcp.json（全域）。', authors: '官方用戶端 · stdio' },
+  { icon: '/assets/claude.svg', iconClass: '', name: 'Claude Code', desc: 'claude mcp add moodle 一行接入；.mcp.json 亦可用。', authors: 'Anthropic · stdio' },
+  { icon: '/assets/codex.svg', iconClass: 'invert-dark', name: 'Codex', desc: '~/.codex/config.toml 加入 [mcp_servers.moodle] 區塊。', authors: 'OpenAI · stdio' },
+  { icon: '/assets/opencode.svg', iconClass: 'tile', name: 'OpenCode', desc: 'opencode.json 的 mcp 區塊宣告 command 與 environment。', authors: 'SST · stdio' },
+  { icon: '/assets/pi-logo.svg', iconClass: '', name: 'pi', desc: '.pi/mcp.json（專案）或 ~/.pi/agent/mcp.json（全域）。', authors: 'earendil-works · stdio' },
 ];
 ---
 <Base title="moodle-mcp — 你最後的下一個助教">
@@ -300,7 +300,7 @@ const clients = [
       <div class="clients">
         {clients.map((c) => (
           <div class="client">
-            <div class="glyph">{c.glyph}</div>
+            <img class={`cicon ${c.iconClass}`} src={c.icon} alt={`${c.name} icon`} width="40" height="40" loading="lazy" />
             <h4>{c.name}</h4>
             <p>{c.desc}</p>
             <div class="authors">{c.authors}</div>

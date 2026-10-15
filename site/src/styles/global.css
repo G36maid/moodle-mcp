@@ -408,7 +408,9 @@ html:not([data-theme="dark"]) .themetoggle .moon { display: none; }
 .clients { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
 .client { border: 1px solid var(--hairline-soft); background: var(--card); border-radius: 10px; padding: 20px 18px 22px; transition: border-color .15s ease, transform .15s ease; }
 .client:hover { border-color: var(--hairline); transform: translateY(-2px); }
-.client .glyph { font-family: var(--mono); font-size: 0.78rem; color: var(--accent-strong); margin-bottom: 10px; }
+.client .cicon { width: 40px; height: 40px; object-fit: contain; margin-bottom: 12px; }
+.client .cicon.tile { border-radius: 9px; border: 1px solid var(--hairline-soft); }
+[data-theme="dark"] .client .cicon.invert-dark { filter: invert(1); }
 .mcp-logo { display: block; }
 [data-theme="dark"] .mcp-logo.light { display: none; }
 html:not([data-theme="dark"]) .mcp-logo.dark { display: none; }
