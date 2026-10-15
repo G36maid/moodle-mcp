@@ -81,9 +81,16 @@ pub async fn detect_timezone(
     .await;
     let (forced, site_default) = match config {
         Ok(Ok(config)) => timezones_from_mobile_config(&config),
-        // No answer, or not web-service JSON (e.g. an HTML error page): the
-        // profile calls would fail the same way.
-        Ok(Err(e @ (MoodleError::Http(_) | MoodleError::NonJsonResponse(_)))) => {
+        // No answer, not web-service JSON (e.g. an HTML error page), or a
+        // proxy/gateway status (429/5xx — the lookup would hammer a site
+        // that is already telling us to back off): the profile calls would
+        // fail the same way.
+        Ok(Err(
+            e @ (MoodleError::Http(_)
+            | MoodleError::NonJsonResponse(_)
+            | MoodleError::HttpStatus { .. }
+            | MoodleError::HttpCooldown { .. }),
+        )) => {
             let error = scrub_token(&e.to_string());
             tracing::info!(%error, "timezone lookup got no web-service answer");
             return None;

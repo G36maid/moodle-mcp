@@ -30,6 +30,20 @@ jobs:
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
 
+  # Dependency vulnerability scan: fails the build on any RustSec advisory
+  # match. The dependency surface is small enough that no warning-only grace
+  # period is needed.
+  security-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@cargo-audit
+
+      - name: Audit
+        run: cargo audit
+
   # Tests on every platform we ship binaries for — issue reporters run the
   # Windows release binary, and path handling (temp dirs, save_to parents,
   # download_file) is exactly where OS differences bite.

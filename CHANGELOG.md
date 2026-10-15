@@ -6,6 +6,27 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- file tools accept only same-site Moodle URLs — external links belong to the
+  agent's own web tooling (`MOODLE_ALLOW_EXTERNAL_FETCH=1` opts out)
+- `MOODLE_ALLOW_HTTP=1` / `auth --allow-http` allow plain-http sites (local
+  test instances on loopback hosts need no flags)
+- `MOODLE_UA` overrides the User-Agent on both HTTP clients (default stays
+  `moodle-mcp/{version}`)
+- `MOODLE_LOG_LEVEL` sets the log level (`error|warn|info|debug|trace`,
+  default `info`); `RUST_LOG` remains the advanced escape hatch
+- a `download_file` `overwrite` parameter (`false` by default) for
+  intentional re-downloads
+- a `cargo-audit` CI job failing the build on RustSec advisory matches
+
+### Changed
+
+- `MOODLE_URL` without a scheme now defaults to `https://`, and plain
+  `http://` is rejected unless the host is loopback or the escape hatch is
+  set — the token (and on `auth`, the password) would otherwise travel in
+  cleartext
+
 ### Fixed
 
 - timestamps render in the timezone Moodle itself uses for the user: the
@@ -14,6 +35,9 @@ follows [Semantic Versioning](https://semver.org/).
   The 0.1.2 detection read a user preference, but Moodle keeps the timezone
   in the user record, so without `MOODLE_TIMEZONE` stock sites fell back to
   UTC (#8)
+- `fetch_file` no longer writes a predictable temp file for document
+  conversion (a symlink/TOCTOU hazard on multi-user machines) — documents
+  are converted fully in memory, with one less disk round-trip
 
 ## [0.1.4] - 2026-10-15
 

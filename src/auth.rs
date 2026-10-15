@@ -24,6 +24,7 @@ pub async fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     let mut username: Option<String> = None;
     let mut password: Option<String> = None;
     let mut service: Option<String> = None;
+    let mut allow_http = false;
     let mut open_browser = false;
     let mut output_json = false;
 
@@ -34,6 +35,7 @@ pub async fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
             "--username" | "-u" => username = it.next().cloned(),
             "--password" | "-p" => password = it.next().cloned(),
             "--service" | "-s" => service = it.next().cloned(),
+            "--allow-http" => allow_http = true,
             "--open" => open_browser = true,
             "--output" | "-o" => {
                 let val = it
@@ -51,7 +53,7 @@ pub async fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
             other => {
                 eprintln!("moodle-mcp auth: unknown argument '{other}'");
                 return Err(
-                    "usage: moodle-mcp auth [--url <site>] [--username U] [--password P] [--service S] [--open] [--output env|json]\nvalues not passed as flags are prompted for interactively"
+                    "usage: moodle-mcp auth [--url <site>] [--username U] [--password P] [--service S] [--allow-http] [--open] [--output env|json]\nvalues not passed as flags are prompted for interactively"
                         .into(),
                 );
             }
@@ -61,6 +63,16 @@ pub async fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     let base_url = match url {
         Some(u) => u.trim_end_matches('/').to_string(),
         None => prompt_url()?,
+    };
+    // One policy for both entry points (serve validates MOODLE_URL the same
+    // way): schemeless defaults to https; plain http is rejected unless
+    // loopback or explicitly allowed — the password is about to cross it.
+    let base_url = match crate::config::normalize_site_url(&base_url, allow_http) {
+        Ok(u) => u,
+        Err(e) => {
+            eprintln!("moodle-mcp auth: {e}");
+            return Err("invalid site URL".into());
+        }
     };
 
     if open_browser {
@@ -112,15 +124,18 @@ pub async fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
 
 /// Prompt for the site URL until it looks like an http(s) URL.
 fn prompt_url() -> Result<String, Box<dyn std::error::Error>> {
+    // The scheme/host policy lives in `normalize_site_url` (applied after the
+    // prompt returns) — the validator only catches obvious typos early.
     Text::new("Moodle URL (e.g. https://moodle.example.com)")
         .with_validator(|s: &str| {
             let s = s.trim();
-            if s.starts_with("http://") || s.starts_with("https://") {
-                Ok(Validation::Valid)
-            } else {
+            if s.is_empty() || s.contains(char::is_whitespace) {
                 Ok(Validation::Invalid(
-                    "enter the full site URL, starting with https://".into(),
+                    "enter the site URL, e.g. https://moodle.example.com (a bare host defaults to https)"
+                        .into(),
                 ))
+            } else {
+                Ok(Validation::Valid)
             }
         })
         .prompt()

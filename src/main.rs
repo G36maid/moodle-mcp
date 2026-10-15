@@ -13,7 +13,26 @@ use rmcp::{ServiceExt, transport::stdio};
 use tracing_subscriber::EnvFilter;
 
 fn init_tracing() {
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    // Product level first (closed set): MOODLE_LOG_LEVEL=error|warn|info|
+    // debug|trace — trace is the only content-bearing level (response body
+    // snippets land in the log — users of shared machines should not enable
+    // it). RUST_LOG stays as the advanced escape hatch
+    // (EnvFilter per-module syntax); invalid product values warn and fall
+    // through to it, then to info.
+    let raw_level = std::env::var("MOODLE_LOG_LEVEL")
+        .ok()
+        .map(|v| v.trim().to_ascii_lowercase())
+        .filter(|v| !v.is_empty());
+    let filter = match raw_level.as_deref() {
+        Some(level @ ("error" | "warn" | "info" | "debug" | "trace")) => EnvFilter::new(level),
+        Some(invalid) => {
+            eprintln!(
+                "moodle-mcp: invalid MOODLE_LOG_LEVEL '{invalid}' (error|warn|info|debug|trace) — falling back to RUST_LOG/info"
+            );
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"))
+        }
+        None => EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+    };
     tracing_subscriber::fmt()
         .with_env_filter(filter)
         // stdout is reserved for the MCP JSON-RPC stream — never write there.

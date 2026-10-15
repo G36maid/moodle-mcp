@@ -122,6 +122,8 @@ pub struct DownloadFileParams {
     url: String,
     /// Local path to write the content to
     save_to: String,
+    /// Replace save_to if it already exists (default: refuse to overwrite)
+    overwrite: Option<bool>,
 }
 
 #[derive(Deserialize, schemars::JsonSchema)]
@@ -353,6 +355,21 @@ impl MoodleMcp {
             .collect();
         *self.courses_cache.write().await = Some((std::time::Instant::now(), ids.clone()));
         Ok(ids)
+    }
+    /// Same-site guard for the file tools: the MCP process makes requests
+    /// the agent's harness cannot see or gate, so its footprint stays inside
+    /// the Moodle site (plus the canonical wwwroot host from site info, for
+    /// alias-configured sites). MOODLE_ALLOW_EXTERNAL_FETCH=1 opts out.
+    async fn file_url_guard(&self, url: &str) -> Result<(), MoodleError> {
+        if self.client.allow_external_fetch() {
+            return Ok(());
+        }
+        let siteurl = self
+            .site_info_cached()
+            .await
+            .ok()
+            .and_then(|v| v.get("siteurl").and_then(Value::as_str).map(str::to_string));
+        self.client.ensure_same_site(url, siteurl.as_deref())
     }
 }
 
@@ -749,25 +766,39 @@ impl MoodleMcp {
     // ---------- files ----------
 
     #[tool(
-        description = "Fetch a Moodle file and return its content as markdown: documents (PDF, Word, PowerPoint, Excel, ODF, RTF, EPUB, CSV), HTML pages and plain text are returned inline; other binaries (zip, images) are rejected — use download_file instead.",
+        description = "Fetch a Moodle file and return its content as markdown: documents (PDF, Word, PowerPoint, Excel, ODF, RTF, EPUB, CSV), HTML pages and plain text are returned inline; other binaries (zip, images) are rejected — use download_file instead. Only same-site Moodle URLs are accepted; for external links use your own web tooling (MOODLE_ALLOW_EXTERNAL_FETCH=1 opts out).",
         annotations(read_only_hint = true)
     )]
     async fn fetch_file(
         &self,
         Parameters(p): Parameters<FetchFileParams>,
     ) -> Result<CallToolResult, McpError> {
+        if let Err(e) = self.file_url_guard(&p.url).await {
+            return finish(Err(e));
+        }
         finish(files::fetch_file(&self.client, &p.url).await)
     }
 
     #[tool(
-        description = "Download a Moodle file to a local path (metadata only — binary payloads never enter the conversation).",
+        description = "Download a Moodle file to a local path (metadata only — binary payloads never enter the conversation). Refuses to overwrite an existing save_to unless overwrite=true. Only same-site Moodle URLs are accepted; for external links use your own web tooling (MOODLE_ALLOW_EXTERNAL_FETCH=1 opts out).",
         annotations(destructive_hint = false, idempotent_hint = true)
     )]
     async fn download_file(
         &self,
         Parameters(p): Parameters<DownloadFileParams>,
     ) -> Result<CallToolResult, McpError> {
-        finish(files::download_file(&self.client, &p.url, &p.save_to).await)
+        if let Err(e) = self.file_url_guard(&p.url).await {
+            return finish(Err(e));
+        }
+        finish(
+            files::download_file(
+                &self.client,
+                &p.url,
+                &p.save_to,
+                p.overwrite.unwrap_or(false),
+            )
+            .await,
+        )
     }
 
     #[tool(
