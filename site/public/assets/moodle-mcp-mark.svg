@@ -48,9 +48,10 @@
   <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#techGrid)"/>
   <rect x="16" y="16" width="480" height="480" rx="112" fill="none" stroke="url(#cardBorder)" stroke-width="3"/>
 
-  <!-- The mark, lifted verbatim from the banner (m + cap + 3 pads + metro network) -->
-  <g transform="translate(76.5, 106.5) scale(1.34)">
-    <g transform="translate(-15.7, -59)">
+  <!-- The full mark from the banner: m + cap + 3 pads + complete metro network.
+       Content bbox: x 15.7..289.75, y 59.35..281.75 → centered at scale 1.34. -->
+  <g transform="translate(72.4, 107) scale(1.34)">
+    <g transform="translate(-15.7, -59.35)">
       <g transform="translate(15.7, 7.9) scale(0.69)" filter="url(#mDropShadow)">
         <!-- Official 'm' -->
         <path fill="url(#moodleTextGrad)" d="M289.6,309.8V201.5c0-22.6-9.4-34-28-34c-18.7,0-28.1,11.3-28.1,34v108.3h-55.1V201.5
@@ -79,11 +80,14 @@
         <path d="M 81.4 212.2 V 234" stroke="#A78BFA"/>
         <path d="M 157.8 212.2 V 234" stroke="#818CF8"/>
         <path d="M 234.5 212.2 V 234" stroke="#6EE7B7"/>
+        <!-- Branches A (left interchange) -->
         <path d="M 81.4 234 H 58 A 6 6 0 0 0 52 240 V 258" stroke="#38BDF8"/>
         <path d="M 81.4 234 V 244 A 6 6 0 0 1 75.4 250 H 40 A 6 6 0 0 0 34 256 V 272" stroke="#34D399"/>
         <path d="M 81.4 234 V 246 A 6 6 0 0 0 87.4 252 H 118 A 6 6 0 0 1 124 258 V 272" stroke="#A78BFA"/>
+        <!-- Branches B (middle interchange) -->
         <path d="M 157.8 234 V 256" stroke="#A78BFA"/>
         <path d="M 157.8 234 V 244 A 6 6 0 0 0 163.8 250 H 186 A 6 6 0 0 1 192 256 V 268" stroke="#F472B6"/>
+        <!-- Branches C (right interchange) -->
         <path d="M 234.5 234 H 258 A 6 6 0 0 1 264 240 V 258" stroke="#F472B6"/>
         <path d="M 234.5 234 H 278 A 6 6 0 0 1 284 240 V 266" stroke="#38BDF8"/>
         <path d="M 234.5 234 V 252" stroke="#34D399"/>
