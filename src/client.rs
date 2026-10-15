@@ -1,3 +1,4 @@
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use serde_json::Value;
@@ -20,6 +21,13 @@ pub struct MoodleClient {
     download_http: reqwest::Client,
     base_url: String,
     token: String,
+    /// Local cooldown gate after a 429/503: `Some((status, until epoch secs))`.
+    /// While active, `call()` fails locally without touching the network —
+    /// an agent's blind retry loop becomes fast local failures instead of a
+    /// request storm against the school's server. One process serves one
+    /// site and one token, so a process-global gate matches the per-token
+    /// limiting Moodle/proxies apply.
+    cooldown: Arc<Mutex<Option<(u16, i64)>>>,
 }
 
 /// Redirect confinement: only redirects that ORIGINATE from the Moodle site
@@ -76,7 +84,17 @@ impl MoodleClient {
             download_http,
             base_url: cfg.base_url,
             token: cfg.token,
+            cooldown: Arc::new(Mutex::new(None)),
         })
+    }
+
+    fn parse_retry_after(header: Option<&reqwest::header::HeaderValue>) -> Option<u64> {
+        header?.to_str().ok()?.trim().parse::<u64>().ok()
+    }
+
+    fn start_cooldown(&self, status: u16, retry_after: u64) {
+        let until = crate::util::now_unix() + retry_after as i64;
+        *self.cooldown.lock().unwrap() = Some((status, until));
     }
 
     /// Generate a web service token via `POST /login/token.php`.
@@ -143,6 +161,18 @@ impl MoodleClient {
         ];
         flatten_json(params, "", &mut form);
 
+        // Local cooldown gate: after a 429/503 we stop hitting the wire
+        // entirely — the request is refused without leaving the process.
+        let now = crate::util::now_unix();
+        if let Some((status, until)) = *self.cooldown.lock().unwrap()
+            && now < until
+        {
+            return Err(MoodleError::HttpCooldown {
+                status,
+                retry_after: (until - now) as u64,
+            });
+        }
+
         let resp = self
             .http
             .post(&url)
@@ -152,27 +182,57 @@ impl MoodleClient {
             .map_err(MoodleError::from)?;
 
         let status = resp.status();
+        let retry_after = Self::parse_retry_after(resp.headers().get(reqwest::header::RETRY_AFTER));
         let text = resp.text().await.map_err(MoodleError::from)?;
         tracing::debug!(wsfunction, %status, bytes = text.len(), "moodle ws response");
         tracing::trace!(body = truncate(&text, 1000), "moodle ws body");
-        let value: Value = serde_json::from_str(&text).map_err(|_| {
-            MoodleError::NonJsonResponse(format!(
-                "expected JSON, got HTTP {status}: {}",
-                truncate(&text, 300)
-            ))
-        })?;
+        let parsed: Option<Value> = serde_json::from_str(&text).ok();
 
-        if value
-            .as_object()
+        // 429/503 start the cooldown regardless of body shape — the back-off
+        // signal comes from the status line (proxies/WAFs in front of Moodle
+        // send HTML error pages; Moodle maintenance sends 503 + Retry-After).
+        if matches!(status.as_u16(), 429 | 503) {
+            let secs = retry_after.unwrap_or(if status.as_u16() == 503 { 300 } else { 30 });
+            self.start_cooldown(status.as_u16(), secs);
+        }
+
+        // Moodle exception payloads can arrive with any status (the error
+        // convention is HTTP 200, but proxies/gateways may alter it) — keep
+        // mapping them first.
+        if parsed
+            .as_ref()
+            .and_then(Value::as_object)
             .is_some_and(|obj| obj.contains_key("exception"))
         {
-            let exc = serde_json::from_value(value).unwrap_or(MoodleException {
+            let exc = serde_json::from_value(parsed.unwrap()).unwrap_or(MoodleException {
                 exception: "unknown".into(),
                 errorcode: "unknown".into(),
                 message: truncate(&text, 200).to_string(),
             });
             return Err(MoodleError::from_exception(exc));
         }
+
+        if !status.is_success() {
+            let code = status.as_u16();
+            if matches!(code, 429 | 503 | 502 | 504) {
+                let secs = retry_after.unwrap_or(if code == 503 { 300 } else { 30 });
+                return Err(MoodleError::HttpStatus {
+                    status: code,
+                    retry_after: secs,
+                });
+            }
+            return Err(MoodleError::NonJsonResponse(format!(
+                "expected JSON, got HTTP {status}: {}",
+                truncate(&text, 300)
+            )));
+        }
+
+        let value = parsed.ok_or_else(|| {
+            MoodleError::NonJsonResponse(format!(
+                "expected JSON, got HTTP {status}: {}",
+                truncate(&text, 300)
+            ))
+        })?;
         Ok(value)
     }
 
@@ -447,5 +507,99 @@ mod tests {
             )
             .unwrap();
         assert_eq!(u.query_pairs().filter(|(k, _)| k == "token").count(), 1);
+    }
+}
+
+#[cfg(test)]
+mod backoff_tests {
+    use super::*;
+    use crate::config::Config;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    fn client_for(uri: &str) -> MoodleClient {
+        MoodleClient::new(Config {
+            base_url: uri.into(),
+            token: "t".into(),
+            timeout_secs: 10,
+            timezone: None,
+            read_only: false,
+            disabled_tools: Vec::new(),
+            user_agent: None,
+        })
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn json_429_without_exception_is_not_success() {
+        // A front component (Cloudflare-style) 429 with a JSON body used to be
+        // returned as a successful response: no `exception` key, status ignored.
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/webservice/rest/server.php"))
+            .respond_with(
+                ResponseTemplate::new(429)
+                    .set_body_json(serde_json::json!({"success": false, "errors": []})),
+            )
+            .mount(&server)
+            .await;
+        let client = client_for(&server.uri());
+        let err = client
+            .call("core_webservice_get_site_info", &serde_json::json!({}))
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, MoodleError::HttpStatus { status: 429, .. }),
+            "{err}"
+        );
+        // The cooldown gate now rejects the next call locally.
+        let err = client
+            .call("core_webservice_get_site_info", &serde_json::json!({}))
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, MoodleError::HttpCooldown { status: 429, .. }),
+            "{err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn retry_after_header_is_honored() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/webservice/rest/server.php"))
+            .respond_with(ResponseTemplate::new(503).insert_header("Retry-After", "120"))
+            .mount(&server)
+            .await;
+        let client = client_for(&server.uri());
+        let err = client
+            .call("core_webservice_get_site_info", &serde_json::json!({}))
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("retry after 120s"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn moodle_exception_on_non_200_still_maps_without_cooldown() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/webservice/rest/server.php"))
+            .respond_with(ResponseTemplate::new(500).set_body_json(serde_json::json!({
+                "exception": "moodle_exception",
+                "errorcode": "dberror",
+                "message": "database is sad"
+            })))
+            .expect(2)
+            .mount(&server)
+            .await;
+        let client = client_for(&server.uri());
+        for _ in 0..2 {
+            let err = client
+                .call("core_webservice_get_site_info", &serde_json::json!({}))
+                .await
+                .unwrap_err();
+            assert!(err.to_string().contains("dberror"), "{err}");
+        }
+        // 500 is not a back-off signal: both calls reached the wire.
     }
 }
