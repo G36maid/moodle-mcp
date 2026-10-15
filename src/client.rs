@@ -48,11 +48,16 @@ impl MoodleClient {
         let base = url::Url::parse(&cfg.base_url)
             .map_err(|e| MoodleError::Config(format!("invalid MOODLE_URL: {e}")))?;
         let base_host = base.host_str().map(str::to_string);
-        let ua = concat!("moodle-mcp/", env!("CARGO_PKG_VERSION"));
+        // MOODLE_UA overrides for institutional-filtering edge cases; the
+        // honest default stays moodle-mcp/{version}.
+        let ua = cfg
+            .user_agent
+            .clone()
+            .unwrap_or_else(|| concat!("moodle-mcp/", env!("CARGO_PKG_VERSION")).to_string());
         let http = reqwest::Client::builder()
             .timeout(Duration::from_secs(cfg.timeout_secs))
             .redirect(redirect_policy(base_host.clone()))
-            .user_agent(ua)
+            .user_agent(&ua)
             .build()
             .map_err(|e| MoodleError::Config(format!("failed to build HTTP client: {e}")))?;
         // File transfers: the total timeout above would abort any large
@@ -63,7 +68,7 @@ impl MoodleClient {
             .connect_timeout(Duration::from_secs(30))
             .read_timeout(Duration::from_secs(cfg.timeout_secs.max(60)))
             .redirect(redirect_policy(base_host))
-            .user_agent(ua)
+            .user_agent(&ua)
             .build()
             .map_err(|e| MoodleError::Config(format!("failed to build HTTP client: {e}")))?;
         Ok(Self {
@@ -362,6 +367,7 @@ mod tests {
                 timezone: None,
                 read_only: false,
                 disabled_tools: Vec::new(),
+                user_agent: None,
             })
             .unwrap()
         };

@@ -424,6 +424,7 @@ mod tests {
             timezone: None,
             read_only: false,
             disabled_tools: Vec::new(),
+            user_agent: None,
         })
         .unwrap();
         let resp = client

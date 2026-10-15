@@ -17,6 +17,10 @@ pub struct Config {
     /// Additional tool names to hide (MOODLE_DISABLE_TOOLS, comma-separated);
     /// unknown names warn at startup instead of failing it.
     pub disabled_tools: Vec<String>,
+    /// Optional User-Agent override (MOODLE_UA). Defaults to the honest
+    /// `moodle-mcp/{version}`; the override exists for institutional-filtering
+    /// edge cases, not as a stealth feature.
+    pub user_agent: Option<String>,
 }
 
 /// Normalize a site URL and enforce the https policy: schemeless input
@@ -94,6 +98,10 @@ impl Config {
                     .collect()
             })
             .unwrap_or_default();
+        let user_agent = std::env::var("MOODLE_UA")
+            .ok()
+            .map(|v| v.trim().to_string())
+            .filter(|v| !v.is_empty());
         Ok(Self {
             base_url,
             token,
@@ -101,6 +109,7 @@ impl Config {
             timezone,
             read_only,
             disabled_tools,
+            user_agent,
         })
     }
 }
