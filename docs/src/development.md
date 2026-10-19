@@ -18,7 +18,7 @@ cargo test
 
 ## Bird's-eye view of the codebase
 
-The server is small enough to read in one sitting — five modules carry
+The server is small enough to read in one sitting — six modules carry
 everything:
 
 - `src/main.rs` is a thin binary: no arguments serves MCP over stdio, and
@@ -41,10 +41,47 @@ everything:
   a markdown rendering in `text`. Nulls are stripped recursively because
   Moodle 3.7 omits many fields. Only markdown is truncated
   (`MAX_DOC_CHARS`), never the JSON.
+- `src/sso/` holds the per-school SSO drivers — one self-contained file
+  per school whose login cannot go through `login/token.php` (SSO
+  portals: the password belongs to the identity provider). See the next
+  section.
 - `tests/` mirrors the suite CI runs: `tests/client_integration.rs`
   mocks the REST endpoint with wiremock, and `tests/mcp_protocol.rs`
   runs the real server over an in-memory duplex transport — protocol
   behavior is tested without a socket or a Moodle.
+
+## Adding a school's SSO driver
+
+`src/sso/` exists because some schools federate login through a portal
+(OIDC/SAML): the password belongs to the identity provider, so the
+credentials mode answers `invalidlogin` no matter what. Each school gets
+one self-contained file — `src/sso/ntust.rs` is the reference — holding
+the metadata (host, Moodle version, identity provider, the date the flow
+was verified live), the host match, and the whole replayed chain.
+`src/sso/mod.rs` carries the shared launch-flow helpers (`launch.php`
+URL building, `moodlemobile://` payload decoding, token validation) and
+the host-matched dispatch; `auth` consults it before any request moves,
+so schools without a driver simply use the credentials mode.
+
+Adding a school is one file plus one arm:
+
+1. Copy `src/sso/ntust.rs` as the template and keep the metadata block
+   honest — a flow verified live on a date, or not verified at all.
+2. Adjust the replayed chain to the school's portal. Every step's error
+   message names what broke, and the password never crosses plain http
+   (the loopback carve-out matches `MOODLE_ALLOW_HTTP`).
+3. Add the `matches(host)` arm to `school_for` in `src/sso/mod.rs`.
+4. Cover the whole chain with an offline wiremock test (see the one in
+   `ntust.rs`), then verify once against the live portal before opening
+   the PR — responsibly: authorized accounts, a handful of requests,
+   and weaknesses you notice go to the school, not to this repository
+   (see [Security & Authentication](security.md#testing-schools-responsibly)).
+
+Never probe or guess: `school_for` is an exact host match, so an
+unknown school fails with guidance instead of leaking credentials to
+the wrong form. If a second school turns out to share the same flow
+shape, extract the shared steps into a family module then — one member
+is not a family.
 
 ## Rules the codebase enforces
 

@@ -99,3 +99,23 @@ finish while stalled connections still die.
   page (`/user/managetoken.php`).
 - Avoid `MOODLE_LOG_LEVEL=trace` on shared machines — it logs
   response-body snippets.
+
+## Testing Schools Responsibly
+
+Verifying an SSO driver means logging into a school's production portal
+with a real account — treat the school's systems and reputation as part
+of the job:
+
+- **Authorized accounts only.** Verify with an account you own or one
+  you are explicitly permitted to test; school infrastructure remains
+  the school's property, and its acceptable-use policy applies.
+- **A handful of requests is the norm.** A driver verification is a
+  single-digit number of HTTP calls. Never scan, brute-force, stress,
+  or probe beyond what the driver needs.
+- **Weaknesses you notice belong to the school.** An unenforced
+  captcha, a broken certificate chain, an open redirect — report it
+  through the school's own channel (the computer center) instead of
+  this repository. Keep such observations out of code, commit messages,
+  docs and issue trackers; private local notes in the gitignored
+  `.secrets/` directory are the place. The driver's documentation
+  states what works, never what is broken.
