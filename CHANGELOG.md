@@ -22,11 +22,11 @@ follows [Semantic Versioning](https://semver.org/).
 - a `download_file` `overwrite` parameter (`false` by default) for
   intentional re-downloads
 - a `cargo-audit` CI job failing the build on RustSec advisory matches
-- an SSO driver for schools that federate login through OIDC portals: when
-  the credentials mode answers `invalidlogin`, auth automatically replays
-  the school's own login chain over plain HTTP — no browser, no token
-  paste — and the resulting token is validated before it is shown
-  (verified live against NTUST's IdentityServer portal)
+- per-school SSO drivers under `src/sso/` (one file, one PR): auth
+  dispatches by host — a school with a maintained driver replays its own
+  login chain over plain HTTP (no browser, no token paste) and the token
+  is validated before it is shown; every other school uses the
+  credentials mode (verified live against NTUST's IdentityServer portal)
 
 ### Removed
 

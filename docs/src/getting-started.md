@@ -69,11 +69,11 @@ moodle-mcp auth
 Keep the two values it prints (`MOODLE_URL` and `MOODLE_TOKEN`) — you'll
 paste them in the next step.
 
-> **Tip:** If your school signs in through single sign-on, `auth` detects
-> it and replays the school's portal with the same credentials — no
-> separate Moodle password needed. If that fails (e.g. an enforced
-> captcha), ask your Moodle admin for a token (see
-> [Security & Authentication](./security.md)).
+> **Tip:** Schools with a maintained SSO driver (see
+> [Security & Authentication](./security.md)) get their portal replayed
+> by `auth` with the same credentials — no separate Moodle password
+> needed. Every other school uses the credentials mode; if that answers
+> `invalidlogin`, ask your Moodle admin for a token.
 
 ## Step 3: Add It to Your Assistant
 

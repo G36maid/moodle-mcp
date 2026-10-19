@@ -15,14 +15,13 @@ moodle-mcp auth
 moodle-mcp auth --url https://moodle.example.com --username yourname
 ```
 
-**SSO-federated schools.** If your institution signs you in through a
-portal (OIDC/SAML), your account may have no local Moodle password —
-the credentials mode then answers `invalidlogin`, and `auth`
-automatically replays the school's own login portal with the same
-credentials instead (no browser; the SSO password travels only to the
-school's portal). If the portal enforces a captcha or does not offer a
-web login, ask your Moodle admin for a token (Site administration →
-Server → Web services → Manage tokens).
+**SSO-federated schools.** auth dispatches by host: a school with a
+maintained driver under the project's `src/sso/` gets its own login
+portal replayed over plain HTTP with the same credentials (no browser;
+the SSO password travels only to the school's portal). Schools without
+a driver use the credentials mode — if that answers `invalidlogin`, ask
+your Moodle admin for a token (Site administration → Server → Web
+services → Manage tokens) or contribute a driver (one file, one PR).
 
 Other flags: `--service` names the web service (default
 `moodle_mobile_app`), `--output json` prints machine-readable output, and
