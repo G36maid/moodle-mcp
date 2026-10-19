@@ -26,7 +26,7 @@
 
 一個 [Model Context Protocol](https://modelcontextprotocol.io) 伺服器，讓 LLM 代理能**操作真實的 Moodle LMS** — 閱讀課程、取得作業 PDF、撰寫程式碼、上傳並繳交作業 — 全部透過單一靜態二進位檔完成。
 
-以 Rust 基於官方 MCP SDK ([`rmcp`](https://crates.io/crates/rmcp)) 建置。已在 **Moodle 3.7 → 5.x** 上完成實際驗證。
+以 Rust 基於官方 MCP SDK ([`rmcp`](https://crates.io/crates/rmcp)) 建置。已在 Moodle 3.7、4.5 與 5.2 上完成實際驗證;面向 **3.7 → 5.x** 設計。
 
 ## ✅ 為什麼需要 moodle-mcp
 
@@ -42,7 +42,7 @@ moodle-mcp 讓代理以你的身分登入。20 個具型別的工具涵蓋完整
 
 ## 🚀 快速開始
 
-需要一個 Moodle 3.7 → 5.x 站點上允許使用手機 App Web Service 的帳號（多數站點皆允許 — 詳見[先決條件](../https://moodle.ntnu.cc/docs/getting-started.html#prerequisites)）。
+需要一個 Moodle 3.7 → 5.x 站點上允許使用手機 App Web Service 的帳號（多數站點皆允許 — 詳見[先決條件](https://moodle.ntnu.cc/docs/getting-started.html#prerequisites)）。
 
 ```bash
 # 1. Install
@@ -61,7 +61,7 @@ claude mcp add moodle \
 #    "What's due in the next two weeks? Plan my studying around it."
 ```
 
-預編譯執行檔、SSO 登入、各客戶端的設定範例，以及完整的環境變數參考：[安裝](../https://moodle.ntnu.cc/docs/installation.html) · [快速入門](../https://moodle.ntnu.cc/docs/getting-started.html) · [設定](../https://moodle.ntnu.cc/docs/configuration.html)
+預編譯執行檔、SSO 登入、各客戶端的設定範例，以及完整的環境變數參考：[安裝](https://moodle.ntnu.cc/docs/installation.html) · [快速入門](https://moodle.ntnu.cc/docs/getting-started.html) · [設定](https://moodle.ntnu.cc/docs/configuration.html)
 
 ## 💬 代理能做什麼
 
@@ -97,18 +97,18 @@ flowchart TD
 
 ## 📚 說明文件
 
-完整說明文件位於 [`docs/`](../https://moodle.ntnu.cc/docs/)（mdBook — 在本機執行 `mdbook serve docs` 即可閱讀）：
+完整說明文件位於 [`docs/`](https://moodle.ntnu.cc/docs/)（mdBook — 在本機執行 `mdbook serve docs` 即可閱讀）：
 
 | 頁面 | 內容 |
 |---|---|
-| [快速入門](../https://moodle.ntnu.cc/docs/getting-started.html) | 從零到第一個提示詞；不需要 MCP 經驗 |
-| [安裝](../https://moodle.ntnu.cc/docs/installation.html) | 預編譯執行檔、cargo、從原始碼建置 |
-| [設定](../https://moodle.ntnu.cc/docs/configuration.html) | 每個環境變數；Claude Code、Codex、OpenCode 與 pi 的設定範例 |
-| [工具](../https://moodle.ntnu.cc/docs/tools.html) | 完整的 22 個工具參考，以及工具之間的 ID 傳遞關係 |
-| [安全性與驗證](../https://moodle.ntnu.cc/docs/security.html) | 權杖生命週期、傳輸與寫入安全 |
-| [更新日誌](../https://moodle.ntnu.cc/docs/changelog.html) | 逐版本發行說明 |
-| [開發](../https://moodle.ntnu.cc/docs/development.html) | 架構導覽、測試、發佈流程 |
-| [關於](../https://moodle.ntnu.cc/docs/about.html) | moodle-mcp、MCP 與 Moodle 分別是什麼 |
+| [快速入門](https://moodle.ntnu.cc/docs/getting-started.html) | 從零到第一個提示詞；不需要 MCP 經驗 |
+| [安裝](https://moodle.ntnu.cc/docs/installation.html) | 預編譯執行檔、cargo、從原始碼建置 |
+| [設定](https://moodle.ntnu.cc/docs/configuration.html) | 每個環境變數；Claude Code、Codex、OpenCode 與 pi 的設定範例 |
+| [工具](https://moodle.ntnu.cc/docs/tools.html) | 完整的 22 個工具參考，以及工具之間的 ID 傳遞關係 |
+| [安全性與驗證](https://moodle.ntnu.cc/docs/security.html) | 權杖生命週期、傳輸與寫入安全 |
+| [更新日誌](https://moodle.ntnu.cc/docs/changelog.html) | 逐版本發行說明 |
+| [開發](https://moodle.ntnu.cc/docs/development.html) | 架構導覽、測試、發佈流程 |
+| [關於](https://moodle.ntnu.cc/docs/about.html) | moodle-mcp、MCP 與 Moodle 分別是什麼 |
 
 ## 🧰 開發
 
@@ -119,13 +119,13 @@ cargo fmt -- --check
 cargo build --release
 ```
 
-專案說明文件位於 [`docs/`](../https://moodle.ntnu.cc/docs/) — mdBook 格式，以 Prettier 排版（見 `docs/README.md`）；可用 `mdbook serve docs` 預覽。
+專案說明文件位於 [`docs/`](https://moodle.ntnu.cc/docs/) — mdBook 格式，以 Prettier 排版（見 `docs/README.md`）；可用 `mdbook serve docs` 預覽。
 
 專案首頁位於 [`site/`](../site/) — Astro 7 + TypeScript（`cd site && npm install && npm run dev`，以 `npm run build` 建置）。
 
 ## 🔐 安全性
 
-請一律使用 **HTTPS** — 權杖會隨每個請求傳輸。它絕不會出現在工具輸出或錯誤訊息中，也只會被注入同站點的 Moodle 網址，且寫入類工具會在執行前先徵得你同意。完整細節請見[安全性與驗證](../https://moodle.ntnu.cc/docs/security.html)。
+請一律使用 **HTTPS** — 權杖會隨每個請求傳輸。它絕不會出現在工具輸出或錯誤訊息中，也只會被注入同站點的 Moodle 網址，且寫入類工具會在執行前先徵得你同意。完整細節請見[安全性與驗證](https://moodle.ntnu.cc/docs/security.html)。
 
 ## 📄 授權條款
 

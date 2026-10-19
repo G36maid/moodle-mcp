@@ -42,7 +42,8 @@ agent typed tools instead, and gets out of the way.
 - **Agent-native.** Tools take and return local file paths instead of
   base64; results embed the IDs for the next tool; errors are
   plain-language and suggest the fix.
-- **Version-adaptive.** Validated live against Moodle 3.7 → 5.x; response
+- **Version-adaptive.** Verified live against Moodle 3.7, 4.5 and 5.2
+  (3.7 and 4.5 on live sites, 5.2 on a self-hosted instance); response
   differences between versions are absorbed by the server.
 - **Safe by default.** Write tools require explicit confirmation, drafts
   are preferred over irreversible submissions, plain HTTP is rejected, and

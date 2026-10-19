@@ -8,6 +8,9 @@ follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- the tool surface is verified against a self-hosted Moodle 5.2.4 as
+  well — the supported range is now live-checked at both ends (3.7 and
+  4.5 on live sites, 5.2 self-hosted)
 - capped list tools report `has_more` (notifications, conversations) —
   the model can tell "all of them" from "the newest N"
 

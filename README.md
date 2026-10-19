@@ -29,7 +29,7 @@ LLM agents **use a real Moodle LMS** — read courses, fetch assignment PDFs,
 write code, upload and submit — through a single static binary.
 
 Built in Rust on the official MCP SDK ([`rmcp`](https://crates.io/crates/rmcp)).
-Validated live against **Moodle 3.7 → 5.x**.
+Verified live against Moodle 3.7, 4.5 and 5.2; designed for **3.7 → 5.x**.
 
 ## ✅ Why
 

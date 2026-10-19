@@ -26,7 +26,7 @@
 
 Un servidor [Model Context Protocol](https://modelcontextprotocol.io) que permite a los agentes LLM **usar un Moodle LMS real** — consultar cursos, extraer PDFs de tareas, escribir código, subir archivos y entregar — todo a través de un único binario estático.
 
-Construido en Rust sobre el SDK oficial de MCP ([`rmcp`](https://crates.io/crates/rmcp)). Validado en entornos reales con **Moodle 3.7 → 5.x**.
+Construido en Rust sobre el SDK oficial de MCP ([`rmcp`](https://crates.io/crates/rmcp)). Verificado en entornos reales con Moodle 3.7, 4.5 y 5.2; diseñado para **3.7 → 5.x**.
 
 ## ✅ Por qué moodle-mcp
 
@@ -42,7 +42,7 @@ moodle-mcp inicia sesión con el agente como tú. 20 herramientas tipadas cubren
 
 ## 🚀 Inicio rápido
 
-Necesita una cuenta de **Moodle 3.7 → 5.x** en un sitio que permita el servicio web de la app móvil (la mayoría lo permiten — ver [requisitos previos](../https://moodle.ntnu.cc/docs/getting-started.html#prerequisites)).
+Necesita una cuenta de **Moodle 3.7 → 5.x** en un sitio que permita el servicio web de la app móvil (la mayoría lo permiten — ver [requisitos previos](https://moodle.ntnu.cc/docs/getting-started.html#prerequisites)).
 
 ```bash
 # 1. Install
@@ -61,7 +61,7 @@ claude mcp add moodle \
 #    "What's due in the next two weeks? Plan my studying around it."
 ```
 
-Binarios precompilados, inicio de sesión SSO, fragmentos de configuración para cada cliente y la referencia completa de variables de entorno: [Instalación](../https://moodle.ntnu.cc/docs/installation.html) · [Primeros pasos](../https://moodle.ntnu.cc/docs/getting-started.html) · [Configuración](../https://moodle.ntnu.cc/docs/configuration.html)
+Binarios precompilados, inicio de sesión SSO, fragmentos de configuración para cada cliente y la referencia completa de variables de entorno: [Instalación](https://moodle.ntnu.cc/docs/installation.html) · [Primeros pasos](https://moodle.ntnu.cc/docs/getting-started.html) · [Configuración](https://moodle.ntnu.cc/docs/configuration.html)
 
 ## 💬 Qué puede hacer el agente
 
@@ -96,18 +96,18 @@ Todo lo que las herramientas dedicadas no cubren está disponible a través de l
 
 ## 📚 Documentación
 
-La documentación completa vive en [`docs/`](../https://moodle.ntnu.cc/docs/) (mdBook — `mdbook serve docs` para leerla en local):
+La documentación completa vive en [`docs/`](https://moodle.ntnu.cc/docs/) (mdBook — `mdbook serve docs` para leerla en local):
 
 | Página | Contenido |
 |---|---|
-| [Primeros pasos](../https://moodle.ntnu.cc/docs/getting-started.html) | de cero al primer prompt; no se asume experiencia con MCP |
-| [Instalación](../https://moodle.ntnu.cc/docs/installation.html) | binarios precompilados, cargo, desde el código fuente |
-| [Configuración](../https://moodle.ntnu.cc/docs/configuration.html) | todas las variables de entorno; fragmentos de configuración para Claude Code, Codex, OpenCode y pi |
-| [Herramientas](../https://moodle.ntnu.cc/docs/tools.html) | la referencia completa de las 22 herramientas y el flujo de IDs entre ellas |
-| [Seguridad y autenticación](../https://moodle.ntnu.cc/docs/security.html) | ciclo de vida del token, seguridad de transporte y de escritura |
-| [Changelog](../https://moodle.ntnu.cc/docs/changelog.html) | notas de versión, versión por versión |
-| [Desarrollo](../https://moodle.ntnu.cc/docs/development.html) | recorrido por la arquitectura, tests, proceso de publicación |
-| [Acerca de](../https://moodle.ntnu.cc/docs/about.html) | qué son moodle-mcp, MCP y Moodle |
+| [Primeros pasos](https://moodle.ntnu.cc/docs/getting-started.html) | de cero al primer prompt; no se asume experiencia con MCP |
+| [Instalación](https://moodle.ntnu.cc/docs/installation.html) | binarios precompilados, cargo, desde el código fuente |
+| [Configuración](https://moodle.ntnu.cc/docs/configuration.html) | todas las variables de entorno; fragmentos de configuración para Claude Code, Codex, OpenCode y pi |
+| [Herramientas](https://moodle.ntnu.cc/docs/tools.html) | la referencia completa de las 22 herramientas y el flujo de IDs entre ellas |
+| [Seguridad y autenticación](https://moodle.ntnu.cc/docs/security.html) | ciclo de vida del token, seguridad de transporte y de escritura |
+| [Changelog](https://moodle.ntnu.cc/docs/changelog.html) | notas de versión, versión por versión |
+| [Desarrollo](https://moodle.ntnu.cc/docs/development.html) | recorrido por la arquitectura, tests, proceso de publicación |
+| [Acerca de](https://moodle.ntnu.cc/docs/about.html) | qué son moodle-mcp, MCP y Moodle |
 
 ## 🧰 Desarrollo
 
@@ -118,13 +118,13 @@ cargo fmt -- --check
 cargo build --release
 ```
 
-La documentación del proyecto vive en [`docs/`](../https://moodle.ntnu.cc/docs/) — mdBook, formateado con Prettier (ver `docs/README.md`); vista previa con `mdbook serve docs`.
+La documentación del proyecto vive en [`docs/`](https://moodle.ntnu.cc/docs/) — mdBook, formateado con Prettier (ver `docs/README.md`); vista previa con `mdbook serve docs`.
 
 La landing page vive en [`site/`](../site/) — Astro 7 + TypeScript (`cd site && npm install && npm run dev`, compilar con `npm run build`).
 
 ## 🔐 Seguridad
 
-Usa **HTTPS** — el token viaja con cada petición. Nunca aparece en la salida de las herramientas ni en los errores, solo se inyecta en URLs de Moodle del mismo sitio, y las herramientas de escritura te piden confirmación antes de actuar. Detalles completos: [Seguridad y autenticación](../https://moodle.ntnu.cc/docs/security.html).
+Usa **HTTPS** — el token viaja con cada petición. Nunca aparece en la salida de las herramientas ni en los errores, solo se inyecta en URLs de Moodle del mismo sitio, y las herramientas de escritura te piden confirmación antes de actuar. Detalles completos: [Seguridad y autenticación](https://moodle.ntnu.cc/docs/security.html).
 
 ## 📄 Licencia
 
