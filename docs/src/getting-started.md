@@ -29,14 +29,12 @@ If your assistant can run commands (Claude Code, Codex, Cursor, OpenCode,
 pi…), it can set the whole thing up for you. Paste this into the chat:
 
 ```text
-Set up moodle-mcp for me. First read https://moodle.ntnu.cc/docs/installation.html
-and https://moodle.ntnu.cc/docs/configuration.html. Then install the binary
-for my platform (prefer the prebuilt archive from the latest GitHub release;
-`cargo install moodle-mcp` as the fallback), run `moodle-mcp auth` in the
-terminal so I can type my school credentials when it prompts, and register
-the server in your own MCP config — name "moodle", stdio command
-`moodle-mcp`, env MOODLE_URL and MOODLE_TOKEN from auth's output. Do not
-store or repeat my credentials anywhere.
+Set up moodle-mcp (github.com/G36maid/moodle-mcp): read docs/src/installation.md
+and docs/src/configuration.md from the repo's main branch first. Then install
+the binary for my platform, run `moodle-mcp auth` in the terminal so I can
+type my school credentials when it prompts, and register the server in your
+own MCP config using the snippet for your harness. Never store or repeat my
+credentials; ask before anything global.
 ```
 
 The assistant installs the binary, walks you through the login in its own
