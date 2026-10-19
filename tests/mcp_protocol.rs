@@ -12,12 +12,13 @@ use wiremock::matchers::{body_string_contains, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 async fn spawn_server(server: &MockServer) -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
-    spawn_server_with(server, false, Vec::new()).await
+    spawn_server_with(server, false, false, Vec::new()).await
 }
 
 async fn spawn_server_with(
     server: &MockServer,
     read_only: bool,
+    enable_ws_function: bool,
     disabled_tools: Vec<String>,
 ) -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
     let client = MoodleClient::new(Config {
@@ -27,13 +28,21 @@ async fn spawn_server_with(
         timezone: None,
         read_only: false,
         disabled_tools: Vec::new(),
+        user_agent: None,
+        allow_external_fetch: false,
+        enable_ws_function,
     })
     .expect("client");
 
     let (server_transport, client_transport) = tokio::io::duplex(64 * 1024);
 
     tokio::spawn(async move {
-        let svc = MoodleMcp::new_with_policy(Arc::new(client), read_only, disabled_tools);
+        let svc = MoodleMcp::new_with_policy(
+            Arc::new(client),
+            read_only,
+            enable_ws_function,
+            disabled_tools,
+        );
         match svc.serve(server_transport).await {
             // Keep the RunningService alive for the whole session.
             Ok(running) => {
@@ -70,12 +79,14 @@ async fn lists_all_tools_over_mcp() {
         .await
         .expect("list_tools");
     let names: Vec<&str> = tools.tools.iter().map(|t| t.name.as_ref()).collect();
-    // Pinned exactly: 22 tools is the design contract — additions or losses
-    // are breaking changes that must be conscious.
+    // Pinned exactly: 20 tools is the default design contract (the escape
+    // hatch pair, list_ws_functions + call_ws_function, is an explicit
+    // MOODLE_ENABLE_WS_FUNCTION opt-in) — additions or losses are breaking
+    // changes that must be conscious.
     assert_eq!(
         names.len(),
-        22,
-        "expected exactly 22 tools, got {}: {names:?}",
+        20,
+        "expected exactly 20 tools, got {}: {names:?}",
         names.len()
     );
     for expected in [
@@ -99,11 +110,12 @@ async fn lists_all_tools_over_mcp() {
         "get_quiz_attempts",
         "get_user",
         "search_users",
-        "call_ws_function",
-        "list_functions",
     ] {
         assert!(names.contains(&expected), "missing tool: {expected}");
     }
+    // the whole escape hatch pair is opt-in
+    assert!(!names.contains(&"list_ws_functions"));
+    assert!(!names.contains(&"call_ws_function"));
 }
 
 #[tokio::test]
@@ -173,7 +185,8 @@ async fn raw_call_rejects_string_params_loudly() {
     let server = MockServer::start().await;
     site_info_mock().mount(&server).await;
 
-    let mcp = spawn_server(&server).await;
+    // raw-call behaviour tests need the escape hatch enabled (it is opt-in).
+    let mcp = spawn_server_with(&server, false, true, Vec::new()).await;
     let args = json!({
         "wsfunction": "core_webservice_get_site_info",
         // A string that is NOT a JSON object — must be rejected loudly.
@@ -214,7 +227,7 @@ async fn raw_call_rejects_unknown_function_with_suggestion() {
         .mount(&server)
         .await;
 
-    let mcp = spawn_server(&server).await;
+    let mcp = spawn_server_with(&server, false, true, Vec::new()).await;
     let args = json!({
         "wsfunction": "mod_forum_get_discussions",
         "params": {"forumid": 1}
@@ -255,7 +268,7 @@ async fn raw_call_rejects_unknown_function_with_suggestion() {
 async fn read_only_mode_hides_write_upload_and_escape_tools() {
     let server = MockServer::start().await;
     site_info_mock().mount(&server).await;
-    let mcp = spawn_server_with(&server, true, Vec::new()).await;
+    let mcp = spawn_server_with(&server, true, false, Vec::new()).await;
 
     let tools = mcp
         .peer()
@@ -263,7 +276,11 @@ async fn read_only_mode_hides_write_upload_and_escape_tools() {
         .await
         .expect("list_tools");
     let names: Vec<&str> = tools.tools.iter().map(|t| t.name.as_ref()).collect();
-    assert_eq!(names.len(), 16, "expected 16 tools, got {names:?}");
+    assert_eq!(
+        names.len(),
+        15,
+        "expected 15 tools (22 - 6 read-only - 1 gated list), got {names:?}"
+    );
     for hidden in [
         "create_forum_discussion",
         "reply_to_discussion",
@@ -277,8 +294,8 @@ async fn read_only_mode_hides_write_upload_and_escape_tools() {
             "{hidden} must be hidden in read-only mode"
         );
     }
-    // list_functions stays — exploring what the token may call is harmless.
-    assert!(names.contains(&"list_functions"));
+    // the hatch is not opted in here, so its discovery tool is gone too
+    assert!(!names.contains(&"list_ws_functions"));
     assert!(names.contains(&"get_assignment"));
 
     // Calls to hidden tools are rejected by the router, not just unlisted.
@@ -292,6 +309,44 @@ async fn read_only_mode_hides_write_upload_and_escape_tools() {
     );
 }
 
+/// The escape hatch must be an explicit opt-in: MOODLE_ENABLE_WS_FUNCTION
+/// alone brings the default surface from 20 back to the full 22.
+#[tokio::test]
+async fn escape_hatch_is_opt_in() {
+    let server = MockServer::start().await;
+    site_info_mock().mount(&server).await;
+
+    let mcp = spawn_server_with(&server, false, true, Vec::new()).await;
+    let tools = mcp
+        .peer()
+        .list_tools(Default::default())
+        .await
+        .expect("list_tools");
+    let names: Vec<&str> = tools.tools.iter().map(|t| t.name.as_ref()).collect();
+    assert_eq!(names.len(), 22, "opt-in must expose all 22 tools");
+    assert!(names.contains(&"call_ws_function"));
+    assert!(names.contains(&"list_ws_functions"));
+}
+
+/// Read-only mode beats the opt-in for execution, not for discovery: the
+/// hatch's write tool stays hidden, its read-only list tool survives.
+#[tokio::test]
+async fn read_only_beats_ws_function_opt_in() {
+    let server = MockServer::start().await;
+    site_info_mock().mount(&server).await;
+    let mcp = spawn_server_with(&server, true, true, Vec::new()).await;
+
+    let tools = mcp
+        .peer()
+        .list_tools(Default::default())
+        .await
+        .expect("list_tools");
+    let names: Vec<&str> = tools.tools.iter().map(|t| t.name.as_ref()).collect();
+    assert_eq!(names.len(), 16, "read-only keeps writes out: 22 - 6");
+    assert!(!names.contains(&"call_ws_function"));
+    assert!(names.contains(&"list_ws_functions"));
+}
+
 /// MOODLE_DISABLE_TOOLS drops individual tools on top of the full surface.
 #[tokio::test]
 async fn disable_tools_filters_individual_tools() {
@@ -300,6 +355,7 @@ async fn disable_tools_filters_individual_tools() {
     let mcp = spawn_server_with(
         &server,
         false,
+        true,
         vec!["send_message".into(), "get_grades".into()],
     )
     .await;

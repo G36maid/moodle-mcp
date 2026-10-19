@@ -13,7 +13,26 @@ use rmcp::{ServiceExt, transport::stdio};
 use tracing_subscriber::EnvFilter;
 
 fn init_tracing() {
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    // Product level first (closed set): MOODLE_LOG_LEVEL=error|warn|info|
+    // debug|trace — trace is the only content-bearing level (response body
+    // snippets land in the log — users of shared machines should not enable
+    // it). RUST_LOG stays as the advanced escape hatch
+    // (EnvFilter per-module syntax); invalid product values warn and fall
+    // through to it, then to info.
+    let raw_level = std::env::var("MOODLE_LOG_LEVEL")
+        .ok()
+        .map(|v| v.trim().to_ascii_lowercase())
+        .filter(|v| !v.is_empty());
+    let filter = match raw_level.as_deref() {
+        Some(level @ ("error" | "warn" | "info" | "debug" | "trace")) => EnvFilter::new(level),
+        Some(invalid) => {
+            eprintln!(
+                "moodle-mcp: invalid MOODLE_LOG_LEVEL '{invalid}' (error|warn|info|debug|trace) — falling back to RUST_LOG/info"
+            );
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"))
+        }
+        None => EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+    };
     tracing_subscriber::fmt()
         .with_env_filter(filter)
         // stdout is reserved for the MCP JSON-RPC stream — never write there.
@@ -35,16 +54,9 @@ fn load_config() -> Config {
     }
 }
 
-/// Resolve the timestamp-rendering timezone: an explicit MOODLE_TIMEZONE
-/// wins (already validated by Config); otherwise the user's Moodle timezone
-/// preference is consulted (its value may be '99' = site default, which no
-/// web service exposes, or otherwise unparseable) and anything unknown
-/// falls back to UTC with a log line.
-/// core_user_get_user_preferences is available to the mobile service on
-/// every supported version:
-/// https://github.com/moodle/moodle/blob/v3.7.0/lib/db/services.php#L1725
-/// https://github.com/moodle/moodle/blob/v4.5.4/lib/db/services.php#L1999
-async fn resolve_timezone(client: &MoodleClient, env_tz: Option<&str>) {
+/// Pick the zone timestamps render in: MOODLE_TIMEZONE if set (Config has
+/// validated it), else what `tools::site::detect_timezone` finds, else UTC.
+async fn resolve_timezone(client: &MoodleClient, env_tz: Option<&str>, timeout_secs: u64) {
     if let Some(name) = env_tz {
         let tz = moodle_mcp::util::parse_timezone(name)
             .expect("MOODLE_TIMEZONE validated at config load");
@@ -52,21 +64,14 @@ async fn resolve_timezone(client: &MoodleClient, env_tz: Option<&str>) {
         tracing::info!(%name, "timestamp timezone set from MOODLE_TIMEZONE");
         return;
     }
-    let detected = client
-        .call(
-            "core_user_get_user_preferences",
-            &serde_json::json!({ "name": "timezone" }),
-        )
-        .await
-        .ok()
-        .and_then(|v| moodle_mcp::util::timezone_from_preferences(&v));
-    match detected {
-        Some(tz) => {
+    let budget = std::time::Duration::from_secs(timeout_secs);
+    match moodle_mcp::tools::site::detect_timezone(client, budget).await {
+        Some((tz, source)) => {
             moodle_mcp::util::set_timezone(tz);
-            tracing::info!(timezone = %tz, "timestamp timezone detected from the Moodle user preference");
+            tracing::info!(timezone = %tz, source, "timestamp timezone detected from Moodle");
         }
         None => tracing::info!(
-            "timezone unknown (site default or not exposed) — rendering timestamps in UTC; \
+            "could not detect the Moodle timezone — rendering timestamps in UTC; \
              set MOODLE_TIMEZONE to override"
         ),
     }
@@ -95,11 +100,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let client = Arc::new(MoodleClient::new(cfg.clone())?);
-    resolve_timezone(&client, cfg.timezone.as_deref()).await;
+    resolve_timezone(&client, cfg.timezone.as_deref(), cfg.timeout_secs).await;
     if cfg.read_only {
         tracing::info!("read-only mode: write, upload and raw-call tools are disabled");
     }
-    let server = MoodleMcp::new_with_policy(client, cfg.read_only, cfg.disabled_tools.clone());
+    if !cfg.enable_ws_function {
+        tracing::info!(
+            "web-service escape hatch (list_ws_functions, call_ws_function) is off — set MOODLE_ENABLE_WS_FUNCTION=true to enable it"
+        );
+    }
+    let server = MoodleMcp::new_with_policy(
+        client,
+        cfg.read_only,
+        cfg.enable_ws_function,
+        cfg.disabled_tools.clone(),
+    );
 
     let running = server.serve(stdio()).await?;
     tracing::info!("moodle-mcp serving on stdio");

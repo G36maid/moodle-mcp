@@ -6,10 +6,10 @@
 //! (`--url`, `--username`, `--password`), so scripts work non-interactively
 //! too.
 //!
-//! - **credentials** mode (default): POST `/login/token.php` with
-//!   username/password (NTNU-verified).
-//! - **`--open`**: opens the site's Security keys page (`/user/managetoken.php`)
-//!   in the browser — the SSO-friendly path; the user copies the token by hand.
+//! - **credentials** mode: POST `/login/token.php` with username/password.
+//!   SSO-federated schools whose accounts have no local Moodle password
+//!   answer `invalidlogin` — the SSO replay path lives in [`crate::sso`]
+//!   (library-level for now; not yet reachable from this command).
 //!
 //! Output defaults to a ready-to-source `export` line; `--output json` prints
 //! raw JSON instead. Prompts render on stderr, so `--output json` on stdout
@@ -24,7 +24,7 @@ pub async fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     let mut username: Option<String> = None;
     let mut password: Option<String> = None;
     let mut service: Option<String> = None;
-    let mut open_browser = false;
+    let mut allow_http = false;
     let mut output_json = false;
 
     let mut it = args.iter();
@@ -34,7 +34,7 @@ pub async fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
             "--username" | "-u" => username = it.next().cloned(),
             "--password" | "-p" => password = it.next().cloned(),
             "--service" | "-s" => service = it.next().cloned(),
-            "--open" => open_browser = true,
+            "--allow-http" => allow_http = true,
             "--output" | "-o" => {
                 let val = it
                     .next()
@@ -51,7 +51,7 @@ pub async fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
             other => {
                 eprintln!("moodle-mcp auth: unknown argument '{other}'");
                 return Err(
-                    "usage: moodle-mcp auth [--url <site>] [--username U] [--password P] [--service S] [--open] [--output env|json]\nvalues not passed as flags are prompted for interactively"
+                    "usage: moodle-mcp auth [--url <site>] [--username U] [--password P] [--service S] [--allow-http] [--output env|json]\nvalues not passed as flags are prompted for interactively"
                         .into(),
                 );
             }
@@ -62,14 +62,22 @@ pub async fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
         Some(u) => u.trim_end_matches('/').to_string(),
         None => prompt_url()?,
     };
-
-    if open_browser {
-        let page = format!("{base_url}/user/managetoken.php");
-        open::that_detached(&page)?;
-        println!("Opened {page}");
-        println!("Log in, open 'Security keys', copy the token, then:");
-        println!("  export MOODLE_URL='{base_url}' MOODLE_TOKEN='<paste>'");
-        return Ok(());
+    // One policy for both entry points (serve validates MOODLE_URL the same
+    // way): schemeless defaults to https; plain http is rejected unless
+    // loopback or explicitly allowed — the password is about to cross it.
+    let mut base_url = match crate::config::normalize_site_url(&base_url, allow_http) {
+        Ok(u) => u,
+        Err(e) => {
+            eprintln!("moodle-mcp auth: {e}");
+            return Err("invalid site URL".into());
+        }
+    };
+    // Schools migrate hosts (moodle.example.edu -> moodle3.example.edu) with
+    // a bare 303 to the new homepage; every request to the old origin would
+    // land on the front page instead of the page asked for.
+    if let Some(final_origin) = crate::client::resolve_site_redirect(&base_url).await {
+        eprintln!("moodle-mcp auth: note: {base_url} redirects to {final_origin} — using it");
+        base_url = final_origin;
     }
 
     let username = match username {
@@ -112,15 +120,18 @@ pub async fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
 
 /// Prompt for the site URL until it looks like an http(s) URL.
 fn prompt_url() -> Result<String, Box<dyn std::error::Error>> {
+    // The scheme/host policy lives in `normalize_site_url` (applied after the
+    // prompt returns) — the validator only catches obvious typos early.
     Text::new("Moodle URL (e.g. https://moodle.example.com)")
         .with_validator(|s: &str| {
             let s = s.trim();
-            if s.starts_with("http://") || s.starts_with("https://") {
-                Ok(Validation::Valid)
-            } else {
+            if s.is_empty() || s.contains(char::is_whitespace) {
                 Ok(Validation::Invalid(
-                    "enter the full site URL, starting with https://".into(),
+                    "enter the site URL, e.g. https://moodle.example.com (a bare host defaults to https)"
+                        .into(),
                 ))
+            } else {
+                Ok(Validation::Valid)
             }
         })
         .prompt()

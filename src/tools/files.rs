@@ -129,31 +129,26 @@ pub async fn fetch_file(client: &MoodleClient, url: &str) -> Result<Value, Moodl
         .to_lowercase();
 
     if convertable.contains(&ext.as_str()) {
-        let tmp = format!(
-            "{}/moodle-fetch-{}.{}",
-            std::env::temp_dir().display(),
-            crate::util::unique_item_id(),
-            ext
-        );
-        // Conversion (write + anydoc + cleanup) is synchronous — run it on
-        // the blocking pool so it never stalls the async workers.
-        let conv = tokio::task::spawn_blocking({
-            let bytes = bytes.clone();
-            let tmp = tmp.clone();
-            move || -> Result<String, MoodleError> {
-                let out = (|| -> Result<String, MoodleError> {
-                    std::fs::write(&tmp, &bytes).map_err(|e| {
-                        MoodleError::Config(format!("failed to buffer download: {e}"))
-                    })?;
-                    anydoc::to_markdown(&tmp).map_err(|e| {
-                        MoodleError::InvalidBody(format!(
-                            "document conversion failed ({e}) — use download_file to save the original"
-                        ))
-                    })
-                })();
-                let _ = std::fs::remove_file(&tmp);
-                out
-            }
+        // Conversion is CPU-bound and synchronous — run it on the blocking
+        // pool. Anydoc is in-memory regardless (its path API is just
+        // fs::read + to_markdown_bytes), so the bytes move straight in: no
+        // temp file (a predictable name is a symlink/TOCTOU hazard on
+        // multi-user machines), no clone, no disk round-trip. The extension
+        // fallback covers signature-less formats (CSV).
+        let detected =
+            anydoc::Format::from_bytes(&bytes).or_else(|| anydoc::Format::from_extension(&ext));
+        let ext_owned = ext.clone();
+        let conv = tokio::task::spawn_blocking(move || -> Result<String, MoodleError> {
+            let format = detected.ok_or_else(|| {
+                MoodleError::InvalidBody(format!(
+                    "unrecognized document content (.{ext_owned}) — use download_file to save the original"
+                ))
+            })?;
+            anydoc::to_markdown_bytes(&bytes, format).map_err(|e| {
+                MoodleError::InvalidBody(format!(
+                    "document conversion failed ({e}) — use download_file to save the original"
+                ))
+            })
         })
         .await
         .map_err(|e| MoodleError::Config(format!("conversion task failed: {e}")))??;
@@ -238,12 +233,23 @@ pub async fn download_file(
     client: &MoodleClient,
     url: &str,
     save_to: &str,
+    overwrite: bool,
 ) -> Result<Value, MoodleError> {
     // Fail fast on a blank destination — no point downloading first.
     if save_to.trim().is_empty() {
         return Err(MoodleError::Config(
             "save_to is empty — provide the local file path to write the download to".into(),
         ));
+    }
+    // The overwrite is opt-in: an agent re-running a download (or picking
+    // the wrong save_to) must not destroy local files silently — the upload
+    // side already rejects same-name files (filenameexist), so the
+    // destructive direction gets the same guard.
+    if !overwrite && tokio::fs::try_exists(save_to).await.unwrap_or(false) {
+        return Err(MoodleError::Config(format!(
+            "{save_to} already exists — refusing to overwrite it; pick a new path, delete the \
+             existing file first, or pass overwrite=true to replace it intentionally"
+        )));
     }
     let mut resp = client.download_file(url).await?;
     let status = resp.status().as_u16();
@@ -405,6 +411,33 @@ mod tests {
     use crate::config::Config;
 
     #[tokio::test]
+    async fn fetch_file_converts_csv_in_memory() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/report.csv"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("name,score\nalice,98\n"))
+            .mount(&server)
+            .await;
+        let client = MoodleClient::new(Config {
+            base_url: server.uri(),
+            token: "t".into(),
+            timeout_secs: 10,
+            timezone: None,
+            read_only: false,
+            disabled_tools: Vec::new(),
+            user_agent: None,
+            allow_external_fetch: false,
+            enable_ws_function: false,
+        })
+        .unwrap();
+        let out = fetch_file(&client, &format!("{}/report.csv", server.uri()))
+            .await
+            .unwrap();
+        assert_eq!(out["format"], "csv");
+        assert!(out["markdown"].as_str().unwrap().contains("alice"));
+    }
+
+    #[tokio::test]
     async fn read_capped_rejects_oversized_stream() {
         // No Content-Length declared — only the mid-stream cap can stop it.
         let server = MockServer::start().await;
@@ -424,6 +457,9 @@ mod tests {
             timezone: None,
             read_only: false,
             disabled_tools: Vec::new(),
+            user_agent: None,
+            allow_external_fetch: false,
+            enable_ws_function: false,
         })
         .unwrap();
         let resp = client
@@ -432,5 +468,53 @@ mod tests {
             .unwrap();
         let err = read_capped(resp, 100).await.expect_err("must reject");
         assert!(err.to_string().contains("100"), "{err:?}");
+    }
+}
+
+#[cfg(test)]
+mod overwrite_tests {
+    use super::*;
+    use crate::client::MoodleClient;
+    use crate::config::Config;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    #[tokio::test]
+    async fn download_file_refuses_overwrite_unless_flagged() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/f.bin"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(b"payload".to_vec()))
+            .mount(&server)
+            .await;
+        let client = MoodleClient::new(Config {
+            base_url: server.uri(),
+            token: "t".into(),
+            timeout_secs: 10,
+            timezone: None,
+            read_only: false,
+            disabled_tools: Vec::new(),
+            user_agent: None,
+            allow_external_fetch: false,
+            enable_ws_function: false,
+        })
+        .unwrap();
+        let dir = std::env::temp_dir().join(format!("mdl-ow-test-{}", std::process::id()));
+        tokio::fs::create_dir_all(&dir).await.unwrap();
+        let target = dir.join("existing.txt");
+        tokio::fs::write(&target, b"old").await.unwrap();
+        let url = format!("{}/f.bin", server.uri());
+
+        let err = download_file(&client, &url, target.to_str().unwrap(), false)
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("already exists"), "{err}");
+        assert_eq!(tokio::fs::read(&target).await.unwrap(), b"old");
+
+        download_file(&client, &url, target.to_str().unwrap(), true)
+            .await
+            .unwrap();
+        assert_eq!(tokio::fs::read(&target).await.unwrap(), b"payload");
+        tokio::fs::remove_dir_all(&dir).await.unwrap();
     }
 }

@@ -1,5 +1,5 @@
 //! The escape hatch: call ANY Moodle WS function the token allows, plus
-//! discovery (`list_functions`) and friendly suggestions on misses.
+//! discovery (`list_ws_functions`) and friendly suggestions on misses.
 
 use serde_json::Value;
 
@@ -42,7 +42,7 @@ pub fn suggest_functions(requested: &str, allowed: &[String]) -> String {
         .collect();
     if close.is_empty() {
         format!(
-            "{} functions are available; use list_functions with a keyword to explore them.",
+            "{} functions are available; use list_ws_functions with a keyword to explore them.",
             allowed.len()
         )
     } else {

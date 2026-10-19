@@ -24,6 +24,16 @@ pub enum MoodleError {
     /// Client-side configuration error.
     #[error("Configuration error: {0}")]
     Config(String),
+
+    /// A front component (proxy/WAF/CDN) or Moodle itself returned a status
+    /// the caller should back off from; `retry_after` is in seconds.
+    #[error("HTTP {status} error: retry after {retry_after}s")]
+    HttpStatus { status: u16, retry_after: u64 },
+
+    /// The local cooldown gate rejected the call before it left the process
+    /// (a previous {status} armed the gate).
+    #[error("HTTP {status} cooldown active: retry after {retry_after}s (request not sent)")]
+    HttpCooldown { status: u16, retry_after: u64 },
 }
 
 /// The exception payload Moodle returns instead of the expected data.
@@ -81,6 +91,25 @@ impl MoodleError {
                 format!("Moodle API error {code}: {message} (exception: {exception}){hint_block}")
             }
             MoodleError::Http(e) => scrub_token(&format!("HTTP request to Moodle failed: {e}")),
+            MoodleError::HttpStatus {
+                status,
+                retry_after,
+            } => {
+                let why = match *status {
+                    429 => "rate limited — likely a reverse proxy/WAF in front of Moodle",
+                    503 => {
+                        "service unavailable — Moodle may be in maintenance mode or behind an unhealthy proxy"
+                    }
+                    _ => "gateway error — an upstream/proxy component is unhealthy",
+                };
+                format!("HTTP {status} {why}: retry after {retry_after}s")
+            }
+            MoodleError::HttpCooldown {
+                status,
+                retry_after,
+            } => format!(
+                "HTTP {status} cooldown active: retry after {retry_after}s (request not sent — a local gate armed by the previous {status})"
+            ),
             MoodleError::InvalidBody(e) => format!("Moodle returned an unexpected response: {e}"),
             MoodleError::NonJsonResponse(e) => {
                 format!("Non-JSON response from Moodle (web services may be disabled): {e}")

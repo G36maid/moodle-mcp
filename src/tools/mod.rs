@@ -1,4 +1,5 @@
-//! MCP tool surface — 22 tools (16 in read-only mode).
+//! MCP tool surface — 20 tools by default (22 with the escape hatch
+//! opted in; 15 in read-only mode, 16 if the hatch is also opted in).
 //!
 //! All `#[tool]` methods live in the single `#[tool_router]` impl block
 //! required by rmcp; business logic lives in the per-domain modules.
@@ -35,8 +36,6 @@ use crate::tools::schedule::{HINT_COURSE, HINT_TIME};
 #[derive(Deserialize, schemars::JsonSchema)]
 pub struct Empty {}
 
-// ---------- identity / courses ----------
-
 #[derive(Deserialize, schemars::JsonSchema)]
 pub struct ListCoursesParams {
     /// Filter courses by name (case-insensitive substring); omit for all
@@ -48,8 +47,6 @@ pub struct CourseOverviewParams {
     /// The Moodle course id (from list_courses)
     course_id: i64,
 }
-
-// ---------- forums ----------
 
 #[derive(Deserialize, schemars::JsonSchema)]
 pub struct ForumDiscussionsParams {
@@ -84,8 +81,6 @@ pub struct ReplyParams {
     message: String,
 }
 
-// ---------- assignments ----------
-
 #[derive(Deserialize, schemars::JsonSchema)]
 pub struct AssignmentIdParams {
     /// The assignment id (from get_course_overview)
@@ -106,8 +101,6 @@ pub struct SubmitAssignmentParams {
     finalize: Option<bool>,
 }
 
-// ---------- files ----------
-
 #[derive(Deserialize, schemars::JsonSchema)]
 pub struct FetchFileParams {
     /// Moodle file URL (from get_course_overview / get_assignment /
@@ -122,6 +115,8 @@ pub struct DownloadFileParams {
     url: String,
     /// Local path to write the content to
     save_to: String,
+    /// Replace save_to if it already exists (default: refuse to overwrite)
+    overwrite: Option<bool>,
 }
 
 #[derive(Deserialize, schemars::JsonSchema)]
@@ -134,15 +129,11 @@ pub struct UploadFileParams {
     item_id: Option<i64>,
 }
 
-// ---------- grades ----------
-
 #[derive(Deserialize, schemars::JsonSchema)]
 pub struct GradesParams {
     /// The Moodle course id; omit for a cross-course summary of final grades
     course_id: Option<i64>,
 }
-
-// ---------- schedule ----------
 
 #[derive(Deserialize, schemars::JsonSchema)]
 pub struct ScheduleParams {
@@ -153,8 +144,6 @@ pub struct ScheduleParams {
     /// Restrict to these course ids; omit for all enrolled courses
     course_ids: Option<Vec<i64>>,
 }
-
-// ---------- messaging ----------
 
 #[derive(Deserialize, schemars::JsonSchema)]
 pub struct NotificationsParams {
@@ -177,8 +166,6 @@ pub struct SendMessageParams {
     /// Message text
     text: String,
 }
-
-// ---------- users ----------
 
 #[derive(Deserialize, schemars::JsonSchema)]
 pub struct GetUserParams {
@@ -207,19 +194,15 @@ pub struct SearchUsersParams {
     limit: Option<u32>,
 }
 
-// ---------- quizzes ----------
-
 #[derive(Deserialize, schemars::JsonSchema)]
 pub struct QuizAttemptsParams {
     /// The quiz id (from get_course_overview)
     quiz_id: i64,
 }
 
-// ---------- escape hatch ----------
-
 #[derive(Deserialize, schemars::JsonSchema)]
 pub struct RawCallParams {
-    /// The Moodle WS function name (see list_functions)
+    /// The Moodle WS function name (see list_ws_functions)
     wsfunction: String,
     /// Function parameters as a JSON object; nested arrays/objects are
     /// flattened to Moodle's PHP bracket notation
@@ -227,7 +210,7 @@ pub struct RawCallParams {
 }
 
 #[derive(Deserialize, schemars::JsonSchema)]
-pub struct ListFunctionsParams {
+pub struct ListWsFunctionsParams {
     /// Keyword to filter function names (case-insensitive substring)
     query: String,
 }
@@ -239,18 +222,19 @@ const CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(600);
 /// A cached value with its fill time (see [`CACHE_TTL`]).
 type Cached<T> = Arc<RwLock<Option<(std::time::Instant, T)>>>;
 
-/// The MCP server: 22 tools for a student's Moodle (16 when read-only
-/// mode filters the write/upload/escape-hatch tools out of the router).
+/// The MCP server: 20 tools for a student's Moodle by default (22 once
+/// the escape hatch is opted in; 15 in read-only mode, 16 if the hatch is
+/// also opted in).
 #[derive(Clone)]
 pub struct MoodleMcp {
     client: Arc<MoodleClient>,
-    site_cache: Cached<Value>,
-    courses_cache: Cached<Vec<i64>>,
+    site_cache: Cached<Arc<Value>>,
+    courses_cache: Cached<Arc<Vec<i64>>>,
     tool_router: ToolRouter<Self>,
     read_only: bool,
 }
 
-/// Tools hidden in read-only mode (MOODLE_READ_ONLY=1): the four WRITE
+/// Tools hidden in read-only mode (MOODLE_READ_ONLY=true): the four WRITE
 /// operations, file upload (a read-only agent has no business staging files
 /// on the server), and the raw escape hatch — `call_ws_function` can invoke
 /// write functions directly and would bypass the restriction.
@@ -263,19 +247,29 @@ pub(crate) const READ_ONLY_DISABLED_TOOLS: &[&str] = &[
     "call_ws_function",
 ];
 
+/// The escape hatch pair, hidden unless MOODLE_ENABLE_WS_FUNCTION=true
+/// opts in. Both tools travel together: a discovery tool that lists
+/// functions the agent cannot then call is a dead end, not a safety
+/// feature (the list is read-only, so MOODLE_READ_ONLY does not need to
+/// hide it when the hatch is opted in).
+const ESCAPE_HATCH_TOOLS: &[&str] = &["call_ws_function", "list_ws_functions"];
+
 impl MoodleMcp {
     /// Cached `core_webservice_get_site_info` payload (identity, functions,
-    /// release — the bootstrap record), refreshed every 10 minutes.
-    async fn site_info_cached(&self) -> Result<Value, MoodleError> {
+    /// release — the bootstrap record), refreshed every 10 minutes. The Arc
+    /// keeps cache hits cheap: the payload embeds the ~350-entry function
+    /// list, and cloning that on every call is pure waste.
+    async fn site_info_cached(&self) -> Result<Arc<Value>, MoodleError> {
         if let Some((at, hit)) = self.site_cache.read().await.clone()
             && at.elapsed() < CACHE_TTL
         {
             return Ok(hit);
         }
-        let info: Value = self
-            .client
-            .call("core_webservice_get_site_info", &json!({}))
-            .await?;
+        let info = Arc::new(
+            self.client
+                .call("core_webservice_get_site_info", &json!({}))
+                .await?,
+        );
         *self.site_cache.write().await = Some((std::time::Instant::now(), info.clone()));
         Ok(info)
     }
@@ -329,8 +323,9 @@ impl MoodleMcp {
             })
     }
 
-    /// The token owner's enrolled course ids (cached, 10-minute TTL).
-    async fn enrolled_course_ids(&self) -> Result<Vec<i64>, MoodleError> {
+    /// The token owner's enrolled course ids (cached, 10-minute TTL; Arc for
+    /// the same reason as [`Self::site_info_cached`]).
+    async fn enrolled_course_ids(&self) -> Result<Arc<Vec<i64>>, MoodleError> {
         if let Some((at, hit)) = self.courses_cache.read().await.clone()
             && at.elapsed() < CACHE_TTL
         {
@@ -351,8 +346,24 @@ impl MoodleMcp {
             .into_iter()
             .filter_map(|c| c.get("id").and_then(Value::as_i64))
             .collect();
+        let ids = Arc::new(ids);
         *self.courses_cache.write().await = Some((std::time::Instant::now(), ids.clone()));
         Ok(ids)
+    }
+    /// Same-site guard for the file tools: the MCP process makes requests
+    /// the agent's harness cannot see or gate, so its footprint stays inside
+    /// the Moodle site (plus the canonical wwwroot host from site info, for
+    /// alias-configured sites). MOODLE_ALLOW_EXTERNAL_FETCH=1 opts out.
+    async fn file_url_guard(&self, url: &str) -> Result<(), MoodleError> {
+        if self.client.allow_external_fetch() {
+            return Ok(());
+        }
+        let siteurl = self
+            .site_info_cached()
+            .await
+            .ok()
+            .and_then(|v| v.get("siteurl").and_then(Value::as_str).map(str::to_string));
+        self.client.ensure_same_site(url, siteurl.as_deref())
     }
 }
 
@@ -360,19 +371,25 @@ impl MoodleMcp {
 impl MoodleMcp {
     /// Build the server, optionally filtering the tool surface. Read-only
     /// mode hides the write/upload/escape-hatch tools
-    /// ([READ_ONLY_DISABLED_TOOLS]); `disabled_tools` (MOODLE_DISABLE_TOOLS)
-    /// drops additional names on top — unknown names are warned about, not
-    /// fatal. Disabled tools vanish from `tools/list` and calls to them are
-    /// rejected by the router, so clients see the real capability surface.
+    /// ([READ_ONLY_DISABLED_TOOLS]); the escape hatch stays hidden unless
+    /// `enable_ws_function` (MOODLE_ENABLE_WS_FUNCTION) opts in;
+    /// `disabled_tools` (MOODLE_DISABLE_TOOLS) drops additional names on top
+    /// — unknown names are warned about, not fatal. Disabled tools vanish
+    /// from `tools/list` and calls to them are rejected by the router, so
+    /// clients see the real capability surface.
     pub fn new_with_policy(
         client: Arc<MoodleClient>,
         read_only: bool,
+        enable_ws_function: bool,
         disabled_tools: Vec<String>,
     ) -> Self {
         let mut tool_router = Self::tool_router();
         let mut names = disabled_tools;
         if read_only {
             names.extend(READ_ONLY_DISABLED_TOOLS.iter().map(|s| (*s).to_string()));
+        }
+        if !enable_ws_function {
+            names.extend(ESCAPE_HATCH_TOOLS.iter().map(|s| (*s).to_string()));
         }
         for name in names {
             if !tool_router.has_route(&name) {
@@ -393,8 +410,6 @@ impl MoodleMcp {
         }
     }
 
-    // ---------- identity ----------
-
     #[tool(
         description = "Identify the token owner (user_id, username, fullname) and the connected Moodle site/release, plus the active timestamp timezone, read-only mode, and this MCP server's version. Also a quick connectivity check: if this fails, the site URL or token is usually wrong.",
         annotations(read_only_hint = true)
@@ -409,8 +424,6 @@ impl MoodleMcp {
         });
         finish(res)
     }
-
-    // ---------- courses ----------
 
     #[tool(
         description = "List the courses you are enrolled in (course_id, name, dates, progress), optionally filtered by name. The starting point of navigation: course_id feeds get_course_overview, course_ids feed get_schedule.",
@@ -444,8 +457,6 @@ impl MoodleMcp {
             Err(e) => finish(Err(e)),
         }
     }
-
-    // ---------- forums ----------
 
     #[tool(
         description = "List the discussions in one forum (subject, preview of the opening post, author, replies, pinned/locked); each row's discussion_id opens get_discussion_posts and opening_post_id targets reply_to_discussion. forum_id comes from get_course_overview.",
@@ -505,8 +516,6 @@ impl MoodleMcp {
         finish(forums::reply_to_discussion(&self.client, p.post_id, &p.subject, &p.message).await)
     }
 
-    // ---------- assignments ----------
-
     #[tool(
         description = "Get everything about one assignment as a markdown document: times, draft/attempt state, full description, attachments (with URLs), your submission (text/files), grade and teacher feedback. Check draft_required here before submit_assignment — it decides whether finalize=true is needed. assignment_id comes from get_course_overview or get_grades.",
         annotations(read_only_hint = true)
@@ -543,8 +552,6 @@ impl MoodleMcp {
         )
     }
 
-    // ---------- grades ----------
-
     #[tool(
         description = "Get grades: without course_id, a cross-course summary of final grades; with course_id, every grade item of that course (quizzes, manual items, course total) with ranges, weights and teacher feedback. Assignment items carry assignment_id for direct chaining into get_assignment.",
         annotations(read_only_hint = true)
@@ -566,8 +573,6 @@ impl MoodleMcp {
         finish(res)
     }
 
-    // ---------- schedule ----------
-
     #[tool(
         description = "Get your timeline of deadlines: assignment due dates, quiz closes and calendar events in a single list, sorted by time. Defaults to the next 30 days across all enrolled courses.",
         annotations(read_only_hint = true)
@@ -587,7 +592,7 @@ impl MoodleMcp {
         let ids = match p.course_ids.clone() {
             Some(ids) if !ids.is_empty() => ids,
             _ => match self.enrolled_course_ids().await {
-                Ok(ids) => ids,
+                Ok(ids) => ids.to_vec(),
                 Err(e) => return Ok(crate::error::moodle_to_tool_result(e)),
             },
         };
@@ -600,8 +605,6 @@ impl MoodleMcp {
             Err(e) => finish(Err(e)),
         }
     }
-
-    // ---------- messaging ----------
 
     #[tool(
         description = "Get your recent notifications (announcements, grade releases, teacher messages); for two-way conversations use get_conversations.",
@@ -680,8 +683,6 @@ impl MoodleMcp {
         finish(messaging::send_message(&self.client, p.user_id, &p.text).await)
     }
 
-    // ---------- users ----------
-
     #[tool(
         description = "Look up one user's profile by an exact id, username, email or idnumber — resolves ids from conversations, notifications and forum posts into names/emails; for keyword search use search_users. Whether other students' profiles are visible is the site's privacy policy.",
         annotations(read_only_hint = true)
@@ -729,8 +730,6 @@ impl MoodleMcp {
         finish(res)
     }
 
-    // ---------- quizzes (read-only) ----------
-
     #[tool(
         description = "Get your attempts on a quiz: state, start/finish times, total marks. quiz_id comes from get_course_overview. Quiz-taking itself is intentionally not provided.",
         annotations(read_only_hint = true)
@@ -746,28 +745,40 @@ impl MoodleMcp {
         finish(res)
     }
 
-    // ---------- files ----------
-
     #[tool(
-        description = "Fetch a Moodle file and return its content as markdown: documents (PDF, Word, PowerPoint, Excel, ODF, RTF, EPUB, CSV), HTML pages and plain text are returned inline; other binaries (zip, images) are rejected — use download_file instead.",
+        description = "Fetch a Moodle file and return its content as markdown: documents (PDF, Word, PowerPoint, Excel, ODF, RTF, EPUB, CSV), HTML pages and plain text are returned inline; other binaries (zip, images) are rejected — use download_file instead. Only same-site Moodle URLs are accepted; for external links use your own web tooling (MOODLE_ALLOW_EXTERNAL_FETCH=1 opts out).",
         annotations(read_only_hint = true)
     )]
     async fn fetch_file(
         &self,
         Parameters(p): Parameters<FetchFileParams>,
     ) -> Result<CallToolResult, McpError> {
+        if let Err(e) = self.file_url_guard(&p.url).await {
+            return finish(Err(e));
+        }
         finish(files::fetch_file(&self.client, &p.url).await)
     }
 
     #[tool(
-        description = "Download a Moodle file to a local path (metadata only — binary payloads never enter the conversation).",
+        description = "Download a Moodle file to a local path (metadata only — binary payloads never enter the conversation). Refuses to overwrite an existing save_to unless overwrite=true. Only same-site Moodle URLs are accepted; for external links use your own web tooling (MOODLE_ALLOW_EXTERNAL_FETCH=1 opts out).",
         annotations(destructive_hint = false, idempotent_hint = true)
     )]
     async fn download_file(
         &self,
         Parameters(p): Parameters<DownloadFileParams>,
     ) -> Result<CallToolResult, McpError> {
-        finish(files::download_file(&self.client, &p.url, &p.save_to).await)
+        if let Err(e) = self.file_url_guard(&p.url).await {
+            return finish(Err(e));
+        }
+        finish(
+            files::download_file(
+                &self.client,
+                &p.url,
+                &p.save_to,
+                p.overwrite.unwrap_or(false),
+            )
+            .await,
+        )
     }
 
     #[tool(
@@ -785,12 +796,10 @@ impl MoodleMcp {
         )
     }
 
-    // ---------- escape hatch ----------
-
     // No annotations: the spec defaults (destructive=true) stay
     // conservative for an arbitrary WS surface.
     #[tool(
-        description = "Call any Moodle web service function by name with free-form JSON parameters (advanced escape hatch). Nested arrays/objects are flattened to Moodle's PHP bracket notation. The function must be enabled for this token — discover candidates with list_functions. WARNING: destructive functions (delete/block/reset) take effect immediately without confirmation — double-check with the user first."
+        description = "Call any Moodle web service function by name with free-form JSON parameters (advanced escape hatch). Nested arrays/objects are flattened to Moodle's PHP bracket notation. The function must be enabled for this token — discover candidates with list_ws_functions. WARNING: destructive functions (delete/block/reset) take effect immediately without confirmation — double-check with the user first."
     )]
     async fn call_ws_function(
         &self,
@@ -822,12 +831,12 @@ impl MoodleMcp {
         description = "Search the Moodle WS functions this token may call (case-insensitive substring, e.g. 'wiki', 'forum', 'assign'). Matches can then be executed via call_ws_function.",
         annotations(read_only_hint = true)
     )]
-    async fn list_functions(
+    async fn list_ws_functions(
         &self,
-        Parameters(p): Parameters<ListFunctionsParams>,
+        Parameters(p): Parameters<ListWsFunctionsParams>,
     ) -> Result<CallToolResult, McpError> {
         let allowed = self.allowed_functions().await;
-        finish(site::list_functions(&allowed, &p.query))
+        finish(site::list_ws_functions(&allowed, &p.query))
     }
 }
 
