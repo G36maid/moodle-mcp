@@ -11,5 +11,6 @@ pub mod client;
 pub mod config;
 pub mod error;
 pub mod output;
+pub mod sso;
 pub mod tools;
 pub mod util;
