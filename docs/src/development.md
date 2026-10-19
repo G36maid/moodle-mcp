@@ -122,8 +122,11 @@ and are review-gated, not optional:
 2. Bump `version` in `Cargo.toml` to match the tag; a check in the
    release job enforces this.
 3. Push the `v*` tag: the workflow builds multi-platform binaries,
-   creates the GitHub release from the changelog section, and publishes
-   the crate to crates.io via trusted publishing.
+   creates the GitHub release from the changelog section, publishes the
+   crate to crates.io via trusted publishing, and publishes the server
+   entry to the official MCP registry (OIDC — the registry verifies the
+   `mcp-name` marker in the crates.io README, and `server.json`'s version
+   must match the tag).
 
 ## What's Next
 
