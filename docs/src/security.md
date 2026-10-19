@@ -16,11 +16,13 @@ moodle-mcp auth --url https://moodle.example.com --username yourname
 ```
 
 **SSO-federated schools.** If your institution signs you in through a
-portal (OIDC/SAML), your account may have no local Moodle password and
-the credentials mode will report `invalidlogin` — the password belongs
-to the identity provider, not to Moodle. Ask your Moodle admin for a
-token (Site administration → Server → Web services → Manage tokens) and
-set `MOODLE_TOKEN` directly; moodle-mcp never needs your SSO password.
+portal (OIDC/SAML), your account may have no local Moodle password —
+the credentials mode then answers `invalidlogin`, and `auth`
+automatically replays the school's own login portal with the same
+credentials instead (no browser; the SSO password travels only to the
+school's portal). If the portal enforces a captcha or does not offer a
+web login, ask your Moodle admin for a token (Site administration →
+Server → Web services → Manage tokens).
 
 Other flags: `--service` names the web service (default
 `moodle_mobile_app`), `--output json` prints machine-readable output, and

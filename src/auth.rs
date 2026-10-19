@@ -6,10 +6,10 @@
 //! (`--url`, `--username`, `--password`), so scripts work non-interactively
 //! too.
 //!
-//! - **credentials** mode: POST `/login/token.php` with username/password.
-//!   SSO-federated schools whose accounts have no local Moodle password
-//!   answer `invalidlogin` — the SSO replay path lives in [`crate::sso`]
-//!   (library-level for now; not yet reachable from this command).
+//! - **credentials** mode: POST `/login/token.php` with username/password;
+//!   SSO-federated schools answer `invalidlogin`, so the auth command then
+//!   automatically replays the school's own login chain ([`crate::sso`]) —
+//!   same command, same prompts, no browser.
 //!
 //! Output defaults to a ready-to-source `export` line; `--output json` prints
 //! raw JSON instead. Prompts render on stderr, so `--output json` on stdout
@@ -91,8 +91,26 @@ pub async fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
 
     let service = service.unwrap_or_else(|| "moodle_mobile_app".to_string());
 
-    let result =
+    let mut result =
         crate::client::MoodleClient::fetch_token(&base_url, &username, &password, &service).await;
+
+    // SSO-federated schools answer invalidlogin no matter what: the
+    // password belongs to the portal, not to Moodle. Replay the portal's
+    // own login chain with the same credentials before giving up — the
+    // user should not need to know which kind of school they attend.
+    if let Err(cred_err) = &result {
+        eprintln!("moodle-mcp auth: {cred_err}");
+        eprintln!("moodle-mcp auth: trying the school's SSO portal with the same credentials…");
+        match crate::sso::sso_login(&base_url, &service, &username, &password).await {
+            Ok(outcome) => {
+                result = Ok(serde_json::json!({ "token": outcome.token }));
+            }
+            Err(sso_err) => {
+                eprintln!("moodle-mcp auth: {sso_err}");
+                return Err("token acquisition failed".into());
+            }
+        }
+    }
 
     match result {
         Ok(payload) => {
