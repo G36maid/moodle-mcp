@@ -1,0 +1,77 @@
+name: pages
+
+on:
+  push:
+    branches: [main]
+    paths: ["site/**", "docs/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+# A Pages artifact is the whole site; overlapping deploys corrupt nothing
+# but publish torn states — serialize and drop the stale run.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # enablement creates the Pages site on first run; cname keeps the
+      # repo's custom-domain setting in sync with the CNAME file in the
+      # artifact (the API call needs the pages: write above).
+      - uses: actions/configure-pages@v6
+        with:
+          enablement: true
+          cname: moodle.ntnu.cc
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Build the landing page
+        run: |
+          npm ci
+          npm run build
+        working-directory: site
+
+      # mdBook and mdbook-mermaid move as a pair: the 0.17.x preprocessor
+      # against a 0.4.x book silently breaks. Keep these pins identical to
+      # the local toolchain the docs are verified against.
+      - name: Install the pinned mdBook toolchain
+        uses: taiki-e/install-action@v2
+        with:
+          tool: mdbook@0.5.4,mdbook-mermaid@0.17.1
+
+      - name: Build the book
+        run: mdbook build
+        working-directory: docs
+
+      - name: Assemble the Pages artifact
+        run: |
+          mkdir _site
+          cp -r site/dist/. _site/
+          mkdir _site/docs
+          cp -r docs/book/. _site/docs/
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
