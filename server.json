@@ -1,22 +1,40 @@
 {
   "$schema": "https://raw.githubusercontent.com/modelcontextprotocol/registry/main/schema/draft/schema.json",
   "name": "io.github.G36maid/moodle-mcp",
-  "description": "Moodle LMS for LLM agents — courses, assignments, forums, files, submissions. A single static Rust binary speaking MCP over stdio, verified against Moodle 3.7, 4.5 and 5.2. No site-side plugin, no admin help needed.",
-  "version": "0.2.0",
-  "authors": [{ "name": "G36maid" }],
+  "description": "Moodle LMS for LLM agents \u2014 courses, assignments, forums, files, submissions. A single static Rust binary speaking MCP over stdio, verified against Moodle 3.7, 4.5 and 5.2. No site-side plugin, no admin help needed.",
+  "version": "0.2.1",
+  "authors": [
+    {
+      "name": "G36maid"
+    }
+  ],
   "website": "https://moodle.ntnu.cc",
   "repository": "https://github.com/G36maid/moodle-mcp",
-  "keywords": ["moodle", "lms", "education", "assignments", "courses"],
+  "keywords": [
+    "moodle",
+    "lms",
+    "education",
+    "assignments",
+    "courses"
+  ],
   "license": "MIT",
-  "protocols": ["2025-06-18"],
-  "capabilities": { "tools": { "listChanged": false } },
+  "protocols": [
+    "2025-06-18"
+  ],
+  "capabilities": {
+    "tools": {
+      "listChanged": false
+    }
+  },
   "packages": [
     {
       "registry_type": "cargo",
       "identifier": "moodle-mcp",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "registry_base_url": "https://crates.io",
-      "transport": { "type": "stdio" }
+      "transport": {
+        "type": "stdio"
+      }
     }
   ]
 }

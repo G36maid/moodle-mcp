@@ -10,6 +10,22 @@ from start to finish.
 This page summarizes the highlights of past releases; the changelog in the
 repository is the complete record.
 
+## 0.2.1 — 2026-10-19
+
+- four defects found by an external review are fixed and tested: the
+  timezone probe no longer delays the MCP handshake on slow sites (it
+  runs alongside serving, UTC until it lands), a 429/503 cooldown is
+  per function instead of blinding every tool for the window, the
+  escape hatch fails closed when the token's function list can't be
+  loaded, and capped lists (notifications, conversations) report
+  `has_more` instead of silently truncating
+- the tool surface is verified against a self-hosted Moodle 5.2.4 —
+  both ends of the supported range are now live-checked (3.7, 4.5 on
+  live sites; 5.2 self-hosted), with zero code changes needed
+- releases ship `.mcpb` bundles — one-click installs for Claude
+  Desktop and Claude Code, no toolchain, prompting for
+  `MOODLE_URL`/`MOODLE_TOKEN` during setup
+
 ## 0.2.0 — 2026-10-19
 
 - per-school SSO drivers: `auth` logs into SSO-federated schools by

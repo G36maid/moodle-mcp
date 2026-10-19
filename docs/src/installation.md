@@ -31,6 +31,18 @@ dependencies.
 > verified"), clear the quarantine flag once:
 > `xattr -d com.apple.quarantine /usr/local/bin/moodle-mcp`.
 
+## One-Click Bundles (`.mcpb`)
+
+Every release also ships one `.mcpb` bundle per platform — the MCP bundle
+format for one-click installs. Clients that understand it (Claude Desktop,
+Claude Code) install the binary without a toolchain and prompt for
+`MOODLE_URL` and `MOODLE_TOKEN` during setup, so the token from
+`moodle-mcp auth` is all you need.
+
+Grab `moodle-mcp-<version>-<platform>.mcpb` from the
+[releases page](https://github.com/G36maid/moodle-mcp/releases/latest) and
+open it with your client.
+
 ## Cargo
 
 ```sh

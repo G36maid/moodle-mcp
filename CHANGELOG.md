@@ -29,6 +29,8 @@ follows [Semantic Versioning](https://semver.org/).
   the MCP `initialize` handshake — a slow site no longer looks like a
   dead server; timestamps render in UTC until the probe lands
 
+## [0.2.1] - 2026-10-19
+
 ## [0.2.0] - 2026-10-19
 
 ### Added
