@@ -92,10 +92,8 @@ pub async fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     let service = service.unwrap_or_else(|| "moodle_mobile_app".to_string());
 
     // Schools with a maintained driver (src/sso/) log in through their own
-    // SSO chain — no token.php attempt, no rejected-credentials noise.
-    // Everyone else goes through credentials mode; if that answers
-    // invalidlogin the error says where a token comes from, and a new
-    // driver is one PR away.
+    // SSO chain; everyone else through credentials mode — invalidlogin
+    // there points at the missing driver (one PR away).
     let token_payload = if crate::sso::supports_sso(&base_url) {
         match crate::sso::sso_login(&base_url, &service, &username, &password).await {
             Ok(outcome) => serde_json::json!({ "token": outcome.token }),
