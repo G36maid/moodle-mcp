@@ -158,6 +158,32 @@ pub struct SsoOutcome {
 
 mod ntust;
 
+/// The schools with a maintained driver.
+enum School {
+    Ntust,
+}
+
+/// The single switch-case: adding a school is one variant, one arm, and
+/// its own file under `src/sso/` — contributed by PR.
+fn school_for(host: &str) -> Option<School> {
+    if ntust::matches(host) {
+        Some(School::Ntust)
+    } else {
+        None
+    }
+}
+
+/// Whether this site has a maintained SSO driver. auth uses it to pick
+/// the SSO path vs the credentials path before any request moves — no
+/// probing, no rejected-credentials noise.
+pub fn supports_sso(base_url: &str) -> bool {
+    let host = url::Url::parse(base_url)
+        .ok()
+        .and_then(|u| u.host_str().map(str::to_string))
+        .unwrap_or_default();
+    school_for(&host).is_some()
+}
+
 /// Run the SSO driver registered for this site's host.
 ///
 /// Each school lives in its own self-contained module under `src/sso/`
@@ -176,13 +202,14 @@ pub async fn sso_login(
         .ok()
         .and_then(|u| u.host_str().map(str::to_string))
         .unwrap_or_default();
-    if ntust::matches(&host) {
-        return ntust::login(base_url, service, username, password).await;
+    match school_for(&host) {
+        Some(School::Ntust) => ntust::login(base_url, service, username, password).await,
+        None => Err(format!(
+            "no SSO driver for {host} — use the credentials mode (login/token.php) \
+             or ask your Moodle admin for a token; contributing one is a \
+             single file under src/sso/"
+        )),
     }
-    Err(format!(
-        "no SSO driver for {host} — use the credentials mode (login/token.php) \
-         or ask your Moodle admin for a token"
-    ))
 }
 
 #[cfg(test)]

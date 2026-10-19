@@ -6,10 +6,10 @@
 //! (`--url`, `--username`, `--password`), so scripts work non-interactively
 //! too.
 //!
-//! - **credentials** mode: POST `/login/token.php` with username/password;
-//!   SSO-federated schools answer `invalidlogin`, so the auth command then
-//!   automatically replays the school's own login chain ([`crate::sso`]) —
-//!   same command, same prompts, no browser.
+//! - **credentials** mode: POST `/login/token.php` with username/password.
+//!   Schools with a maintained SSO driver ([`crate::sso`], matched by host)
+//!   skip this and replay their own login chain instead — auth picks the
+//!   path per host, before any request moves.
 //!
 //! Output defaults to a ready-to-source `export` line; `--output json` prints
 //! raw JSON instead. Prompts render on stderr, so `--output json` on stdout
@@ -91,49 +91,51 @@ pub async fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
 
     let service = service.unwrap_or_else(|| "moodle_mobile_app".to_string());
 
-    let mut result =
-        crate::client::MoodleClient::fetch_token(&base_url, &username, &password, &service).await;
-
-    // SSO-federated schools answer invalidlogin no matter what: the
-    // password belongs to the portal, not to Moodle. Replay the portal's
-    // own login chain with the same credentials before giving up — the
-    // user should not need to know which kind of school they attend.
-    if let Err(cred_err) = &result {
-        eprintln!("moodle-mcp auth: {cred_err}");
-        eprintln!("moodle-mcp auth: trying the school's SSO portal with the same credentials…");
+    // Schools with a maintained driver (src/sso/) log in through their own
+    // SSO chain — no token.php attempt, no rejected-credentials noise.
+    // Everyone else goes through credentials mode; if that answers
+    // invalidlogin the error says where a token comes from, and a new
+    // driver is one PR away.
+    let token_payload = if crate::sso::supports_sso(&base_url) {
         match crate::sso::sso_login(&base_url, &service, &username, &password).await {
-            Ok(outcome) => {
-                result = Ok(serde_json::json!({ "token": outcome.token }));
-            }
-            Err(sso_err) => {
-                eprintln!("moodle-mcp auth: {sso_err}");
+            Ok(outcome) => serde_json::json!({ "token": outcome.token }),
+            Err(e) => {
+                eprintln!("moodle-mcp auth: {e}");
                 return Err("token acquisition failed".into());
             }
         }
-    }
-
-    match result {
-        Ok(payload) => {
-            let token = payload
-                .get("token")
-                .and_then(Value::as_str)
-                .ok_or("response did not contain a token")?;
-            if output_json {
-                println!("{payload}");
-            } else {
-                println!("Token obtained ({service}).");
-                println!();
-                println!("export MOODLE_URL='{base_url}' MOODLE_TOKEN='{token}'");
-                println!();
-                println!("The token is a credential — treat it like a password.");
+    } else {
+        match crate::client::MoodleClient::fetch_token(&base_url, &username, &password, &service)
+            .await
+        {
+            Ok(payload) => payload,
+            Err(e) => {
+                eprintln!("{e}");
+                if e.to_string().contains("no local Moodle password") {
+                    eprintln!(
+                        "moodle-mcp auth: no SSO driver is maintained for this school yet — \
+                         ask your admin for a token, or contribute one"
+                    );
+                }
+                return Err("token acquisition failed".into());
             }
-            Ok(())
         }
-        Err(e) => {
-            eprintln!("{e}");
-            Err("token acquisition failed".into())
-        }
+    };
+
+    let token = token_payload
+        .get("token")
+        .and_then(Value::as_str)
+        .ok_or("response did not contain a token")?;
+    if output_json {
+        println!("{token_payload}");
+    } else {
+        println!("Token obtained ({service}).");
+        println!();
+        println!("export MOODLE_URL='{base_url}' MOODLE_TOKEN='{token}'");
+        println!();
+        println!("The token is a credential — treat it like a password.");
     }
+    Ok(())
 }
 
 /// Prompt for the site URL until it looks like an http(s) URL.
