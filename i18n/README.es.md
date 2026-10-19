@@ -42,7 +42,7 @@ moodle-mcp inicia sesión con el agente como tú. 20 herramientas tipadas cubren
 
 ## 🚀 Inicio rápido
 
-Necesita una cuenta de **Moodle 3.7 → 5.x** en un sitio que permita el servicio web de la app móvil (la mayoría lo permiten — ver [requisitos previos](../docs/src/getting-started.md#prerequisites)).
+Necesita una cuenta de **Moodle 3.7 → 5.x** en un sitio que permita el servicio web de la app móvil (la mayoría lo permiten — ver [requisitos previos](../https://moodle.ntnu.cc/docs/getting-started.html#prerequisites)).
 
 ```bash
 # 1. Install
@@ -61,7 +61,7 @@ claude mcp add moodle \
 #    "What's due in the next two weeks? Plan my studying around it."
 ```
 
-Binarios precompilados, inicio de sesión SSO, fragmentos de configuración para cada cliente y la referencia completa de variables de entorno: [Instalación](../docs/src/installation.md) · [Primeros pasos](../docs/src/getting-started.md) · [Configuración](../docs/src/configuration.md)
+Binarios precompilados, inicio de sesión SSO, fragmentos de configuración para cada cliente y la referencia completa de variables de entorno: [Instalación](../https://moodle.ntnu.cc/docs/installation.html) · [Primeros pasos](../https://moodle.ntnu.cc/docs/getting-started.html) · [Configuración](../https://moodle.ntnu.cc/docs/configuration.html)
 
 ## 💬 Qué puede hacer el agente
 
@@ -96,18 +96,18 @@ Todo lo que las herramientas dedicadas no cubren está disponible a través de l
 
 ## 📚 Documentación
 
-La documentación completa vive en [`docs/`](../docs/src/SUMMARY.md) (mdBook — `mdbook serve docs` para leerla en local):
+La documentación completa vive en [`docs/`](../https://moodle.ntnu.cc/docs/) (mdBook — `mdbook serve docs` para leerla en local):
 
 | Página | Contenido |
 |---|---|
-| [Primeros pasos](../docs/src/getting-started.md) | de cero al primer prompt; no se asume experiencia con MCP |
-| [Instalación](../docs/src/installation.md) | binarios precompilados, cargo, desde el código fuente |
-| [Configuración](../docs/src/configuration.md) | todas las variables de entorno; fragmentos de configuración para Claude Code, Codex, OpenCode y pi |
-| [Herramientas](../docs/src/tools.md) | la referencia completa de las 22 herramientas y el flujo de IDs entre ellas |
-| [Seguridad y autenticación](../docs/src/security.md) | ciclo de vida del token, seguridad de transporte y de escritura |
-| [Changelog](../docs/src/changelog.md) | notas de versión, versión por versión |
-| [Desarrollo](../docs/src/development.md) | recorrido por la arquitectura, tests, proceso de publicación |
-| [Acerca de](../docs/src/about.md) | qué son moodle-mcp, MCP y Moodle |
+| [Primeros pasos](../https://moodle.ntnu.cc/docs/getting-started.html) | de cero al primer prompt; no se asume experiencia con MCP |
+| [Instalación](../https://moodle.ntnu.cc/docs/installation.html) | binarios precompilados, cargo, desde el código fuente |
+| [Configuración](../https://moodle.ntnu.cc/docs/configuration.html) | todas las variables de entorno; fragmentos de configuración para Claude Code, Codex, OpenCode y pi |
+| [Herramientas](../https://moodle.ntnu.cc/docs/tools.html) | la referencia completa de las 22 herramientas y el flujo de IDs entre ellas |
+| [Seguridad y autenticación](../https://moodle.ntnu.cc/docs/security.html) | ciclo de vida del token, seguridad de transporte y de escritura |
+| [Changelog](../https://moodle.ntnu.cc/docs/changelog.html) | notas de versión, versión por versión |
+| [Desarrollo](../https://moodle.ntnu.cc/docs/development.html) | recorrido por la arquitectura, tests, proceso de publicación |
+| [Acerca de](../https://moodle.ntnu.cc/docs/about.html) | qué son moodle-mcp, MCP y Moodle |
 
 ## 🧰 Desarrollo
 
@@ -118,13 +118,13 @@ cargo fmt -- --check
 cargo build --release
 ```
 
-La documentación del proyecto vive en [`docs/`](../docs/src/SUMMARY.md) — mdBook, formateado con Prettier (ver `docs/README.md`); vista previa con `mdbook serve docs`.
+La documentación del proyecto vive en [`docs/`](../https://moodle.ntnu.cc/docs/) — mdBook, formateado con Prettier (ver `docs/README.md`); vista previa con `mdbook serve docs`.
 
 La landing page vive en [`site/`](../site/) — Astro 7 + TypeScript (`cd site && npm install && npm run dev`, compilar con `npm run build`).
 
 ## 🔐 Seguridad
 
-Usa **HTTPS** — el token viaja con cada petición. Nunca aparece en la salida de las herramientas ni en los errores, solo se inyecta en URLs de Moodle del mismo sitio, y las herramientas de escritura te piden confirmación antes de actuar. Detalles completos: [Seguridad y autenticación](../docs/src/security.md).
+Usa **HTTPS** — el token viaja con cada petición. Nunca aparece en la salida de las herramientas ni en los errores, solo se inyecta en URLs de Moodle del mismo sitio, y las herramientas de escritura te piden confirmación antes de actuar. Detalles completos: [Seguridad y autenticación](../https://moodle.ntnu.cc/docs/security.html).
 
 ## 📄 Licencia
 

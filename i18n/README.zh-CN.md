@@ -42,7 +42,7 @@ moodle-mcp 让智能体以你的身份登录。20 个类型化工具覆盖完整
 
 ## 🚀 快速开始
 
-需要一个 Moodle 3.7 → 5.x 站点上允许移动应用 Web Service 的账号（多数站点均已允许 — 详见[前置条件](../docs/src/getting-started.md#prerequisites)）。
+需要一个 Moodle 3.7 → 5.x 站点上允许移动应用 Web Service 的账号（多数站点均已允许 — 详见[前置条件](../https://moodle.ntnu.cc/docs/getting-started.html#prerequisites)）。
 
 ```bash
 # 1. Install
@@ -61,7 +61,7 @@ claude mcp add moodle \
 #    "What's due in the next two weeks? Plan my studying around it."
 ```
 
-预编译二进制文件、SSO 登录、各客户端的配置片段，以及完整的环境变量参考：[安装](../docs/src/installation.md) · [快速入门](../docs/src/getting-started.md) · [配置](../docs/src/configuration.md)
+预编译二进制文件、SSO 登录、各客户端的配置片段，以及完整的环境变量参考：[安装](../https://moodle.ntnu.cc/docs/installation.html) · [快速入门](../https://moodle.ntnu.cc/docs/getting-started.html) · [配置](../https://moodle.ntnu.cc/docs/configuration.html)
 
 ## 💬 智能体能做什么
 
@@ -97,18 +97,18 @@ flowchart TD
 
 ## 📚 文档
 
-完整文档位于 [`docs/`](../docs/src/SUMMARY.md)（mdBook — 本机运行 `mdbook serve docs` 即可阅读）：
+完整文档位于 [`docs/`](../https://moodle.ntnu.cc/docs/)（mdBook — 本机运行 `mdbook serve docs` 即可阅读）：
 
 | 页面 | 内容 |
 |---|---|
-| [快速入门](../docs/src/getting-started.md) | 从零到第一个提示词；无需 MCP 经验 |
-| [安装](../docs/src/installation.md) | 预编译二进制文件、cargo、从源码构建 |
-| [配置](../docs/src/configuration.md) | 每个环境变量；Claude Code、Codex、OpenCode 和 pi 的配置片段 |
-| [工具](../docs/src/tools.md) | 完整的 22 个工具参考，以及工具之间的 ID 流转关系 |
-| [安全与认证](../docs/src/security.md) | Token 生命周期、传输与写入安全 |
-| [更新日志](../docs/src/changelog.md) | 逐版本发布说明 |
-| [开发](../docs/src/development.md) | 架构导览、测试、发布流程 |
-| [关于](../docs/src/about.md) | moodle-mcp、MCP 和 Moodle 分别是什么 |
+| [快速入门](../https://moodle.ntnu.cc/docs/getting-started.html) | 从零到第一个提示词；无需 MCP 经验 |
+| [安装](../https://moodle.ntnu.cc/docs/installation.html) | 预编译二进制文件、cargo、从源码构建 |
+| [配置](../https://moodle.ntnu.cc/docs/configuration.html) | 每个环境变量；Claude Code、Codex、OpenCode 和 pi 的配置片段 |
+| [工具](../https://moodle.ntnu.cc/docs/tools.html) | 完整的 22 个工具参考，以及工具之间的 ID 流转关系 |
+| [安全与认证](../https://moodle.ntnu.cc/docs/security.html) | Token 生命周期、传输与写入安全 |
+| [更新日志](../https://moodle.ntnu.cc/docs/changelog.html) | 逐版本发布说明 |
+| [开发](../https://moodle.ntnu.cc/docs/development.html) | 架构导览、测试、发布流程 |
+| [关于](../https://moodle.ntnu.cc/docs/about.html) | moodle-mcp、MCP 和 Moodle 分别是什么 |
 
 ## 🧰 开发
 
@@ -119,13 +119,13 @@ cargo fmt -- --check
 cargo build --release
 ```
 
-项目文档位于 [`docs/`](../docs/src/SUMMARY.md) — mdBook 格式，使用 Prettier 排版（见 `docs/README.md`）；可用 `mdbook serve docs` 预览。
+项目文档位于 [`docs/`](../https://moodle.ntnu.cc/docs/) — mdBook 格式，使用 Prettier 排版（见 `docs/README.md`）；可用 `mdbook serve docs` 预览。
 
 项目官网位于 [`site/`](../site/) — Astro 7 + TypeScript（`cd site && npm install && npm run dev`，使用 `npm run build` 构建）。
 
 ## 🔐 安全
 
-请始终使用 **HTTPS** — Token 会随每个请求传输。它绝不会出现在工具输出或错误信息中，也只会被注入同站点的 Moodle 链接，且写入类工具会在执行前先征得你的确认。完整细节请见[安全与认证](../docs/src/security.md)。
+请始终使用 **HTTPS** — Token 会随每个请求传输。它绝不会出现在工具输出或错误信息中，也只会被注入同站点的 Moodle 链接，且写入类工具会在执行前先征得你的确认。完整细节请见[安全与认证](../https://moodle.ntnu.cc/docs/security.html)。
 
 ## 📄 许可证
 

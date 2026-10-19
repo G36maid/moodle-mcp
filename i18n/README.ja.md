@@ -42,7 +42,7 @@ moodle-mcp はエージェントをあなたのアカウントでサインイン
 
 ## 🚀 クイックスタート
 
-モバイルアプリ用 Web サービスが許可されているサイトの **Moodle 3.7 〜 5.x** アカウントが必要です（多くのサイトで許可されています。[前提条件](../docs/src/getting-started.md#prerequisites) を参照）。
+モバイルアプリ用 Web サービスが許可されているサイトの **Moodle 3.7 〜 5.x** アカウントが必要です（多くのサイトで許可されています。[前提条件](../https://moodle.ntnu.cc/docs/getting-started.html#prerequisites) を参照）。
 
 ```bash
 # 1. Install
@@ -61,7 +61,7 @@ claude mcp add moodle \
 #    "What's due in the next two weeks? Plan my studying around it."
 ```
 
-事前ビルド済みバイナリ、SSO ログイン、各クライアント向けの設定スニペット、環境変数の完全なリファレンス:[インストール](../docs/src/installation.md) · [はじめに](../docs/src/getting-started.md) · [設定](../docs/src/configuration.md)
+事前ビルド済みバイナリ、SSO ログイン、各クライアント向けの設定スニペット、環境変数の完全なリファレンス:[インストール](../https://moodle.ntnu.cc/docs/installation.html) · [はじめに](../https://moodle.ntnu.cc/docs/getting-started.html) · [設定](../https://moodle.ntnu.cc/docs/configuration.html)
 
 ## 💬 エージェントにできること
 
@@ -96,18 +96,18 @@ flowchart TD
 
 ## 📚 ドキュメント
 
-完全なドキュメントは [`docs/`](../docs/src/SUMMARY.md) にあります（mdBook — `mdbook serve docs` でローカルから閲覧できます）:
+完全なドキュメントは [`docs/`](../https://moodle.ntnu.cc/docs/) にあります（mdBook — `mdbook serve docs` でローカルから閲覧できます）:
 
 | ページ | 内容 |
 |---|---|
-| [はじめに](../docs/src/getting-started.md) | ゼロから最初のプロンプトまで。MCP の経験は前提としません |
-| [インストール](../docs/src/installation.md) | 事前ビルド済みバイナリ、cargo、ソースからのビルド |
-| [設定](../docs/src/configuration.md) | すべての環境変数。Claude Code、Codex、OpenCode、pi 向けの設定スニペット |
-| [ツール](../docs/src/tools.md) | 22 ツールの完全なリファレンスとツール間の ID の流れ |
-| [セキュリティと認証](../docs/src/security.md) | トークンのライフサイクル、転送と書き込みの安全性 |
-| [変更履歴](../docs/src/changelog.md) | バージョンごとのリリースノート |
-| [開発](../docs/src/development.md) | アーキテクチャ解説、テスト、リリース手順 |
-| [moodle-mcp とは](../docs/src/about.md) | moodle-mcp、MCP、Moodle とは何か |
+| [はじめに](../https://moodle.ntnu.cc/docs/getting-started.html) | ゼロから最初のプロンプトまで。MCP の経験は前提としません |
+| [インストール](../https://moodle.ntnu.cc/docs/installation.html) | 事前ビルド済みバイナリ、cargo、ソースからのビルド |
+| [設定](../https://moodle.ntnu.cc/docs/configuration.html) | すべての環境変数。Claude Code、Codex、OpenCode、pi 向けの設定スニペット |
+| [ツール](../https://moodle.ntnu.cc/docs/tools.html) | 22 ツールの完全なリファレンスとツール間の ID の流れ |
+| [セキュリティと認証](../https://moodle.ntnu.cc/docs/security.html) | トークンのライフサイクル、転送と書き込みの安全性 |
+| [変更履歴](../https://moodle.ntnu.cc/docs/changelog.html) | バージョンごとのリリースノート |
+| [開発](../https://moodle.ntnu.cc/docs/development.html) | アーキテクチャ解説、テスト、リリース手順 |
+| [moodle-mcp とは](../https://moodle.ntnu.cc/docs/about.html) | moodle-mcp、MCP、Moodle とは何か |
 
 ## 🧰 開発
 
@@ -118,13 +118,13 @@ cargo fmt -- --check
 cargo build --release
 ```
 
-プロジェクトのドキュメントは [`docs/`](../docs/src/SUMMARY.md) にあります。mdBook 形式で、Prettier により整形されています（詳細は `docs/README.md` を参照）。`mdbook serve docs` でプレビューできます。
+プロジェクトのドキュメントは [`docs/`](../https://moodle.ntnu.cc/docs/) にあります。mdBook 形式で、Prettier により整形されています（詳細は `docs/README.md` を参照）。`mdbook serve docs` でプレビューできます。
 
 ランディングページは [`site/`](../site/) にあります。Astro 7 + TypeScript で構築されています（`cd site && npm install && npm run dev` で開発、`npm run build` でビルド）。
 
 ## 🔐 セキュリティ
 
-**HTTPS** を使用してください。トークンはすべてのリクエストに添付して送られます。ツールの出力やエラーに表示されることはなく、同一サイトの Moodle URL にのみ注入され、書き込みツールは実行前にあなたの確認を求めます。詳細:[セキュリティと認証](../docs/src/security.md)。
+**HTTPS** を使用してください。トークンはすべてのリクエストに添付して送られます。ツールの出力やエラーに表示されることはなく、同一サイトの Moodle URL にのみ注入され、書き込みツールは実行前にあなたの確認を求めます。詳細:[セキュリティと認証](../https://moodle.ntnu.cc/docs/security.html)。
 
 ## 📄 ライセンス
 

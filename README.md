@@ -57,7 +57,7 @@ browser:
 
 Needs a Moodle 3.7 → 5.x account on a site that allows the mobile-app web
 service (most do — see
-[prerequisites](docs/src/getting-started.md#prerequisites)).
+[prerequisites](https://moodle.ntnu.cc/docs/getting-started.html#prerequisites)).
 
 ```bash
 # 1. Install
@@ -78,9 +78,9 @@ claude mcp add moodle \
 
 Prebuilt binaries, SSO login, config snippets for every client, and the
 full environment-variable reference:
-[Installation](docs/src/installation.md) ·
-[Getting Started](docs/src/getting-started.md) ·
-[Configuration](docs/src/configuration.md)
+[Installation](https://moodle.ntnu.cc/docs/installation.html) ·
+[Getting Started](https://moodle.ntnu.cc/docs/getting-started.html) ·
+[Configuration](https://moodle.ntnu.cc/docs/configuration.html)
 
 ## 💬 What the agent can do
 
@@ -121,19 +121,19 @@ hatch is opt-in via `MOODLE_ENABLE_WS_FUNCTION=true`).
 
 ## 📚 Documentation
 
-Full documentation lives in [`docs/`](docs/src/SUMMARY.md) (mdBook —
+Full documentation lives at **[moodle.ntnu.cc/docs](https://moodle.ntnu.cc/docs/)** (mdBook —
 `mdbook serve docs` to read locally):
 
 | Page | Contents |
 |---|---|
-| [Getting Started](docs/src/getting-started.md) | from zero to the first prompt; no MCP experience assumed |
-| [Installation](docs/src/installation.md) | prebuilt binaries, cargo, from source |
-| [Configuration](docs/src/configuration.md) | every environment variable; config snippets for Claude Code, Codex, OpenCode, and pi |
-| [Tools](docs/src/tools.md) | the full 22-tool reference and the ID flow between them |
-| [Security & Authentication](docs/src/security.md) | token lifecycle, transport and write safety |
-| [Changelog](docs/src/changelog.md) | release notes, version by version |
-| [Development](docs/src/development.md) | architecture tour, tests, release process |
-| [About](docs/src/about.md) | what moodle-mcp, MCP, and Moodle are |
+| [Getting Started](https://moodle.ntnu.cc/docs/getting-started.html) | from zero to the first prompt; no MCP experience assumed |
+| [Installation](https://moodle.ntnu.cc/docs/installation.html) | prebuilt binaries, cargo, from source |
+| [Configuration](https://moodle.ntnu.cc/docs/configuration.html) | every environment variable; config snippets for Claude Code, Codex, OpenCode, and pi |
+| [Tools](https://moodle.ntnu.cc/docs/tools.html) | the full 22-tool reference and the ID flow between them |
+| [Security & Authentication](https://moodle.ntnu.cc/docs/security.html) | token lifecycle, transport and write safety |
+| [Changelog](https://moodle.ntnu.cc/docs/changelog.html) | release notes, version by version |
+| [Development](https://moodle.ntnu.cc/docs/development.html) | architecture tour, tests, release process |
+| [About](https://moodle.ntnu.cc/docs/about.html) | what moodle-mcp, MCP, and Moodle are |
 
 ## 🧰 Development
 
@@ -144,7 +144,7 @@ cargo fmt -- --check
 cargo build --release
 ```
 
-Project documentation lives in [`docs/`](docs/src/SUMMARY.md) — mdBook,
+Project documentation lives in [`docs/`](https://moodle.ntnu.cc/docs/) — mdBook,
 formatted with Prettier (see `docs/README.md`); preview with
 `mdbook serve docs`.
 
@@ -156,7 +156,7 @@ The landing page lives in [`site/`](site/) — Astro 7 + TypeScript
 Use **HTTPS** — the token travels with every request. It never appears in
 tool output or errors, is only injected into same-site Moodle URLs, and
 write tools confirm with you before they act. Full details:
-[Security & Authentication](docs/src/security.md).
+[Security & Authentication](https://moodle.ntnu.cc/docs/security.html).
 
 ## 📄 License
 

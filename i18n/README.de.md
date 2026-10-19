@@ -42,7 +42,7 @@ moodle-mcp meldet den Agenten unter deinem Namen an. 20 typisierte Werkzeuge dec
 
 ## 🚀 Schnellstart
 
-Benötigt wird ein Konto auf einer Moodle-Instanz 3.7 → 5.x, die den Webdienst der mobilen App erlaubt (die meisten tun das — siehe [Voraussetzungen](../docs/src/getting-started.md#prerequisites)).
+Benötigt wird ein Konto auf einer Moodle-Instanz 3.7 → 5.x, die den Webdienst der mobilen App erlaubt (die meisten tun das — siehe [Voraussetzungen](../https://moodle.ntnu.cc/docs/getting-started.html#prerequisites)).
 
 ```bash
 # 1. Install
@@ -61,7 +61,7 @@ claude mcp add moodle \
 #    "What's due in the next two weeks? Plan my studying around it."
 ```
 
-Vorkompilierte Binärdateien, SSO-Login, Konfigurationsbeispiele für jeden Client und die vollständige Referenz der Umgebungsvariablen: [Installation](../docs/src/installation.md) · [Erste Schritte](../docs/src/getting-started.md) · [Konfiguration](../docs/src/configuration.md)
+Vorkompilierte Binärdateien, SSO-Login, Konfigurationsbeispiele für jeden Client und die vollständige Referenz der Umgebungsvariablen: [Installation](../https://moodle.ntnu.cc/docs/installation.html) · [Erste Schritte](../https://moodle.ntnu.cc/docs/getting-started.html) · [Konfiguration](../https://moodle.ntnu.cc/docs/configuration.html)
 
 ## 💬 Was der Agent kann
 
@@ -97,18 +97,18 @@ Alles, was die dedizierten Werkzeuge nicht abdecken, ist über den Escape-Hatch 
 
 ## 📚 Dokumentation
 
-Die vollständige Dokumentation liegt in [`docs/`](../docs/src/SUMMARY.md) (mdBook — zum lokalen Lesen `mdbook serve docs`):
+Die vollständige Dokumentation liegt in [`docs/`](../https://moodle.ntnu.cc/docs/) (mdBook — zum lokalen Lesen `mdbook serve docs`):
 
 | Seite | Inhalt |
 |---|---|
-| [Erste Schritte](../docs/src/getting-started.md) | von null bis zum ersten Prompt; ohne MCP-Vorkenntnisse |
-| [Installation](../docs/src/installation.md) | vorkompilierte Binärdateien, cargo, aus dem Quellcode |
-| [Konfiguration](../docs/src/configuration.md) | jede Umgebungsvariable; Konfigurationsbeispiele für Claude Code, Codex, OpenCode und pi |
-| [Werkzeuge](../docs/src/tools.md) | die vollständige Referenz aller 22 Werkzeuge und der ID-Fluss zwischen ihnen |
-| [Sicherheit & Authentifizierung](../docs/src/security.md) | Token-Lebenszyklus, Transport- und Schreibsicherheit |
-| [Änderungsprotokoll](../docs/src/changelog.md) | Release-Notizen, Version für Version |
-| [Entwicklung](../docs/src/development.md) | Architekturrundgang, Tests, Release-Prozess |
-| [Über](../docs/src/about.md) | was moodle-mcp, MCP und Moodle sind |
+| [Erste Schritte](../https://moodle.ntnu.cc/docs/getting-started.html) | von null bis zum ersten Prompt; ohne MCP-Vorkenntnisse |
+| [Installation](../https://moodle.ntnu.cc/docs/installation.html) | vorkompilierte Binärdateien, cargo, aus dem Quellcode |
+| [Konfiguration](../https://moodle.ntnu.cc/docs/configuration.html) | jede Umgebungsvariable; Konfigurationsbeispiele für Claude Code, Codex, OpenCode und pi |
+| [Werkzeuge](../https://moodle.ntnu.cc/docs/tools.html) | die vollständige Referenz aller 22 Werkzeuge und der ID-Fluss zwischen ihnen |
+| [Sicherheit & Authentifizierung](../https://moodle.ntnu.cc/docs/security.html) | Token-Lebenszyklus, Transport- und Schreibsicherheit |
+| [Änderungsprotokoll](../https://moodle.ntnu.cc/docs/changelog.html) | Release-Notizen, Version für Version |
+| [Entwicklung](../https://moodle.ntnu.cc/docs/development.html) | Architekturrundgang, Tests, Release-Prozess |
+| [Über](../https://moodle.ntnu.cc/docs/about.html) | was moodle-mcp, MCP und Moodle sind |
 
 ## 🧰 Entwicklung
 
@@ -119,13 +119,13 @@ cargo fmt -- --check
 cargo build --release
 ```
 
-Die Projektdokumentation liegt in [`docs/`](../docs/src/SUMMARY.md) — mdBook, formatiert mit Prettier (siehe `docs/README.md`); Vorschau mit `mdbook serve docs`.
+Die Projektdokumentation liegt in [`docs/`](../https://moodle.ntnu.cc/docs/) — mdBook, formatiert mit Prettier (siehe `docs/README.md`); Vorschau mit `mdbook serve docs`.
 
 Die Landingpage liegt in [`site/`](../site/) — Astro 7 + TypeScript (`cd site && npm install && npm run dev`, Build mit `npm run build`).
 
 ## 🔐 Sicherheit
 
-Verwende **HTTPS** — der Token wird bei jeder Anfrage mitgesendet. Er erscheint nie in Werkzeugausgaben oder Fehlermeldungen, wird nur in Moodle-URLs derselben Site eingefügt, und Schreibwerkzeuge holen vor jeder Aktion deine Bestätigung ein. Alle Details: [Sicherheit & Authentifizierung](../docs/src/security.md).
+Verwende **HTTPS** — der Token wird bei jeder Anfrage mitgesendet. Er erscheint nie in Werkzeugausgaben oder Fehlermeldungen, wird nur in Moodle-URLs derselben Site eingefügt, und Schreibwerkzeuge holen vor jeder Aktion deine Bestätigung ein. Alle Details: [Sicherheit & Authentifizierung](../https://moodle.ntnu.cc/docs/security.html).
 
 ## 📄 Lizenz
 
