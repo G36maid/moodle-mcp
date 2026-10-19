@@ -22,6 +22,12 @@ follows [Semantic Versioning](https://semver.org/).
 - a `download_file` `overwrite` parameter (`false` by default) for
   intentional re-downloads
 - a `cargo-audit` CI job failing the build on RustSec advisory matches
+- security-review hardening: redirects that originate from the Moodle
+  site may never drop to plain http (the token-bearing chain), an SSO
+  driver's callback POST gets the same https guard as the password POST,
+  the `export` line `auth` prints is quote-safe against hostile tokens,
+  and `MOODLE_TIMEOUT_SECS` typos fail at startup instead of silently
+  becoming the default
 - per-school SSO drivers under `src/sso/` (one file, one PR): auth
   dispatches by host — a school with a maintained driver replays its own
   login chain over plain HTTP (no browser, no token paste) and the token

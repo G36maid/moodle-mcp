@@ -118,7 +118,7 @@ pub async fn validate_token(base_url: &str, token: &str) -> Result<serde_json::V
     if value.get("exception").is_some() {
         return Err(format!(
             "the site rejected the token: {}",
-            echo_safe(
+            crate::util::echo_safe(
                 value
                     .get("message")
                     .or_else(|| value.get("error"))
@@ -128,25 +128,6 @@ pub async fn validate_token(base_url: &str, token: &str) -> Result<serde_json::V
         ));
     }
     Ok(value)
-}
-
-/// Server-provided text reaches the terminal through error messages —
-/// strip control characters (escape-sequence injection) and cap length.
-fn echo_safe(text: &str) -> String {
-    text.chars().filter(|c| !c.is_control()).take(200).collect()
-}
-
-/// The loopback carve-out for the plaintext-credential guard: local test
-/// instances (the same exemption `MOODLE_ALLOW_HTTP` makes) plus
-/// localhost-shaped names.
-pub(crate) fn is_loopback_host(host: Option<&str>) -> bool {
-    let Some(host) = host else { return false };
-    if host == "localhost" || host.ends_with(".localhost") {
-        return true;
-    }
-    host.parse::<std::net::IpAddr>()
-        .map(|ip| ip.is_loopback())
-        .unwrap_or(false)
 }
 
 /// The result of a successful SSO run: the token for `MOODLE_TOKEN` and the

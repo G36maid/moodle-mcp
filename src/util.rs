@@ -193,6 +193,24 @@ pub fn truncate_chars(s: &str, max: usize) -> String {
     format!("{cut}… [truncated]")
 }
 
+/// Server-provided error text reaches the terminal through error messages —
+/// strip control characters (escape-sequence injection) and cap length.
+pub fn echo_safe(text: &str) -> String {
+    text.chars().filter(|c| !c.is_control()).take(200).collect()
+}
+
+/// The loopback carve-out for the plaintext-credential guard: local test
+/// instances (the same exemption `MOODLE_ALLOW_HTTP` makes) plus
+/// localhost-shaped names.
+pub fn is_loopback_host(host: &str) -> bool {
+    if host == "localhost" || host.ends_with(".localhost") {
+        return true;
+    }
+    host.parse::<std::net::IpAddr>()
+        .map(|ip| ip.is_loopback())
+        .unwrap_or(false)
+}
+
 /// Fetch a value from nested JSON by a `a.b.c`-style path (objects only).
 pub fn dig<'a>(v: &'a Value, path: &str) -> Option<&'a Value> {
     path.split('.').try_fold(v, |acc, key| acc.get(key))

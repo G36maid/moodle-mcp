@@ -69,8 +69,11 @@ on.
 ## Timeouts and Timezones
 
 `MOODLE_TIMEOUT_SECS` bounds each API request and the startup timezone
-lookup. File downloads stream to disk and use a read timeout instead of a
-total timeout, so large files finish while stalled connections still die.
+lookup. A value that is not a number of seconds (or is `0`) fails at
+startup — the same rule the boolean switches follow, so a typo can never
+silently shorten every timeout to nothing. File downloads stream to disk
+and use a read timeout instead of a total timeout, so large files finish
+while stalled connections still die.
 
 By default timestamps render in the timezone Moodle itself uses for you:
 the site's forced timezone, then your profile timezone if the site shows

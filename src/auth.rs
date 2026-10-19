@@ -129,11 +129,24 @@ pub async fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     } else {
         println!("Token obtained ({service}).");
         println!();
-        println!("export MOODLE_URL='{base_url}' MOODLE_TOKEN='{token}'");
+        // The line is meant for `source`/`eval` — a token from a hostile
+        // server must not be able to break out of the quoting.
+        println!(
+            "export MOODLE_URL='{}' MOODLE_TOKEN='{}'",
+            shell_single_quoted(&base_url),
+            shell_single_quoted(token)
+        );
         println!();
         println!("The token is a credential — treat it like a password.");
     }
     Ok(())
+}
+
+/// Make a value safe inside single quotes for POSIX shells: everything
+/// between single quotes is literal except the quote itself, which closes,
+/// emits an escaped quote, and reopens.
+fn shell_single_quoted(value: &str) -> String {
+    value.replace('\'', "'\\''")
 }
 
 /// Prompt for the site URL until it looks like an http(s) URL.
@@ -203,4 +216,24 @@ fn prompt_error(err: inquire::InquireError) -> Box<dyn std::error::Error> {
          pass --url, --username and --password as flags instead"
     )
     .into()
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn quoting_keeps_hostile_values_inert() {
+        // a token from a hostile server must not break out of the quoting
+        // when the printed export line is sourced: a'\''b re-enters the
+        // quoting, so everything between the outer quotes stays literal.
+        let hostile = "a'; rm -rf ~; '";
+        let quoted = format!("'{}'", super::shell_single_quoted(hostile));
+        assert_eq!(
+            quoted,
+            concat!("'", "a", "'\\''", "; rm -rf ~; ", "'\\''", "'")
+        );
+        assert_eq!(
+            super::shell_single_quoted("plain-token-123"),
+            "plain-token-123"
+        );
+    }
 }

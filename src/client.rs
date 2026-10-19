@@ -37,22 +37,41 @@ pub struct MoodleClient {
 /// Redirect confinement: only redirects that ORIGINATE from the Moodle site
 /// are host-locked — those carry the injected `?token=` and must never cross
 /// to a third party. Redirect chains that started on an external URL (course
-/// links → CDNs, http→https hops) may continue.
+/// links → CDNs, http→https hops) may continue. Site-originated chains may
+/// also never drop to plain http: the token-bearing query would cross the
+/// wire in cleartext even on the same host.
 fn redirect_policy(base_host: Option<String>) -> reqwest::redirect::Policy {
     reqwest::redirect::Policy::custom(move |attempt| {
         if attempt.previous().len() >= 10 {
             return attempt.error("too many redirects");
         }
-        let from_site = attempt
-            .previous()
-            .last()
+        let origin = attempt.previous().last();
+        let from_site = origin
             .and_then(|u| u.host_str())
             .is_some_and(|h| Some(h) == base_host.as_deref());
+        if from_site
+            && downgrades_https(
+                origin.map(|u| u.scheme().to_string()).as_deref(),
+                attempt.url(),
+            )
+        {
+            return attempt.error(
+                "refusing an https→http downgrade redirect \
+                                  from the Moodle site",
+            );
+        }
         match (from_site, attempt.url().host_str()) {
             (true, Some(h)) if Some(h) != base_host.as_deref() => attempt.stop(),
             _ => attempt.follow(),
         }
     })
+}
+
+/// An https request may never be redirected to plain http — a stripping
+/// proxy or misconfigured school mirror would otherwise carry the token
+/// query onto the wire in cleartext.
+fn downgrades_https(from_scheme: Option<&str>, to: &url::Url) -> bool {
+    from_scheme == Some("https") && to.scheme() == "http"
 }
 
 impl MoodleClient {
@@ -456,15 +475,9 @@ fn token_error_hint(code: &str, error: &str, service: &str) -> String {
         _ => format!(
             "login failed: {} (check username/password and that the \
          service '{service}' is enabled for your account)",
-            echo_safe(error)
+            crate::util::echo_safe(error)
         ),
     }
-}
-
-/// Server-provided error text reaches the terminal through this message —
-/// strip control characters (escape-sequence injection) and cap length.
-fn echo_safe(text: &str) -> String {
-    text.chars().filter(|c| !c.is_control()).take(200).collect()
 }
 
 /// Rewrite `/pluginfile.php/<args…>` into `/webservice/pluginfile.php/<args…>`

@@ -62,7 +62,7 @@ pub fn normalize_site_url(raw: &str, allow_http: bool) -> Result<String, String>
     let url =
         url::Url::parse(&with_scheme).map_err(|e| format!("invalid site URL '{trimmed}': {e}"))?;
     let host = url.host_str().unwrap_or_default();
-    if url.scheme() == "http" && !is_loopback_host(host) && !allow_http {
+    if url.scheme() == "http" && !crate::util::is_loopback_host(host) && !allow_http {
         return Err(format!(
             "refusing plain http for '{trimmed}' — the token (and on `auth`, the password) \
              would travel unencrypted; use https:// (local test instance? use \
@@ -72,8 +72,19 @@ pub fn normalize_site_url(raw: &str, allow_http: bool) -> Result<String, String>
     Ok(with_scheme)
 }
 
-fn is_loopback_host(host: &str) -> bool {
-    host == "localhost" || host.starts_with("127.") || host == "::1" || host == "[::1]"
+/// Parse MOODLE_TIMEOUT_SECS: a typo must fail startup, not silently
+/// become the default — the same rule the boolean switches follow.
+fn parse_timeout_secs(raw: &str) -> Result<u64, String> {
+    let secs: u64 = raw.trim().parse().map_err(|_| {
+        format!(
+            "MOODLE_TIMEOUT_SECS: '{}' is not a number of seconds (e.g. 60)",
+            raw.trim()
+        )
+    })?;
+    if secs == 0 {
+        return Err("MOODLE_TIMEOUT_SECS: must be at least 1 second".to_string());
+    }
+    Ok(secs)
 }
 
 impl Config {
@@ -92,10 +103,10 @@ impl Config {
             normalize_site_url(&raw_url, allow_http).map_err(|e| format!("MOODLE_URL: {e}"))?;
         let token = std::env::var("MOODLE_TOKEN")
             .map_err(|_| "MOODLE_TOKEN is required (Moodle web service token)".to_string())?;
-        let timeout_secs = std::env::var("MOODLE_TIMEOUT_SECS")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(60);
+        let timeout_secs = match std::env::var("MOODLE_TIMEOUT_SECS") {
+            Ok(v) => parse_timeout_secs(&v)?,
+            Err(_) => 60,
+        };
         let timezone = std::env::var("MOODLE_TIMEZONE")
             .ok()
             .map(|v| v.trim().to_string())
@@ -204,5 +215,32 @@ mod tests {
     #[test]
     fn garbage_is_rejected() {
         assert!(normalize_site_url("not a url", false).is_err());
+    }
+
+    #[test]
+    fn timeout_typo_fails_instead_of_defaulting() {
+        // safety-relevant env values must fail loudly — same rule as the
+        // boolean switches
+        for bad in ["6O", "", "abc", "0", "-5"] {
+            assert!(parse_timeout_secs(bad).is_err(), "{bad} must be rejected");
+        }
+        assert_eq!(parse_timeout_secs("90").unwrap(), 90);
+        assert_eq!(parse_timeout_secs(" 60 ").unwrap(), 60);
+    }
+
+    #[test]
+    fn loopback_detection_matches_host_shapes() {
+        for host in [
+            "localhost",
+            "moodle.localhost",
+            "127.0.0.1",
+            "127.8.9.10",
+            "::1",
+        ] {
+            assert!(crate::util::is_loopback_host(host), "{host} is loopback");
+        }
+        for host in ["example.com", "localhost.evil.com", "10.0.0.1"] {
+            assert!(!crate::util::is_loopback_host(host), "{host} is not");
+        }
     }
 }

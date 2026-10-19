@@ -80,7 +80,11 @@ pub async fn login(
     // The password crosses exactly this connection — never plain http
     // unless the school's host is loopback (the same carve-out
     // MOODLE_ALLOW_HTTP makes for local test instances).
-    if post_url.scheme() != "https" && !super::is_loopback_host(post_url.host_str()) {
+    if post_url.scheme() != "https"
+        && !post_url
+            .host_str()
+            .is_some_and(crate::util::is_loopback_host)
+    {
         return Err(format!(
             "refusing to send the password over {} — the school's login form \
              resolved to a non-https address",
@@ -107,6 +111,19 @@ pub async fn login(
         .map_err(|e| format!("bad callback URL: {e}"))?
         .join(&callback)
         .map_err(|e| format!("bad callback action: {e}"))?;
+    // PKCE makes a stolen code useless without the verifier, but the
+    // session cookie rides this POST — same plaintext guard as the password.
+    if callback_url.scheme() != "https"
+        && !callback_url
+            .host_str()
+            .is_some_and(crate::util::is_loopback_host)
+    {
+        return Err(format!(
+            "refusing to send the authorization code over {} — the school's \
+             callback resolved to a non-https address",
+            callback_url.scheme()
+        ));
+    }
     client
         .post(callback_url)
         .form(&code_fields)
