@@ -19,6 +19,8 @@ cargo test
 ```
 
 Rust 1.88+ (edition 2024). All tests are offline — no live Moodle needed.
+Hooks: `prek install` wires commit/push gates (fmt, clippy at push,
+changelog structure, hygiene) — keep them enabled when committing.
 Releases: pushing a `v*` tag builds multi-platform binaries and publishes
 to crates.io; a `CHANGELOG.md` section for the version is required.
 
