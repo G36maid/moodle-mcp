@@ -4,6 +4,65 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versioning
 follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- file tools accept only same-site Moodle URLs — external links belong to the
+  agent's own web tooling (`MOODLE_ALLOW_EXTERNAL_FETCH=true` opts out)
+- `MOODLE_ENABLE_WS_FUNCTION` opts in to the `call_ws_function` escape hatch
+  (hidden by default — a write-capable raw call is a conscious choice;
+  `MOODLE_READ_ONLY` hides it regardless)
+- `MOODLE_ALLOW_HTTP=true` / `auth --allow-http` allow plain-http sites (local
+  test instances on loopback hosts need no flags)
+- `MOODLE_UA` overrides the User-Agent on both HTTP clients (default stays
+  `moodle-mcp/{version}`)
+- `MOODLE_LOG_LEVEL` sets the log level (`error|warn|info|debug|trace`,
+  default `info`); `RUST_LOG` remains the advanced escape hatch
+- a `download_file` `overwrite` parameter (`false` by default) for
+  intentional re-downloads
+- a `cargo-audit` CI job failing the build on RustSec advisory matches
+- an SSO driver for schools that federate login through OIDC portals: the
+  school's login form chain is replayed over plain HTTP — no browser, no
+  token paste — and the resulting token is validated before it is shown
+  (verified live against NTUST's IdentityServer portal)
+
+### Removed
+
+- the `auth --open` flag: the Security-keys-page flow did not work at any
+  surveyed school (the page was blocked by the web server or empty), and
+  both verified schools are covered without a browser — NTNU by the
+  credentials mode, NTUST by the SSO driver
+
+### Changed
+
+- `list_functions` is renamed to `list_ws_functions` — it pairs with
+  `call_ws_function` and says what it lists (web-service functions)
+- the whole escape hatch pair (`list_ws_functions`, `call_ws_function`) is
+  out of the default tool surface: the server
+  now lists 20 tools until `MOODLE_ENABLE_WS_FUNCTION=true` opts in
+- boolean env switches (`MOODLE_READ_ONLY`, `MOODLE_ALLOW_HTTP`,
+  `MOODLE_ALLOW_EXTERNAL_FETCH`, `MOODLE_ENABLE_WS_FUNCTION`) accept
+  `true`/`false` (also `1`/`0`, `yes`/`no`, `on`/`off`, case-insensitive)
+  and reject any other value at startup instead of silently falling back —
+  a typo'd `MOODLE_READ_ONLY=ture` used to disable the safety switch
+- `MOODLE_URL` without a scheme now defaults to `https://`, and plain
+  `http://` is rejected unless the host is loopback or the escape hatch is
+  set — the token (and on `auth`, the password) would otherwise travel in
+  cleartext
+
+### Fixed
+
+- timestamps render in the timezone Moodle itself uses for the user: the
+  site's forced timezone, then the user's profile timezone if the site
+  shows it, then the site default (the site-level values need Moodle 4.2+).
+  The 0.1.2 detection read a user preference, but Moodle keeps the timezone
+  in the user record, so without `MOODLE_TIMEZONE` stock sites fell back to
+  UTC (#8, fix by @thc1006)
+- `fetch_file` no longer writes a predictable temp file for document
+  conversion (a symlink/TOCTOU hazard on multi-user machines) — documents
+  are converted fully in memory, with one less disk round-trip
+
 ## [0.1.4] - 2026-10-15
 
 ### Fixed
