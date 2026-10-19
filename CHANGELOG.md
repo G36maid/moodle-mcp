@@ -13,6 +13,9 @@ follows [Semantic Versioning](https://semver.org/).
   4.5 on live sites, 5.2 self-hosted)
 - capped list tools report `has_more` (notifications, conversations) —
   the model can tell "all of them" from "the newest N"
+- releases ship `.mcpb` bundles alongside the platform archives —
+  one-click installs for MCP-bundle clients (Claude Desktop/Claude Code),
+  with `MOODLE_URL`/`MOODLE_TOKEN` declared in the manifest
 
 ### Changed
 

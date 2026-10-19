@@ -76,10 +76,54 @@ jobs:
           Compress-Archive -Path $staging -DestinationPath "$staging.zip"
           "archive=$staging.zip" >> $env:GITHUB_ENV
 
+      - name: Package (mcpb)
+        # MCP bundle (mcpb): manifest + the raw binary, flat zip. Claude
+        # Desktop/Claude Code install these with one click — no toolchain.
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          EXT=""
+          CMD="${BIN_NAME}"
+          if [[ "${{ matrix.target }}" == *windows* ]]; then
+            EXT=".exe"
+            CMD="${BIN_NAME}.exe"
+          fi
+          DIR="mcpb-staging"
+          rm -rf "$DIR" && mkdir "$DIR"
+          cp "target/${{ matrix.target }}/release/${BIN_NAME}${EXT}" "${DIR}/${CMD}"
+          cat > "${DIR}/manifest.json" <<EOF
+          {
+            "manifest_version": "0.3",
+            "name": "moodle-mcp",
+            "display_name": "moodle-mcp",
+            "version": "${VERSION}",
+            "description": "Moodle LMS for LLM agents — courses, assignments, forums, files, submissions.",
+            "author": { "name": "G36maid" },
+            "website": "https://moodle.ntnu.cc",
+            "repository": "https://github.com/G36maid/moodle-mcp",
+            "server": {
+              "type": "binary",
+              "command": "${CMD}",
+              "env": {
+                "MOODLE_URL": { "description": "Moodle site URL, e.g. https://moodle.example.com", "required": true },
+                "MOODLE_TOKEN": { "description": "Web-service token from moodle-mcp auth", "required": true }
+              }
+            }
+          }
+          EOF
+          if [[ "${{ matrix.os }}" == windows-* ]]; then
+            (cd "$DIR" && 7z a "../moodle-mcp-${VERSION}-${{ matrix.target }}.mcpb" .)
+          else
+            (cd "$DIR" && zip -r "../moodle-mcp-${VERSION}-${{ matrix.target }}.mcpb" .)
+          fi
+          echo "mcpb=moodle-mcp-${VERSION}-${{ matrix.target }}.mcpb" >> "$GITHUB_ENV"
+
       - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.target }}
-          path: ${{ env.archive }}
+          path: |
+            ${{ env.archive }}
+            ${{ env.mcpb }}
 
   release:
     needs: build
