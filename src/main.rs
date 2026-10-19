@@ -100,7 +100,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let client = Arc::new(MoodleClient::new(cfg.clone())?);
-    resolve_timezone(&client, cfg.timezone.as_deref(), cfg.timeout_secs).await;
+    // The timezone probe costs a full round-trip on a slow site, and MCP
+    // clients treat a late `initialize` reply as a dead server — resolve
+    // it while serving instead of before the handshake. Timestamps render
+    // in UTC until it lands (set_timezone's first call wins).
+    let tz_client = Arc::clone(&client);
+    let (tz_opt, timeout) = (cfg.timezone.clone(), cfg.timeout_secs);
+    tokio::spawn(async move {
+        resolve_timezone(&tz_client, tz_opt.as_deref(), timeout).await;
+    });
     if cfg.read_only {
         tracing::info!("read-only mode: write, upload and raw-call tools are disabled");
     }

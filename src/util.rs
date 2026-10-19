@@ -9,13 +9,13 @@ use serde_json::Value;
 /// exactly one Moodle site, so a global is the pragmatic choice).
 static TIMEZONE: OnceLock<chrono_tz::Tz> = OnceLock::new();
 
-/// Install the timezone all timestamps render in (startup only; the first
-/// call wins, later calls are no-ops).
+/// Install the timezone all timestamps render in (the first call wins,
+/// later calls are no-ops).
 pub fn set_timezone(tz: chrono_tz::Tz) {
     let _ = TIMEZONE.set(tz);
 }
 
-/// The active rendering timezone (UTC until startup resolution).
+/// The active rendering timezone (UTC until the probe lands).
 pub fn timezone() -> chrono_tz::Tz {
     *TIMEZONE.get().unwrap_or(&chrono_tz::Tz::UTC)
 }

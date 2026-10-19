@@ -1485,3 +1485,97 @@ async fn site_level_redirect_is_resolved_to_the_final_origin() {
             .is_none()
     );
 }
+
+/// A 429 starts a cooldown for the throttled function only — other
+/// functions (other tools) must keep working through the window, and the
+/// throttled one must fail locally without touching the wire.
+#[tokio::test]
+async fn cooldown_is_per_function() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(body_string_contains("wsfunction=core_grades_get_grades"))
+        .respond_with(ResponseTemplate::new(429).insert_header("Retry-After", "300"))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(body_string_contains(
+            "wsfunction=core_enrol_get_users_courses",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!([{"id": 3, "fullname": "c"}])))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let client = client_for(&server).await;
+    // First 429 surfaces as the HTTP error and starts the cooldown…
+    let err = client
+        .call("core_grades_get_grades", &json!({"courseid": 3}))
+        .await
+        .unwrap_err();
+    assert!(matches!(err, MoodleError::HttpStatus { .. }), "{err}");
+    // …the next call to the same function is refused locally instead of
+    // hitting the wire again.
+    let err = client
+        .call("core_grades_get_grades", &json!({"courseid": 3}))
+        .await
+        .unwrap_err();
+    assert!(matches!(err, MoodleError::HttpCooldown { .. }), "{err}");
+    let ok = client
+        .call("core_enrol_get_users_courses", &json!({}))
+        .await
+        .unwrap();
+    assert_eq!(ok[0]["id"], json!(3), "other functions keep working");
+}
+
+/// The legacy two-call merge caps at the requested limit and must say so —
+/// `has_more` distinguishes "all of them" from "the newest N".
+#[tokio::test]
+async fn notifications_report_truncation() {
+    let server = MockServer::start().await;
+    let twenty_five: Vec<Value> = (100..125)
+        .map(|i| {
+            json!({"id": i, "useridfrom": 7, "timecreated": i, "timeread": null,
+                        "subject": "s", "userfromfullname": "x", "smallmessage": "m"})
+        })
+        .collect();
+    Mock::given(method("POST"))
+        .and(body_string_contains("wsfunction=core_message_get_messages"))
+        .and(body_string_contains("read=0"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"messages": twenty_five})))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(body_string_contains("wsfunction=core_message_get_messages"))
+        .and(body_string_contains("read=1"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"messages": []})))
+        .mount(&server)
+        .await;
+
+    let client = client_for(&server).await;
+    let out = moodle_mcp::tools::messaging::get_notifications(
+        &client,
+        "core_message_get_messages",
+        5,
+        None,
+        20,
+        false,
+    )
+    .await
+    .expect("notifications");
+    assert_eq!(out["count"], json!(20));
+    assert_eq!(out["has_more"], json!(true));
+
+    // Below the cap: has_more stays false even when the halves overlap.
+    let out = moodle_mcp::tools::messaging::get_notifications(
+        &client,
+        "core_message_get_messages",
+        5,
+        None,
+        50,
+        false,
+    )
+    .await
+    .expect("notifications");
+    assert_eq!(out["count"], json!(25));
+    assert_eq!(out["has_more"], json!(false));
+}

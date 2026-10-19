@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -25,13 +26,15 @@ pub struct MoodleClient {
     rest_url: String,
     token: String,
     allow_external_fetch: bool,
-    /// Local cooldown gate after a 429/503: `Some((status, until epoch secs))`.
-    /// While active, `call()` fails locally without touching the network —
-    /// an agent's blind retry loop becomes fast local failures instead of a
-    /// request storm against the school's server. One process serves one
-    /// site and one token, so a process-global gate matches the per-token
-    /// limiting Moodle/proxies apply.
-    cooldown: Arc<Mutex<Option<(u16, i64)>>>,
+    /// Local cooldown after a 429/503, keyed by wsfunction:
+    /// `(status, until epoch secs)`. While active, `call()` fails locally
+    /// without touching the network — an agent's blind retry loop becomes
+    /// fast local failures instead of a
+    /// request storm against the school's server. Keyed per function:
+    /// one throttled function must not blind every tool — other
+    /// endpoints (and other tools' writes) keep working through the
+    /// window.
+    cooldown: Arc<Mutex<HashMap<String, (u16, i64)>>>,
 }
 
 /// Redirect confinement: only redirects that ORIGINATE from the Moodle site
@@ -112,7 +115,7 @@ impl MoodleClient {
             base_url: cfg.base_url,
             token: cfg.token,
             allow_external_fetch: cfg.allow_external_fetch,
-            cooldown: Arc::new(Mutex::new(None)),
+            cooldown: Arc::new(Mutex::new(HashMap::new())),
         })
     }
 
@@ -120,11 +123,15 @@ impl MoodleClient {
         header?.to_str().ok()?.trim().parse::<u64>().ok()
     }
 
-    fn start_cooldown(&self, status: u16, retry_after: u64) {
+    fn start_cooldown(&self, wsfunction: &str, status: u16, retry_after: u64) {
         let until = crate::util::now_unix() + retry_after as i64;
         // A panic while holding the gate must not poison it shut forever —
         // every later call would fail without ever reaching the wire.
-        *self.cooldown.lock().unwrap_or_else(|e| e.into_inner()) = Some((status, until));
+        // Expired entries leave with the insert so the map stays the size
+        // of the functions actually in cooldown.
+        let mut map = self.cooldown.lock().unwrap_or_else(|e| e.into_inner());
+        map.retain(|_, &mut (_, u)| u > crate::util::now_unix());
+        map.insert(wsfunction.to_string(), (status, until));
     }
 
     /// Host identity for same-site checks: hostname plus the explicit port
@@ -239,10 +246,15 @@ impl MoodleClient {
         ];
         flatten_json(params, "", &mut form);
 
-        // Local cooldown gate: after a 429/503 we stop hitting the wire
-        // entirely — the request is refused without leaving the process.
+        // Local cooldown gate, per function: after a 429/503 on this
+        // function we stop hitting the wire entirely — the request is
+        // refused without leaving the process.
         let now = crate::util::now_unix();
-        if let Some((status, until)) = *self.cooldown.lock().unwrap_or_else(|e| e.into_inner())
+        if let Some(&(status, until)) = self
+            .cooldown
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(wsfunction)
             && now < until
         {
             return Err(MoodleError::HttpCooldown {
@@ -271,7 +283,7 @@ impl MoodleClient {
         // send HTML error pages; Moodle maintenance sends 503 + Retry-After).
         if matches!(status.as_u16(), 429 | 503) {
             let secs = retry_after.unwrap_or(if status.as_u16() == 503 { 300 } else { 30 });
-            self.start_cooldown(status.as_u16(), secs);
+            self.start_cooldown(wsfunction, status.as_u16(), secs);
         }
 
         // Moodle exception payloads can arrive with any status (the error

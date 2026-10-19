@@ -91,6 +91,9 @@ pub async fn get_notifications(
         extract_notification_items(&client.call(wsfunction, &params).await?)
     };
 
+    // A capped list must announce it was capped — otherwise the model
+    // cannot tell "all of them" from "the newest 20".
+    let has_more = items.len() >= limit.max(1) as usize;
     let items: Vec<Value> = items
         .into_iter()
         .map(|n| {
@@ -110,7 +113,7 @@ pub async fn get_notifications(
             })
         })
         .collect();
-    Ok(json!({ "count": items.len(), "notifications": items }))
+    Ok(json!({ "count": items.len(), "has_more": has_more, "notifications": items }))
 }
 
 /// Pull the notification/message array out of any response shape
@@ -235,8 +238,11 @@ pub async fn get_conversations(
             })
         })
         .collect();
+    // A capped list must announce it was capped — see get_notifications.
+    let has_more = conversations.len() >= limit.max(1) as usize;
     Ok(json!({
         "count": conversations.len(),
+        "has_more": has_more,
         "conversations": conversations
     }))
 }

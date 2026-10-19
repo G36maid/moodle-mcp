@@ -6,6 +6,23 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- capped list tools report `has_more` (notifications, conversations) —
+  the model can tell "all of them" from "the newest N"
+
+### Changed
+
+- the 429/503 cooldown is per web-service function: one throttled
+  function no longer disables every tool for the window — other endpoints
+  (and other tools' writes) keep working
+- the escape hatch fails closed: when the token's enabled-function list
+  cannot be loaded (site info failed), `call_ws_function` refuses the
+  call instead of sending it unverified
+- the Moodle timezone probe runs alongside serving instead of delaying
+  the MCP `initialize` handshake — a slow site no longer looks like a
+  dead server; timestamps render in UTC until the probe lands
+
 ## [0.2.0] - 2026-10-19
 
 ### Added

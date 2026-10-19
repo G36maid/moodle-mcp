@@ -11,20 +11,38 @@ use crate::error::MoodleError;
 ///
 /// `allowed` is the token's enabled functions (from the cached site info);
 /// the call is rejected client-side when the function is not in it — with a
-/// fuzzy "did you mean" suggestion when a close name exists.
+/// fuzzy "did you mean" suggestion when a close name exists. An empty list
+/// means site info could not be loaded, and the call is refused rather than
+/// sent unverified.
 pub async fn call_ws_function(
     client: &MoodleClient,
     wsfunction: &str,
     params: &Value,
     allowed: &[String],
 ) -> Result<Value, MoodleError> {
-    if !allowed.is_empty() && !allowed.iter().any(|f| f == wsfunction) {
+    ensure_allowed(wsfunction, allowed)?;
+    client.call(wsfunction, params).await
+}
+
+/// Escape-hatch gate: fail closed. Every supported Moodle returns the
+/// function list in site info, so an empty list is a failed site-info call —
+/// sending the request unverified would skip the only client-side check
+/// the hatch has.
+fn ensure_allowed(wsfunction: &str, allowed: &[String]) -> Result<(), MoodleError> {
+    if allowed.is_empty() {
+        return Err(MoodleError::Config(format!(
+            "the list of functions enabled for this token could not be loaded, \
+             so '{wsfunction}' cannot be verified — retry, and if it persists \
+             check MOODLE_URL and MOODLE_TOKEN"
+        )));
+    }
+    if !allowed.iter().any(|f| f == wsfunction) {
         return Err(MoodleError::Config(format!(
             "function '{wsfunction}' is not enabled for this configuration. {}",
             suggest_functions(wsfunction, allowed)
         )));
     }
-    client.call(wsfunction, params).await
+    Ok(())
 }
 
 /// Suggest close function names when an exact match is missing: closest
@@ -97,5 +115,25 @@ mod tests {
     fn levenshtein_bounded() {
         assert!(levenshtein_limited("abc", "axc", 1));
         assert!(!levenshtein_limited("abc", "xyz", 1));
+    }
+
+    #[test]
+    fn empty_function_list_fails_closed() {
+        let err = ensure_allowed("core_enrol_get_users_courses", &[]).unwrap_err();
+        assert!(err.to_string().contains("could not be loaded"), "{err}");
+    }
+
+    #[test]
+    fn not_enabled_names_close_matches() {
+        let allowed: Vec<String> = vec!["core_enrol_get_users_courses".into()];
+        let err = ensure_allowed("core_enrol_get_users_coursess", &allowed).unwrap_err();
+        assert!(err.to_string().contains("not enabled"), "{err}");
+        assert!(err.to_string().contains("Did you mean"), "{err}");
+    }
+
+    #[test]
+    fn enabled_function_passes() {
+        let allowed: Vec<String> = vec!["core_enrol_get_users_courses".into()];
+        assert!(ensure_allowed("core_enrol_get_users_courses", &allowed).is_ok());
     }
 }
