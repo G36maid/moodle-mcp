@@ -1562,7 +1562,7 @@ dependencies = [
 
 [[package]]
 name = "moodle-mcp"
-version = "0.2.1"
+version = "0.2.0"
 dependencies = [
  "anydoc",
  "base64 0.23.1",
