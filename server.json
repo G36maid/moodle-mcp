@@ -1,40 +1,40 @@
 {
-  "$schema": "https://raw.githubusercontent.com/modelcontextprotocol/registry/main/schema/draft/schema.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.G36maid/moodle-mcp",
-  "description": "Moodle LMS for LLM agents \u2014 courses, assignments, forums, files, submissions. A single static Rust binary speaking MCP over stdio, verified against Moodle 3.7, 4.5 and 5.2. No site-side plugin, no admin help needed.",
+  "description": "Moodle LMS for LLM agents — courses, assignments, files, submissions in one static binary.",
   "version": "0.2.1",
-  "authors": [
-    {
-      "name": "G36maid"
-    }
-  ],
   "website": "https://moodle.ntnu.cc",
-  "repository": "https://github.com/G36maid/moodle-mcp",
-  "keywords": [
-    "moodle",
-    "lms",
-    "education",
-    "assignments",
-    "courses"
-  ],
-  "license": "MIT",
-  "protocols": [
-    "2025-06-18"
-  ],
-  "capabilities": {
-    "tools": {
-      "listChanged": false
-    }
+  "repository": {
+    "url": "https://github.com/G36maid/moodle-mcp",
+    "source": "github"
   },
+  "keywords": ["moodle", "lms", "education", "assignments", "courses"],
+  "license": "MIT",
+  "protocols": ["2025-06-18"],
+  "capabilities": { "tools": { "listChanged": false } },
   "packages": [
     {
-      "registry_type": "cargo",
+      "registryType": "cargo",
       "identifier": "moodle-mcp",
       "version": "0.2.1",
-      "registry_base_url": "https://crates.io",
-      "transport": {
-        "type": "stdio"
-      }
+      "registryBaseUrl": "https://crates.io",
+      "transport": { "type": "stdio" },
+      "environmentVariables": [
+        {
+          "name": "MOODLE_URL",
+          "description": "Your Moodle site URL, e.g. https://moodle.example.com",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "MOODLE_TOKEN",
+          "description": "Web-service token from moodle-mcp auth",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": true
+        }
+      ]
     }
   ]
 }
