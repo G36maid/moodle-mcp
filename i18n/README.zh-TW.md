@@ -64,14 +64,12 @@ claude mcp add moodle \
 或把這段貼進你的 agent,讓它代做每一步(它會在自己的終端機開啟 `moodle-mcp auth`——學校帳密在終端機裡輸入,不是貼進對話):
 
 ```text
-Set up moodle-mcp for me. First read https://moodle.ntnu.cc/docs/installation.html
-and https://moodle.ntnu.cc/docs/configuration.html. Then install the binary
-for my platform (prefer the prebuilt archive from the latest GitHub release;
-`cargo install moodle-mcp` as the fallback), run `moodle-mcp auth` in the
-terminal so I can type my school credentials when it prompts, and register
-the server in your own MCP config — name "moodle", stdio command
-`moodle-mcp`, env MOODLE_URL and MOODLE_TOKEN from auth's output. Do not
-store or repeat my credentials anywhere.
+Set up moodle-mcp (github.com/G36maid/moodle-mcp): read docs/src/installation.md
+and docs/src/configuration.md from the repo's main branch first. Then install
+the binary for my platform, run `moodle-mcp auth` in the terminal so I can
+type my school credentials when it prompts, and register the server in your
+own MCP config using the snippet for your harness. Never store or repeat my
+credentials; ask before anything global.
 ```
 
 預編譯執行檔、SSO 登入、各客戶端的設定範例，以及完整的環境變數參考：[安裝](https://moodle.ntnu.cc/docs/installation.html) · [快速入門](https://moodle.ntnu.cc/docs/getting-started.html) · [設定](https://moodle.ntnu.cc/docs/configuration.html)

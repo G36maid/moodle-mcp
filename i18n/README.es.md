@@ -64,14 +64,12 @@ claude mcp add moodle \
 O pega esto en tu agente y deja que haga todos los pasos (abrirá `moodle-mcp auth` en su terminal — escribe ahí tus credenciales, no en el chat):
 
 ```text
-Set up moodle-mcp for me. First read https://moodle.ntnu.cc/docs/installation.html
-and https://moodle.ntnu.cc/docs/configuration.html. Then install the binary
-for my platform (prefer the prebuilt archive from the latest GitHub release;
-`cargo install moodle-mcp` as the fallback), run `moodle-mcp auth` in the
-terminal so I can type my school credentials when it prompts, and register
-the server in your own MCP config — name "moodle", stdio command
-`moodle-mcp`, env MOODLE_URL and MOODLE_TOKEN from auth's output. Do not
-store or repeat my credentials anywhere.
+Set up moodle-mcp (github.com/G36maid/moodle-mcp): read docs/src/installation.md
+and docs/src/configuration.md from the repo's main branch first. Then install
+the binary for my platform, run `moodle-mcp auth` in the terminal so I can
+type my school credentials when it prompts, and register the server in your
+own MCP config using the snippet for your harness. Never store or repeat my
+credentials; ask before anything global.
 ```
 
 Binarios precompilados, inicio de sesión SSO, fragmentos de configuración para cada cliente y la referencia completa de variables de entorno: [Instalación](https://moodle.ntnu.cc/docs/installation.html) · [Primeros pasos](https://moodle.ntnu.cc/docs/getting-started.html) · [Configuración](https://moodle.ntnu.cc/docs/configuration.html)
