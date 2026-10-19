@@ -61,6 +61,19 @@ claude mcp add moodle \
 #    "What's due in the next two weeks? Plan my studying around it."
 ```
 
+またはこのプロンプトをエージェントに貼り付け、すべてのステップを任せてください(エージェントは自身のターミナルで `moodle-mcp auth` を開きます——学校の認証情報はチャットではなくターミナルに入力します):
+
+```text
+Set up moodle-mcp for me. First read https://moodle.ntnu.cc/docs/installation.html
+and https://moodle.ntnu.cc/docs/configuration.html. Then install the binary
+for my platform (prefer the prebuilt archive from the latest GitHub release;
+`cargo install moodle-mcp` as the fallback), run `moodle-mcp auth` in the
+terminal so I can type my school credentials when it prompts, and register
+the server in your own MCP config — name "moodle", stdio command
+`moodle-mcp`, env MOODLE_URL and MOODLE_TOKEN from auth's output. Do not
+store or repeat my credentials anywhere.
+```
+
 事前ビルド済みバイナリ、SSO ログイン、各クライアント向けの設定スニペット、環境変数の完全なリファレンス:[インストール](https://moodle.ntnu.cc/docs/installation.html) · [はじめに](https://moodle.ntnu.cc/docs/getting-started.html) · [設定](https://moodle.ntnu.cc/docs/configuration.html)
 
 ## 💬 エージェントにできること

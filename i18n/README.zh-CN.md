@@ -61,6 +61,19 @@ claude mcp add moodle \
 #    "What's due in the next two weeks? Plan my studying around it."
 ```
 
+或把这段贴进你的 agent,让它代办每一步(它会在自己的终端开启 `moodle-mcp auth`——学校账号密码在终端里输入,而不是贴进对话):
+
+```text
+Set up moodle-mcp for me. First read https://moodle.ntnu.cc/docs/installation.html
+and https://moodle.ntnu.cc/docs/configuration.html. Then install the binary
+for my platform (prefer the prebuilt archive from the latest GitHub release;
+`cargo install moodle-mcp` as the fallback), run `moodle-mcp auth` in the
+terminal so I can type my school credentials when it prompts, and register
+the server in your own MCP config — name "moodle", stdio command
+`moodle-mcp`, env MOODLE_URL and MOODLE_TOKEN from auth's output. Do not
+store or repeat my credentials anywhere.
+```
+
 预编译二进制文件、SSO 登录、各客户端的配置片段，以及完整的环境变量参考：[安装](https://moodle.ntnu.cc/docs/installation.html) · [快速入门](https://moodle.ntnu.cc/docs/getting-started.html) · [配置](https://moodle.ntnu.cc/docs/configuration.html)
 
 ## 💬 智能体能做什么
