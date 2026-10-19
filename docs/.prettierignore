@@ -1,0 +1,6 @@
+# mdBook build output
+book/
+
+# mdbook-mermaid vendored assets
+mermaid.min.js
+mermaid-init.js

@@ -1,0 +1,25 @@
+[book]
+authors = ["G36maid"]
+language = "en"
+src = "src"
+title = "moodle-mcp"
+
+[build]
+create-missing = false
+
+[output.html]
+smart-punctuation = true
+no-section-label = true
+preferred-dark-theme = "ayu"
+git-repository-url = "https://github.com/G36maid/moodle-mcp"
+edit-url-template = "https://github.com/G36maid/moodle-mcp/edit/main/docs/{path}"
+additional-js = ["mermaid.min.js", "mermaid-init.js"]
+
+[output.html.search]
+limit-results = 20
+use-boolean-and = true
+
+[preprocessor]
+
+[preprocessor.mermaid]
+command = "mdbook-mermaid"
