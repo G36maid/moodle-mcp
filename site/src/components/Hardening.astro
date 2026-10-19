@@ -1,0 +1,215 @@
+---
+/* Security section: accordion + redacted-token panel + eight hardening cells. */
+const topics = [
+  {
+    id: "token",
+    title: "Token safety",
+    body: "The token is injected only into same-site pluginfile URLs, and redirects that leave your Moodle host are stopped. It never appears in tool output or errors.",
+  },
+  {
+    id: "transport",
+    title: "Transport",
+    body: "Plain HTTP is rejected unless the host is loopback — or you set MOODLE_ALLOW_HTTP yourself, for isolated networks where you accept the risk.",
+  },
+  {
+    id: "transfers",
+    title: "Transfer limits",
+    body: "100 MB inline fetches, 500 MB streamed downloads, 100 MB uploads. Downloads stream to disk, bounded by a read timeout so stalled connections still die.",
+  },
+  {
+    id: "privilege",
+    title: "Least privilege",
+    body: "MOODLE_READ_ONLY=1 removes every write tool before the agent ever sees them. Nothing you say in a prompt can bring them back.",
+  },
+];
+
+const cells = [
+  ["HTTPS-first", "Cleartext URLs are rejected; loopback test sites stay exempt."],
+  ["Host-locked redirects", "A redirect off your Moodle host never carries the token."],
+  ["Redacted errors", "Any token in a rendered message becomes token=[REDACTED]."],
+  ["Draft-first writes", "Uploads land in your draft area; finalizing is explicit."],
+  ["No quiz-taking", "Attempt records are readable; answering for you is not provided."],
+  ["Same-site files only", "fetch_file and download_file stay on your site unless you opt out."],
+  ["Read-only mode", "One env var hides all six write tools from the tool list."],
+  ["Timezone-aware", "Timestamps render in the zone Moodle itself uses for you."],
+];
+---
+
+<section class="hardening" id="security">
+  <div class="frame">
+    <div class="section-head">
+      <div>
+        <h2>Hardened by default</h2>
+        <p class="lede">
+          The token is a live credential — it carries your full student
+          permissions. The server treats it that way before your agent says a
+          word.
+        </p>
+      </div>
+      <div class="head-actions">
+        <a class="btn btn-ghost" href="https://github.com/G36maid/moodle-mcp/blob/main/docs/src/security.md">
+          Security docs <span aria-hidden="true">›</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="split">
+      <div class="acc">
+        {
+          topics.map((t, i) => (
+            <div class="acc-item" data-topic={t.id}>
+              <button class="acc-head" aria-expanded={i === 0}>
+                <span>{t.title}</span>
+                <span class="plus" aria-hidden="true">{i === 0 ? "−" : "+"}</span>
+              </button>
+              <div class="acc-body">
+                <p>{t.body}</p>
+              </div>
+            </div>
+          ))
+        }
+      </div>
+
+      <div class="panel">
+        <p class="p-head">tool output — redaction built in</p>
+        <p class="err">
+          error: request failed{" "}
+          <span class="dim">url=</span><span class="url">https://moodle.example.com/webservice/rest/server.php</span>
+        </p>
+        <p class="err">
+          <span class="dim">&amp;token=</span><span class="redact">[REDACTED]</span>
+          <span class="dim">→ hint:</span> check MOODLE_URL has no trailing slash
+        </p>
+        <p class="p-foot">stdout stays clean — logs go to stderr, data to stdout</p>
+      </div>
+    </div>
+
+    <div class="cells grid-4">
+      {
+        cells.map(([title, body]) => (
+          <div class="cell">
+            <h3>{title}</h3>
+            <p>{body}</p>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<script>
+  function bind(root: Document | HTMLElement = document) {
+    const items = root.querySelectorAll<HTMLElement>(".hardening .acc-item");
+    items.forEach((item) => {
+      item.querySelector(".acc-head")?.addEventListener("click", () => {
+        items.forEach((other) => {
+          const active = other === item;
+          other.querySelector(".acc-head")?.setAttribute("aria-expanded", String(active));
+          const plus = other.querySelector<HTMLElement>(".plus");
+          if (plus) plus.textContent = active ? "−" : "+";
+        });
+      });
+    });
+  }
+  bind();
+  document.addEventListener("astro:page-load", () => bind());
+</script>
+
+<style>
+  .hardening {
+    max-width: calc(var(--frame-max) + 2px);
+    margin: 0 auto;
+    border-top: 1px solid var(--line);
+  }
+
+  .split {
+    display: grid;
+    grid-template-columns: 440px 1fr;
+    border-top: 1px solid var(--line);
+  }
+
+  .acc {
+    border-right: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.28);
+  }
+
+  .acc-item + .acc-item {
+    border-top: 1px solid var(--line);
+  }
+
+  .acc-head {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: none;
+    border: none;
+    padding: 18px 24px;
+    font-family: var(--font-mono);
+    font-size: 15px;
+    color: var(--ink-strong);
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .acc-head:hover {
+    color: var(--orange);
+  }
+
+  .plus { color: var(--ink-faint); }
+  .acc-head[aria-expanded="true"] .plus { color: var(--orange); }
+
+  .acc-body { display: none; padding: 0 24px 20px; }
+  .acc-head[aria-expanded="true"] + .acc-body { display: block; }
+
+  .acc-body p { margin: 0; font-size: 13px; }
+
+  .panel {
+    background: var(--night);
+    padding: 26px 30px;
+    min-height: 240px;
+  }
+
+  .p-head {
+    margin: 0 0 16px;
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #62676f;
+  }
+
+  .err {
+    margin: 0 0 10px;
+    font-size: 13px;
+    color: #e6e8ec;
+    word-break: break-all;
+  }
+
+  .dim { color: #62676f; }
+  .url { color: #a78bfa; }
+  .redact {
+    color: #fb923c;
+    background: rgba(242, 165, 65, 0.12);
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+
+  .p-foot {
+    margin: 22px 0 0;
+    padding-top: 16px;
+    border-top: 1px solid #23262d;
+    color: #7d838d;
+    font-size: 12.5px;
+  }
+
+  @media (max-width: 900px) {
+    .split {
+      grid-template-columns: 1fr;
+    }
+
+    .acc {
+      border-right: none;
+      border-bottom: 1px solid var(--line);
+    }
+  }
+</style>

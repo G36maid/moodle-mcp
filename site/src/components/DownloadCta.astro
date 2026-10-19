@@ -1,0 +1,107 @@
+---
+
+<section class="cta" id="install">
+  <div class="inner">
+    <div class="tile">
+      <img src="/brand/moodle-mcp-icon.svg" alt="moodle-mcp icon" />
+    </div>
+    <h2><span class="grad-mcp">Your Moodle, one prompt away</span></h2>
+    <p class="sub">Single binary. Twenty tools. Zero browser tabs.</p>
+    <div class="actions">
+      <a
+        class="btn btn-primary"
+        href="https://github.com/G36maid/moodle-mcp/releases/latest"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path
+            d="M8 1v9m0 0L4.5 6.5M8 10l3.5-3.5M2 13.5h12"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"></path>
+        </svg>
+        Download now <span class="kbd">D</span>
+      </a>
+      <a
+        class="btn btn-ghost"
+        href="https://github.com/G36maid/moodle-mcp"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path
+            d="M5.5 10.5 10.5 5.5m-4 0h4v4"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"></path>
+        </svg>
+        Clone source <span class="kbd">C</span>
+      </a>
+    </div>
+    <p class="hint">or <code>cargo install moodle-mcp</code> — needs Rust 1.88+</p>
+  </div>
+</section>
+
+<style>
+  .cta {
+    border-top: 1px solid var(--line);
+    text-align: center;
+    background:
+      radial-gradient(circle at 50% 0%, rgba(19, 72, 220, 0.05), transparent 55%);
+  }
+
+  .inner {
+    padding: 72px var(--gutter) 84px;
+  }
+
+  .tile {
+    width: 112px;
+    margin: 0 auto 30px;
+    border-radius: 24px;
+    box-shadow:
+      0 0 0 1px var(--line),
+      0 18px 40px rgba(15, 23, 42, 0.28);
+  }
+
+  .tile img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 24px;
+  }
+
+  h2 {
+    font-size: 34px;
+    
+  }
+
+  .sub {
+    margin: 12px 0 0;
+    font-size: 15px;
+  }
+
+  .actions {
+    margin-top: 32px;
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .hint {
+    margin: 24px 0 0;
+    font-size: 13px;
+    color: var(--ink-faint);
+  }
+
+  .hint code {
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 1px 7px;
+    color: var(--ink-strong);
+  }
+</style>

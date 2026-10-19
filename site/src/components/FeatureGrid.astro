@@ -1,0 +1,148 @@
+---
+/* Two wide feature cards with CSS-drawn mock panels + six text cells,
+   mirroring the plotted feature-grid rhythm of the reference layout. */
+---
+
+<section class="features" id="features">
+  <div class="frame">
+    <div class="grid-2">
+      <article class="card">
+        <div class="panel">
+          <div class="term">
+            <p class="t-head">get_schedule · next 14 days</p>
+            <p class="row"><span class="d">MON 20</span><span class="bar w40 o"></span>HW2 released</p>
+            <p class="row"><span class="d">THU 23</span><span class="bar w55 b"></span>Quiz 3 closes 23:59</p>
+            <p class="row"><span class="d">TUE 28</span><span class="bar w70 b"></span>Lab report due</p>
+            <p class="row"><span class="d">FRI 31</span><span class="bar w30 r"></span>HW1 · final deadline</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <h3>Deadline sweep</h3>
+          <p>
+            One call merges every due date, quiz close, and course event into a
+            single timeline your agent can plan a study week around.
+          </p>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="panel">
+          <div class="term">
+            <p class="t-head">journey · brief → draft</p>
+            <p class="row ok">✓ get_assignment <span>brief + attachments</span></p>
+            <p class="row ok">✓ fetch_file <span>hw1.pdf → markdown</span></p>
+            <p class="row run">● agent <span>drafting answers</span></p>
+            <p class="row idle">○ upload_file <span>draft.md</span></p>
+            <p class="row idle">○ submit_assignment <span>finalize=false</span></p>
+          </div>
+        </div>
+        <div class="card-body">
+          <h3>Assignment autopilot</h3>
+          <p>
+            From brief to draft: read the assignment, convert the attached PDF,
+            work the problems, upload, and submit a draft — then read it back
+            to verify.
+          </p>
+        </div>
+      </article>
+    </div>
+
+    <div class="cells grid-3">
+      <div class="cell"><h3>Course map</h3><p>get_course_overview merges five endpoints into one markdown map, every ID and file URL embedded.</p></div>
+      <div class="cell"><h3>PDF → markdown</h3><p>Assignment briefs become readable requirements — math, tables, and slides included.</p></div>
+      <div class="cell"><h3>Grades &amp; feedback</h3><p>Cross-course summaries or every grade item of one course, weights and comments included.</p></div>
+      <div class="cell"><h3>Forums &amp; messaging</h3><p>Catch up on announcement threads, then draft a message to your teacher — with confirmation.</p></div>
+      <div class="cell"><h3>Escape hatch</h3><p>Opt in with MOODLE_ENABLE_WS_FUNCTION=true and call_ws_function reaches every other enabled web-service function your token can call.</p></div>
+      <div class="cell"><h3>Version-adaptive</h3><p>Built against Moodle 3.7 and designed through 5.x — response differences are absorbed for you.</p></div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .features {
+    max-width: calc(var(--frame-max) + 2px);
+    margin: 96px auto 0;
+  }
+
+  .card {
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.28);
+  }
+
+  .grid-2 .card:last-child {
+    border-right: none;
+  }
+
+  .panel {
+    margin: 22px;
+    border: 1px dashed var(--line);
+    border-radius: 6px;
+    background: var(--night);
+    padding: 18px;
+  }
+
+  .term {
+    color: #aab0ba;
+    font-size: 12px;
+  }
+
+  .t-head {
+    color: #62676f;
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin: 0 0 12px;
+  }
+
+  .row {
+    margin: 0 0 9px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    white-space: nowrap;
+  }
+
+  .d {
+    color: #7d838d;
+    width: 52px;
+    flex-shrink: 0;
+  }
+
+  .bar {
+    height: 6px;
+    border-radius: 3px;
+    display: inline-block;
+  }
+
+  .w30 { width: 30%; } .w40 { width: 40%; }
+  .w55 { width: 55%; } .w70 { width: 70%; }
+  .o { background: #f2a541; } .b { background: #6366f1; } .r { background: #e05252; }
+
+  .row span { color: #62676f; }
+
+  .row.ok { color: #7fd99a; }
+  .row.run { color: #f2c161; }
+  .row.idle { color: #7d838d; }
+
+  .card-body {
+    padding: 4px 24px 26px;
+  }
+
+  .card-body h3 {
+    font-size: 16px;
+    margin-bottom: 8px;
+  }
+
+  .card-body p {
+    margin: 0;
+    font-size: 13px;
+    max-width: 400px;
+  }
+
+  @media (max-width: 720px) {
+    .grid-2 .card {
+      border-right: none;
+    }
+  }
+</style>

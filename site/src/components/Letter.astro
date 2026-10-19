@@ -1,0 +1,172 @@
+---
+/* A maintainer's note on a letter card, with a plot-stamp seal. */
+---
+
+<section class="letter-sec" id="about">
+  <div class="frame">
+    <div class="sheet-wrap">
+      <article class="sheet">
+        <p class="over">A LETTER</p>
+        <h2>From the maintainer</h2>
+        <p class="para">
+          Studying with an agent shouldn't mean five browser tabs, hand-download
+          PDFs, and copy-pasted forum threads. moodle-mcp started as a way to
+          hand my own coursework agent the same access the official mobile app
+          has — no scraping, no browser automation, just the web services
+          Moodle already exposes.
+        </p>
+        <hr class="rule" />
+        <p class="para">
+          Everything ships in one static Rust binary: 22 typed tools, document
+          conversion, and an auth CLI. Writes ask first, drafts come before
+          finals, and quiz-taking stays out on purpose. If that trade sounds
+          right to you, install it and ask your agent what's due.
+        </p>
+        <div class="sign">
+          <img
+            class="avatar"
+            src="/brand/moodle-mcp-icon.svg"
+            alt=""
+            width="34"
+            height="34"
+          />
+          <div>
+            <p class="who">G36maid</p>
+            <p class="sub">maintainer</p>
+          </div>
+        </div>
+        <svg class="stamp" viewBox="0 0 120 120" aria-hidden="true">
+          <defs>
+            <path id="circ" d="M60,60 m-44,0 a44,44 0 1,1 88,0 a44,44 0 1,1 -88,0" />
+          </defs>
+          <circle cx="60" cy="60" r="54" fill="none" stroke="#f5c9a0" stroke-width="1.5" />
+          <circle cx="60" cy="60" r="34" fill="none" stroke="#f5c9a0" stroke-width="1" />
+          <text class="ring">
+            <textPath href="#circ">SINGLE BINARY · MOODLE-MCP · EST 2025 · MIT ·</textPath>
+          </text>
+          <path
+            d="M48 72v-20l10 12 2-8 2 8 10-12v20"
+            fill="none"
+            stroke="#f98012"
+            stroke-width="3"
+            stroke-linecap="round"></path>
+        </svg>
+      </article>
+    </div>
+  </div>
+</section>
+
+<style>
+  .letter-sec {
+    max-width: calc(var(--frame-max) + 2px);
+    margin: 0 auto;
+    border-top: 1px solid var(--line);
+    padding: 56px var(--gutter);
+  }
+
+  .sheet-wrap {
+    max-width: 980px;
+    margin: 0 auto;
+    background:
+      repeating-linear-gradient(
+        45deg,
+        rgba(19, 72, 220, 0.05) 0 1px,
+        transparent 1px 9px
+      ),
+      var(--paper-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px;
+  }
+
+  .sheet {
+    position: relative;
+    background:
+      radial-gradient(
+        circle at 88% 12%,
+        rgba(19, 72, 220, 0.06),
+        transparent 42%
+      ),
+      #fdfdfb;
+    border: 1px solid var(--line-soft);
+    border-radius: 6px;
+    padding: 44px 48px 40px;
+    overflow: hidden;
+  }
+
+  .over {
+    margin: 0;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--ink-faint);
+  }
+
+  h2 {
+    font-size: 30px;
+    margin-top: 10px;
+  }
+
+  .para {
+    max-width: 480px;
+    margin: 22px 0 0;
+    font-size: 14px;
+  }
+
+  .rule {
+    border: none;
+    border-top: 1px solid var(--line);
+    width: 120px;
+    margin: 26px 0 0;
+  }
+
+  .sign {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 30px;
+  }
+
+  .avatar {
+    border-radius: 8px;
+  }
+
+  .who {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: 16px;
+    color: var(--ink-strong);
+  }
+
+  .sub {
+    margin: 0;
+    font-size: 11px;
+    color: var(--ink-faint);
+  }
+
+  .stamp {
+    position: absolute;
+    top: 34px;
+    right: 40px;
+    width: 128px;
+    height: 128px;
+    opacity: 0.9;
+  }
+
+  .ring {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.22em;
+    fill: #d9995b;
+  }
+
+  @media (max-width: 640px) {
+    .sheet {
+      padding: 32px 24px;
+    }
+
+    .stamp {
+      position: static;
+      margin-top: 20px;
+    }
+  }
+</style>

@@ -1,0 +1,181 @@
+---
+/* Release cards generated from the changelog — original cover tiles. */
+const releases = [
+  {
+    version: "0.1.4",
+    date: "October 15th, 2026",
+    accent: "#f98012",
+    title: "Timezones that match Moodle",
+    excerpt:
+      "get_course_overview now includes section summaries and surfaces availability restrictions and hidden states — restricted items no longer look freely available.",
+    newest: true,
+  },
+  {
+    version: "0.1.3",
+    date: "October 14th, 2026",
+    accent: "#8b5cf6",
+    title: "Downloads that ask first",
+    excerpt:
+      "download_file no longer creates missing parent directories — it fails naming the folder and suggests the fix, following the explicit-action convention.",
+    newest: false,
+  },
+  {
+    version: "0.1.2",
+    date: "October 13th, 2026",
+    accent: "#2dd4bf",
+    title: "Hardening passes",
+    excerpt:
+      "Moodle-native timezone detection, transfer size caps, tool hiding with MOODLE_DISABLE_TOOLS, and in-memory document conversion for fetch_file.",
+    newest: false,
+  },
+];
+---
+
+<section class="latest" id="releases">
+  <div class="frame">
+    <div class="section-head">
+      <div>
+        <h2>The latest releases</h2>
+        <p class="lede">
+          Keep a Changelog format, semantic versioning, and multi-platform
+          binaries built from every v-tag.
+        </p>
+      </div>
+      <div class="head-actions">
+        <a
+          class="btn btn-ghost"
+          href="https://github.com/G36maid/moodle-mcp/releases"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          View releases <span aria-hidden="true">›</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="cards">
+      {
+        releases.map((r) => (
+          <a
+            class="card"
+            href={`https://github.com/G36maid/moodle-mcp/releases/tag/v${r.version}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <div class="cover" style={`--accent: ${r.accent}`}>
+              <span class="tick tl" />
+              <span class="tick tr" />
+              <span class="tick bl" />
+              <span class="tick br" />
+              <span class="v">v{r.version}</span>
+            </div>
+            <div class="body">
+              <h3>{r.title}</h3>
+              <p>{r.excerpt}</p>
+              <p class="meta">
+                G36maid · {r.date}
+                {r.newest && <span class="chip">Newest</span>}
+              </p>
+            </div>
+          </a>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+  .latest {
+    max-width: calc(var(--frame-max) + 2px);
+    margin: 0 auto;
+    border-top: 1px solid var(--line);
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    padding: 0 var(--gutter) 64px;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    text-decoration: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .card:hover {
+    border-color: var(--orange-lo);
+    box-shadow: 0 6px 18px rgba(23, 24, 28, 0.07);
+  }
+
+  .cover {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    background:
+      radial-gradient(circle at 70% 20%, rgba(255, 255, 255, 0.06), transparent 50%),
+      var(--night);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .v {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 44px;
+    color: var(--accent);
+    text-shadow: 0 0 24px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+
+  .tick {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: color-mix(in srgb, var(--accent) 70%, #fff);
+  }
+
+  .tick.tl { top: 10px; left: 10px; }
+  .tick.tr { top: 10px; right: 10px; }
+  .tick.bl { bottom: 10px; left: 10px; }
+  .tick.br { bottom: 10px; right: 10px; }
+
+  .body {
+    padding: 18px 20px 20px;
+  }
+
+  h3 {
+    font-size: 18px;
+  }
+
+  .body > p {
+    margin: 10px 0 0;
+    font-size: 12.5px;
+    color: var(--ink);
+  }
+
+  .meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--ink-faint) !important;
+    font-size: 11px !important;
+  }
+
+  .chip {
+    border: 1px solid var(--orange-lo);
+    color: var(--orange-lo);
+    font-size: 10px;
+    padding: 1px 7px;
+    border-radius: 999px;
+  }
+
+  @media (max-width: 860px) {
+    .cards {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

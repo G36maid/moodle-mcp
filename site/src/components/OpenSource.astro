@@ -1,0 +1,128 @@
+---
+/* Live repo stats, fetched from the GitHub API at build time (no key needed).
+   Falls back to em-dashes when the API is unreachable so builds stay green. */
+
+interface Stats {
+  stars: string;
+  forks: string;
+  contributors: string;
+  releases: string;
+}
+
+const nf = new Intl.NumberFormat("en-US");
+let stats: Stats = {
+  stars: "—",
+  forks: "—",
+  contributors: "—",
+  releases: "—",
+};
+
+try {
+  const [repoRes, contribRes, relRes] = await Promise.all([
+    fetch("https://api.github.com/repos/G36maid/moodle-mcp"),
+    fetch(
+      "https://api.github.com/repos/G36maid/moodle-mcp/contributors?per_page=100",
+    ),
+    fetch("https://api.github.com/repos/G36maid/moodle-mcp/releases?per_page=100"),
+  ]);
+
+  if (repoRes.ok) {
+    const repo = await repoRes.json();
+    stats.stars = nf.format(repo.stargazers_count ?? 0);
+    stats.forks = nf.format(repo.forks_count ?? 0);
+  }
+  if (contribRes.ok) {
+    const contributors = await contribRes.json();
+    stats.contributors = nf.format(contributors.length ?? 0);
+  }
+  if (relRes.ok) {
+    const releases = await relRes.json();
+    stats.releases = nf.format(releases.length ?? 0);
+  }
+} catch {
+  // offline build — keep the dashes
+}
+---
+
+<section class="oss" id="open-source">
+  <div class="frame inner">
+    <h2><span class="grad-mcp">Open Source</span></h2>
+    <p class="lede">
+      moodle-mcp is MIT-licensed and built in the open. Its tests run fully
+      offline; its release binaries are reproducible from CI.
+    </p>
+
+    <div class="stats">
+      <div class="stat"><strong>{stats.stars}</strong><span>Stars</span></div>
+      <div class="stat"><strong>{stats.forks}</strong><span>Forks</span></div>
+      <div class="stat"><strong>{stats.contributors}</strong><span>Contributors</span></div>
+      <div class="stat"><strong>{stats.releases}</strong><span>Releases</span></div>
+    </div>
+
+  </div>
+</section>
+
+<style>
+  .oss {
+    max-width: calc(var(--frame-max) + 2px);
+    margin: 0 auto;
+    border-top: 1px solid var(--line);
+    text-align: center;
+  }
+
+  .inner {
+    padding: 64px 0 56px;
+  }
+
+  h2 {
+    font-size: 34px;
+    
+  }
+
+  .lede {
+    max-width: 480px;
+    margin: 14px auto 0;
+    font-size: 15px;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    margin-top: 32px;
+    padding: 18px 0;
+  }
+
+  .stat {
+    border-right: 1px solid var(--line);
+    padding: 10px 0;
+  }
+
+  .stat:last-child {
+    border-right: none;
+  }
+
+  .stat strong {
+    display: block;
+    font-family: var(--font-serif);
+    font-size: 30px;
+    font-weight: 400;
+    color: var(--ink-strong);
+  }
+
+  .stat span {
+    font-size: 12px;
+    color: var(--ink-faint);
+  }
+
+  @media (max-width: 720px) {
+    .stats {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .stat:nth-child(2n) {
+      border-right: none;
+    }
+  }
+</style>

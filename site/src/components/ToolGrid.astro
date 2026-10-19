@@ -1,0 +1,187 @@
+---
+/* All 22 tools as cards in the plotted grid; the tail rows fade out
+   like the reference layout's extension grid. */
+const rw = { r: "read", w: "write" } as const;
+
+const tools: { name: string; desc: string; mode: keyof typeof rw }[] = [
+  { name: "whoami", desc: "Token owner identity + site release.", mode: "r" },
+  { name: "list_courses", desc: "Enrolled courses, optional name filter.", mode: "r" },
+  { name: "get_course_overview", desc: "Whole-course markdown map in one call.", mode: "r" },
+  { name: "get_assignment", desc: "Full assignment document: brief, files, state.", mode: "r" },
+  { name: "fetch_file", desc: "PDF/DOCX/PPTX/XLSX → markdown.", mode: "r" },
+  { name: "download_file", desc: "Raw bytes → a local path.", mode: "r" },
+  { name: "upload_file", desc: "Local file → your private draft area.", mode: "w" },
+  { name: "submit_assignment", desc: "Submit text and/or draft files; draft-first.", mode: "w" },
+  { name: "get_forum_discussions", desc: "Thread list with opening-post previews.", mode: "r" },
+  { name: "get_discussion_posts", desc: "Whole thread as markdown.", mode: "r" },
+  { name: "create_forum_discussion", desc: "Start a thread.", mode: "w" },
+  { name: "reply_to_discussion", desc: "Reply to a post or thread.", mode: "w" },
+  { name: "get_grades", desc: "Cross-course summary or per-course items.", mode: "r" },
+  { name: "get_schedule", desc: "Merged deadline timeline, next 30 days.", mode: "r" },
+  { name: "get_notifications", desc: "Recent notifications, read filter.", mode: "r" },
+  { name: "get_conversations", desc: "Conversations with member ids.", mode: "r" },
+  { name: "send_message", desc: "Direct message — confirms with you first.", mode: "w" },
+  { name: "get_quiz_attempts", desc: "Attempt records, read-only.", mode: "r" },
+  { name: "get_user", desc: "Profile lookup.", mode: "r" },
+  { name: "search_users", desc: "User search.", mode: "r" },
+  { name: "call_ws_function", desc: "Opt-in escape hatch: any enabled WS function.", mode: "w" },
+  { name: "list_ws_functions", desc: "Discover callable web-service functions by keyword.", mode: "r" },
+];
+---
+
+<section class="tools" id="tools">
+  <div class="frame">
+    <div class="section-head">
+      <div>
+        <h2>20 curated tools</h2>
+        <p class="lede">
+          Typed tools that mirror the student journey — courses, assignments,
+          files, forums, grades, messaging — with an opt-in escape hatch for
+          the rest.
+        </p>
+      </div>
+      <div class="head-actions">
+        <a class="btn btn-ghost" href="https://github.com/G36maid/moodle-mcp/blob/main/docs/src/tools.md">
+          All tool docs <span aria-hidden="true">›</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="grid">
+      {
+        tools.map((t) => (
+          <a
+            class="tool"
+            href="https://github.com/G36maid/moodle-mcp/blob/main/docs/src/tools.md"
+          >
+            <div class="row">
+              <span class="name">{t.name}</span>
+              <span class={`badge ${t.mode}`}>{rw[t.mode]}</span>
+            </div>
+            <p class="desc">{t.desc}</p>
+            <p class="foot">
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <path d="M8 1a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM2.5 15a5.5 5.5 0 0 1 11 0h-11Z" />
+              </svg>
+              the agent, on your behalf
+            </p>
+          </a>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+  .tools {
+    max-width: calc(var(--frame-max) + 2px);
+    margin: 0 auto;
+    border-top: 1px solid var(--line);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-top: 1px solid var(--line);
+    -webkit-mask-image: linear-gradient(to bottom, black 62%, transparent 97%);
+    mask-image: linear-gradient(to bottom, black 62%, transparent 97%);
+  }
+
+  .tool {
+    display: block;
+    padding: 16px 18px;
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    background: var(--card);
+    text-decoration: none;
+    min-height: 108px;
+  }
+
+  .tool:nth-child(4n) {
+    border-right: none;
+  }
+
+  .tool:hover {
+    background: #fff;
+    outline: 1px solid var(--orange);
+    outline-offset: -1px;
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink-strong);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .badge {
+    flex-shrink: 0;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid;
+  }
+
+  .badge.r {
+    color: #2c5aa0;
+    border-color: rgba(99, 102, 241, 0.45);
+  }
+
+  .badge.w {
+    color: #b25c10;
+    border-color: rgba(178, 92, 16, 0.45);
+  }
+
+  .desc {
+    margin: 8px 0 0;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--ink);
+  }
+
+  .foot {
+    margin: 10px 0 0;
+    font-size: 10.5px;
+    color: var(--ink-faint);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  @media (max-width: 900px) {
+    .grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .tool:nth-child(4n) {
+      border-right: 1px solid var(--line);
+    }
+
+    .tool:nth-child(2n) {
+      border-right: none;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .grid {
+      grid-template-columns: 1fr;
+      -webkit-mask-image: none;
+      mask-image: none;
+    }
+
+    .tool {
+      border-right: none !important;
+    }
+  }
+</style>

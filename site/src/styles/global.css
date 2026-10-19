@@ -1,0 +1,345 @@
+/* moodle-mcp site — design tokens
+   Layout: "technical blueprint" rhythm (hairline frame rails, plotted cells).
+   Palette: pulled from assets/moodle-mcp-icon.svg / banner —
+   navy night base, Moodle-orange gradient, MCP violet→sky circuit accents. */
+
+:root {
+  /* brand — from the icon/banner SVGs */
+  --orange-hi: #ff9933;
+  --orange: #f98012;
+  --orange-lo: #ea580c;
+  --violet: #8b5cf6;
+  --indigo: #6366f1;
+  --sky: #38bdf8;
+  --teal: #2dd4bf;
+  --night: #0f172a;
+  --night-2: #1e293b;
+  --night-3: #1e1b4b;
+
+  /* neutrals */
+  --ink: #393d45;
+  --ink-strong: #17181c;
+  --ink-faint: #6b6f78;
+  --paper: #f4f3ef;
+  --paper-2: #ecebe5;
+  --card: #fbfbf9;
+  --line: #ddd9cf;
+  --line-soft: #e7e4db;
+
+  /* type */
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-serif: "IBM Plex Serif", Georgia, serif;
+
+  /* layout */
+  --frame-max: 1128px;
+  --gutter: 48px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background-color: var(--paper);
+  background-image: radial-gradient(
+      circle at 25% 8%,
+      rgba(249, 128, 18, 0.04),
+      transparent 42%
+    ),
+    radial-gradient(circle at 78% 30%, rgba(99, 102, 241, 0.04), transparent 46%);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-serif);
+  color: var(--ink-strong);
+  font-weight: 400;
+  margin: 0;
+}
+
+::selection {
+  background: rgba(249, 128, 18, 0.22);
+}
+
+/* ---- brand utilities ---- */
+
+/* "moodle" orange gradient text (from moodleGrad in the icon SVG) */
+.grad-orange {
+  background: linear-gradient(180deg, var(--orange-hi), var(--orange-lo));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* "-mcp" violet→sky gradient text (from mcpGrad in the icon SVG) */
+.grad-mcp {
+  background: linear-gradient(90deg, var(--violet), var(--indigo), var(--sky));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* the banner's signature hairline: orange → violet → sky */
+.grad-line {
+  height: 2px;
+  border: none;
+  background: linear-gradient(
+    90deg,
+    var(--orange),
+    var(--violet) 45%,
+    var(--indigo) 62%,
+    var(--sky)
+  );
+}
+
+/* ---- shared primitives ---- */
+
+.container {
+  max-width: var(--frame-max);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+
+/* centered content column with hairline frame rails, like a plotted sheet */
+.frame {
+  position: relative;
+  max-width: calc(var(--frame-max) + 2px);
+  margin: 0 auto;
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  background: transparent;
+}
+
+/* plot-sheet registration marks where each section meets the rails */
+.frame::before,
+.frame::after {
+  content: "";
+  position: absolute;
+  top: -5px;
+  width: 11px;
+  height: 11px;
+  background: linear-gradient(var(--line), var(--line)) center / 100% 1px no-repeat,
+    linear-gradient(var(--line), var(--line)) center / 1px 100% no-repeat;
+  pointer-events: none;
+}
+
+.frame::before {
+  left: -6px;
+}
+
+.frame::after {
+  right: -6px;
+}
+
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+  color: inherit;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 6px 0 14px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn .kbd {
+  margin-left: 6px;
+}
+
+.btn-primary {
+  background: var(--orange);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(23, 24, 28, 0.25);
+}
+
+.btn-primary .kbd {
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.btn-primary:hover {
+  background: var(--orange-lo);
+}
+
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--ink-strong);
+  border-color: rgba(0, 0, 0, 0.18);
+}
+
+.btn-ghost .kbd {
+  border-color: rgba(0, 0, 0, 0.35);
+}
+
+.btn-ghost:hover {
+  background: #fff;
+}
+
+/* ghost button on dark (night) surfaces */
+.night .btn-ghost,
+.btn-ghost.on-dark {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e6e8ec;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.night .btn-ghost .kbd,
+.btn-ghost.on-dark .kbd {
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.night .btn-ghost:hover,
+.btn-ghost.on-dark:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* section heading cluster: serif title + mono lede + action button */
+.section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 56px var(--gutter) 48px;
+}
+
+.section-head h2 {
+  font-size: 32px;
+  letter-spacing: -0.01em;
+}
+
+.section-head .lede {
+  max-width: 420px;
+  margin: 12px 0 0;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.head-actions {
+  display: flex;
+  gap: 12px;
+  flex-shrink: 0;
+  padding-top: 8px;
+}
+
+@media (max-width: 860px) {
+  .section-head {
+    flex-direction: column;
+  }
+}
+
+/* hairline cell grids with plot-sheet corner ticks */
+.cells {
+  border-top: 1px solid var(--line);
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.cell {
+  padding: 20px 24px 24px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+}
+
+.cell:last-child,
+.grid-3 .cell:nth-child(3n),
+.grid-4 .cell:nth-child(4n) {
+  border-right: none;
+}
+
+.cell h3 {
+  font-size: 15px;
+  font-weight: 400;
+  margin-bottom: 8px;
+}
+
+.cell p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+@media (max-width: 860px) {
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .grid-3 .cell:nth-child(3n),
+  .grid-4 .cell:nth-child(4n) {
+    border-right: 1px solid var(--line);
+  }
+
+  .grid-3 .cell:nth-child(2n),
+  .grid-4 .cell:nth-child(2n) {
+    border-right: none;
+  }
+}
+
+@media (max-width: 560px) {
+  :root {
+    --gutter: 20px;
+  }
+
+  .grid-3,
+  .grid-4,
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .cell {
+    border-right: none !important;
+  }
+}

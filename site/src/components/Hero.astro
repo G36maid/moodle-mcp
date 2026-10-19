@@ -1,0 +1,198 @@
+---
+/* Hero: a night-navy panel in the style of assets/moodle-mcp-banner —
+   gradient hairline, circuit fan, orange-gradient headline, and the
+   official Model Context Protocol mark (nominative use, linked). */
+---
+
+<section class="hero-wrap" id="top">
+  <div class="frame">
+    <figure class="banner-art">
+      <img
+        src="/brand/banner.png"
+        alt="moodle-mcp banner: the Moodle m wearing a graduation cap, wired
+        into MCP protocol traces, beside the moodle-mcp wordmark and the
+        tagline — let LLM agents read, code, submit and navigate real Moodle
+        courses"
+        width="1280"
+        height="640"
+      />
+    </figure>
+
+    <div class="panel">
+      <div class="fan" aria-hidden="true"></div>
+
+      <h1><span class="grad-orange">Teach your agent Moodle</span></h1>
+
+      <p class="sub">
+        One static Rust binary. Twenty typed tools, plus an opt-in escape
+        hatch to every Moodle web service. Document conversion and an auth
+        CLI in the box — speaking the Model Context Protocol over stdio.
+      </p>
+
+      <div class="actions">
+        <a class="btn btn-primary" href="#install">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path
+              d="M8 1v9m0 0L4.5 6.5M8 10l3.5-3.5M2 13.5h12"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"></path>
+          </svg>
+          Install now <span class="kbd">I</span>
+        </a>
+        <a
+          class="btn btn-ghost on-dark"
+          href="https://github.com/G36maid/moodle-mcp"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path
+              d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"></path>
+          </svg>
+          Clone source <span class="kbd">C</span>
+        </a>
+      </div>
+
+      <a
+        class="mcp-badge"
+        href="https://modelcontextprotocol.io"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Built on the Model Context Protocol"
+      >
+        <img src="/brand/mcp-logo-dark.svg" alt="Model Context Protocol" height="20" />
+      </a>
+
+      <p class="note">
+        Works with Claude Code, Codex, OpenCode, and pi · Moodle 3.7 → 5.x
+      </p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .hero-wrap {
+    max-width: calc(var(--frame-max) + 2px);
+    margin: 0 auto;
+  }
+
+  .panel {
+    position: relative;
+    overflow: hidden;
+    margin: 48px var(--gutter) 56px;
+    border-radius: 14px;
+    border: 1px solid var(--night-2);
+    background:
+      radial-gradient(ellipse 70% 90% at 50% 115%, rgba(99, 102, 241, 0.16), transparent 60%),
+      radial-gradient(circle at 18% -10%, rgba(249, 128, 18, 0.14), transparent 45%),
+      linear-gradient(160deg, var(--night) 30%, var(--night-3) 55%, var(--night) 85%);
+    text-align: center;
+    padding: 88px var(--gutter) 72px;
+  }
+
+  /* banner hairline across the top edge of the panel */
+  .panel::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      var(--orange),
+      var(--violet) 45%,
+      var(--indigo) 62%,
+      var(--sky)
+    );
+  }
+
+  /* circuit fan: spokes from below, violet, fading out */
+  .fan {
+    position: absolute;
+    inset: -40% -20%;
+    background: repeating-conic-gradient(
+      from 200grad at 50% 120%,
+      transparent 0deg 4.6deg,
+      rgba(139, 92, 246, 0.16) 4.6deg 4.65deg
+    );
+    mask-image: radial-gradient(
+      ellipse 62% 78% at 50% 92%,
+      black 18%,
+      transparent 64%
+    );
+    pointer-events: none;
+  }
+
+  h1 {
+    position: relative;
+    font-style: italic;
+    font-weight: 400;
+    font-size: clamp(44px, 6.4vw, 66px);
+    line-height: 1.04;
+    letter-spacing: -0.022em;
+  }
+
+  /* standalone brand card on the paper sheet, above the night panel */
+  .banner-art {
+    margin: 44px auto 0;
+    max-width: 980px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+  }
+
+  .banner-art img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .sub {
+    position: relative;
+    max-width: 560px;
+    margin: 18px auto 0;
+    font-size: 14px;
+    color: #9aa0ab;
+  }
+
+  .actions {
+    position: relative;
+    margin-top: 36px;
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .mcp-badge {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin: 30px auto 0;
+    padding: 9px 16px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .mcp-badge img {
+    height: 20px;
+    width: auto;
+  }
+
+  .mcp-badge:hover {
+    border-color: rgba(255, 255, 255, 0.35);
+  }
+
+  .note {
+    position: relative;
+    margin: 22px 0 0;
+    font-size: 12.5px;
+    color: #6b7280;
+  }
+</style>

@@ -1,0 +1,231 @@
+---
+/* A hand-drawn (pure CSS) mock of an agent session driving moodle-mcp —
+   no screenshots, everything original markup. */
+---
+
+<section class="showcase">
+  <a class="pill" href="#journey">
+    <span class="tri" aria-hidden="true">▶</span> Follow a full run
+  </a>
+
+  <div class="frame window-wrap">
+    <div class="window" role="img" aria-label="Mock agent session submitting an assignment draft through moodle-mcp">
+      <div class="titlebar">
+        <span class="dot red"></span>
+        <span class="dot yellow"></span>
+        <span class="dot green"></span>
+        <span class="title">agent — moodle-mcp</span>
+        <span class="title meta">Information Security · HW1</span>
+      </div>
+      <div class="panes">
+        <aside class="side">
+          <p class="side-head">ENROLLED</p>
+          <p class="course active">Information Security</p>
+          <p class="course">Data Communication</p>
+          <p class="course">Software Engineering</p>
+          <p class="side-head tools">TOOLS</p>
+          <p class="tool">get_course_overview</p>
+          <p class="tool">get_assignment</p>
+          <p class="tool">fetch_file</p>
+          <p class="tool">upload_file</p>
+          <p class="tool">submit_assignment</p>
+        </aside>
+        <div class="chat">
+          <p class="prompt">
+            <span class="you">you</span>
+            Finish my Information Security HW1: read the brief and the attached
+            PDF, work through the problems, and submit a draft.
+          </p>
+          <div class="calls">
+            <p class="call ok"><span class="fn">get_assignment</span> brief + 2 attachments</p>
+            <p class="call ok"><span class="fn">fetch_file</span> hw1.pdf → markdown (4,812 chars)</p>
+            <p class="call run"><span class="fn">agent</span> solving 3 problems → draft.md</p>
+            <p class="call ok"><span class="fn">upload_file</span> draft.md → draft area</p>
+            <p class="call ok"><span class="fn">submit_assignment</span> finalize=false</p>
+            <p class="call done">draft saved — nothing sent to your teacher yet</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .showcase {
+    position: relative;
+    padding: 0 var(--gutter);
+    max-width: calc(var(--frame-max) + 2px);
+    margin: 0 auto;
+  }
+
+  .pill {
+    position: absolute;
+    top: -16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font-size: 13px;
+    color: var(--ink-strong);
+    text-decoration: none;
+    box-shadow: 0 2px 8px rgba(23, 24, 28, 0.08);
+  }
+
+  .pill:hover {
+    border-color: var(--orange);
+    color: var(--orange);
+  }
+
+  .tri {
+    font-size: 10px;
+    color: var(--orange);
+  }
+
+  .window-wrap {
+    border-top: none;
+  }
+
+  .window {
+    margin: 0 auto;
+    max-width: 1060px;
+    border: 1px solid var(--line);
+    border-radius: 10px 10px 0 0;
+    border-bottom: none;
+    overflow: hidden;
+    background: var(--night);
+    color: #c9cdd6;
+    font-size: 12.5px;
+    box-shadow: 0 -14px 40px rgba(23, 24, 28, 0.10);
+  }
+
+  .titlebar {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 10px 14px;
+    background: var(--night-2);
+    border-bottom: 1px solid #24314a;
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  .red { background: #f0554d; }
+  .yellow { background: #f2bd48; }
+  .green { background: #43c645; }
+
+  .title {
+    margin-left: 10px;
+    color: #9aa0ab;
+  }
+
+  .title.meta {
+    margin-left: auto;
+    color: #5b6b8c;
+  }
+
+  .panes {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    min-height: 340px;
+  }
+
+  .side {
+    border-right: 1px solid #24314a;
+    padding: 14px 0;
+    background: #0b1120;
+  }
+
+  .side p {
+    margin: 0;
+    padding: 4px 16px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .side-head {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: #565b64;
+    margin-top: 10px !important;
+  }
+
+  .course {
+    color: #b9bec8;
+  }
+
+  .course.active {
+    background: #1b2a4a;
+    color: #f0f1f4;
+    border-left: 2px solid var(--orange);
+  }
+
+  .tool {
+    color: #7d838d;
+    font-size: 11.5px;
+  }
+
+  .chat {
+    padding: 18px 22px;
+  }
+
+  .prompt {
+    margin: 0 0 16px;
+    padding: 12px 14px;
+    background: #1b2a4a;
+    border: 1px solid #24314a;
+    border-radius: 6px;
+    color: #e6e8ec;
+  }
+
+  .you {
+    color: #a78bfa;
+    margin-right: 8px;
+    font-weight: 500;
+  }
+
+  .calls {
+    display: grid;
+    gap: 6px;
+  }
+
+  .call {
+    margin: 0;
+    padding: 7px 12px;
+    border-left: 2px solid #2a2e36;
+    color: #aab0ba;
+  }
+
+  .fn {
+    color: #a78bfa;
+    margin-right: 10px;
+  }
+
+  .call.run { border-left-color: #f2a541; color: #d8dbe0; }
+  .call.ok { border-left-color: #3ba55c; }
+  .call.done {
+    border-left-color: #3ba55c;
+    color: #7fd99a;
+    margin-top: 4px;
+  }
+
+  @media (max-width: 720px) {
+    .panes {
+      grid-template-columns: 1fr;
+    }
+
+    .side {
+      display: none;
+    }
+  }
+</style>

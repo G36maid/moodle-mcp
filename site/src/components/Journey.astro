@@ -1,0 +1,248 @@
+---
+/* Accordion of agent journeys; the dark panel on the right swaps content. */
+const journeys = [
+  {
+    id: "due",
+    title: "What's due next?",
+    body: "One question, one call. The agent merges deadlines across every enrolled course into a plan that fits your week.",
+    panel: [
+      { fn: "get_schedule", arg: "{ days: 14 }", out: "6 deadlines · 2 quiz closes" },
+      { fn: "get_course_overview", arg: "{ course_id: 42 }", out: "section map + materials" },
+    ],
+    verdict: "A study plan, balanced against real due dates.",
+  },
+  {
+    id: "autopilot",
+    title: "Assignment autopilot",
+    body: "The full loop: read the brief, convert the attached PDF, work the problems, upload the solution, submit a draft, verify.",
+    panel: [
+      { fn: "get_assignment", arg: "{ assignment_id: 917 }", out: "brief + hw1.pdf" },
+      { fn: "fetch_file", arg: "{ url: …pluginfile… }", out: "4,812 chars of markdown" },
+      { fn: "upload_file", arg: "{ path: 'draft.md' }", out: "item_id 55210" },
+      { fn: "submit_assignment", arg: "{ finalize: false }", out: "draft saved ✓" },
+    ],
+    verdict: "A draft in your draft area — final submit stays yours.",
+  },
+  {
+    id: "digest",
+    title: "Weekly catch-up",
+    body: "Missed a week? The agent reads notifications and forum threads, then hands you a digest with links back to the source.",
+    panel: [
+      { fn: "get_notifications", arg: "{ limit: 20 }", out: "3 announcements" },
+      { fn: "get_forum_discussions", arg: "{ forum_id: 301 }", out: "12 threads" },
+      { fn: "get_discussion_posts", arg: "{ discussion_id: 5 }", out: "thread as markdown" },
+    ],
+    verdict: "Every announcement, summarized and sourced.",
+  },
+  {
+    id: "beyond",
+    title: "Beyond the 20",
+    body: "Opt in with MOODLE_ENABLE_WS_FUNCTION=true and the escape hatch opens the full web-service surface your token allows — anything the curated tools don't cover.",
+    panel: [
+      { fn: "list_ws_functions", arg: "{ query: 'calendar' }", out: "core_calendar_create_events …" },
+      { fn: "call_ws_function", arg: "{ wsfunction: …, params }", out: "typed JSON, nulls stripped" },
+    ],
+    verdict: "~350 functions, PHP bracket notation handled.",
+  },
+];
+---
+
+<section class="journey" id="journey">
+  <div class="frame">
+    <div class="section-head">
+      <div>
+        <h2>One prompt, the whole journey</h2>
+        <p class="lede">
+          moodle-mcp doesn't lock your agent into one vendor flow — it gives
+          every MCP client typed tools that chain on their own.
+        </p>
+      </div>
+      <div class="head-actions">
+        <a class="btn btn-ghost" href="https://github.com/G36maid/moodle-mcp/blob/main/docs/src/tools.md">
+          Tool reference <span aria-hidden="true">›</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="split">
+      <div class="acc" role="tablist">
+        {
+          journeys.map((j, i) => (
+            <div class="acc-item" data-journey={j.id}>
+              <button class="acc-head" role="tab" aria-selected={i === 0} aria-expanded={i === 0}>
+                <span>{j.title}</span>
+                <span class="plus" aria-hidden="true">{i === 0 ? "−" : "+"}</span>
+              </button>
+              <div class="acc-body">
+                <p>{j.body}</p>
+              </div>
+            </div>
+          ))
+        }
+      </div>
+
+      <div class="panels">
+        {
+          journeys.map((j, i) => (
+            <div class:list={["panel", { active: i === 0 }]} data-panel={j.id}>
+              <div class="code">
+                {j.panel.map((step) => (
+                  <p class="line">
+                    <span class="fn">{step.fn}</span>
+                    <span class="arg">{step.arg}</span>
+                    <span class="arrow">→</span>
+                    <span class="out">{step.out}</span>
+                  </p>
+                ))}
+              </div>
+              <p class="verdict">{j.verdict}</p>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  function bind(root: Document | HTMLElement = document) {
+    const items = root.querySelectorAll<HTMLElement>(".acc-item");
+    items.forEach((item) => {
+      const head = item.querySelector<HTMLButtonElement>(".acc-head");
+      head?.addEventListener("click", () => {
+        const id = item.dataset.journey;
+        items.forEach((other) => {
+          const active = other === item;
+          other.querySelector(".acc-head")?.setAttribute("aria-selected", String(active));
+          other.querySelector(".acc-head")?.setAttribute("aria-expanded", String(active));
+          const plus = other.querySelector<HTMLElement>(".plus");
+          if (plus) plus.textContent = active ? "−" : "+";
+        });
+        document.querySelectorAll<HTMLElement>(".panels .panel").forEach((p) => {
+          p.classList.toggle("active", p.getAttribute("data-panel") === id);
+        });
+      });
+    });
+  }
+  bind();
+  document.addEventListener("astro:page-load", () => bind());
+</script>
+
+<style>
+  .journey {
+    max-width: calc(var(--frame-max) + 2px);
+    margin: 0 auto;
+    border-top: 1px solid var(--line);
+  }
+
+  .split {
+    display: grid;
+    grid-template-columns: 440px 1fr;
+    border-top: 1px solid var(--line);
+  }
+
+  .acc {
+    border-right: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.28);
+  }
+
+  .acc-item + .acc-item {
+    border-top: 1px solid var(--line);
+  }
+
+  .acc-head {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: none;
+    border: none;
+    padding: 18px 24px;
+    font-family: var(--font-mono);
+    font-size: 15px;
+    color: var(--ink-strong);
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .acc-head:hover {
+    color: var(--orange);
+  }
+
+  .plus {
+    color: var(--ink-faint);
+    font-size: 16px;
+  }
+
+  .acc-body {
+    display: none;
+    padding: 0 24px 20px;
+  }
+
+  .acc-head[aria-expanded="true"] + .acc-body {
+    display: block;
+  }
+
+  .acc-head[aria-expanded="true"] .plus {
+    color: var(--orange);
+  }
+
+  .acc-body p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--ink);
+  }
+
+  .panels {
+    position: relative;
+    background: var(--night);
+    min-height: 380px;
+  }
+
+  .panel {
+    display: none;
+    padding: 26px 30px;
+  }
+
+  .panel.active {
+    display: block;
+  }
+
+  .code {
+    display: grid;
+    gap: 10px;
+  }
+
+  .line {
+    margin: 0;
+    font-size: 13px;
+    color: #aab0ba;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .fn { color: #a78bfa; }
+  .arg { color: #fb923c; }
+  .arrow { color: #5b6b8c; }
+  .out { color: #7fd99a; }
+
+  .verdict {
+    margin: 22px 0 0;
+    padding-top: 16px;
+    border-top: 1px solid #23262d;
+    color: #e6e8ec;
+    font-size: 13.5px;
+  }
+
+  @media (max-width: 900px) {
+    .split {
+      grid-template-columns: 1fr;
+    }
+
+    .acc {
+      border-right: none;
+      border-bottom: 1px solid var(--line);
+    }
+  }
+</style>

@@ -1,0 +1,44 @@
+---
+const pillars = [
+  {
+    title: "Curated",
+    body: "22 human-shaped tools that mirror how you already click through Moodle — not a dump of 350 raw web-service functions.",
+  },
+  {
+    title: "Agent-native",
+    body: "Tools trade local file paths, not base64 blobs. Every result embeds the IDs for the next call. Errors suggest the fix.",
+  },
+  {
+    title: "Safe by default",
+    body: "Write tools ask before they act. Submissions stay drafts until you say finalize. Quiz-taking is intentionally missing.",
+  },
+];
+---
+
+<section class="trio">
+  <div class="frame cells grid-3">
+    {
+      pillars.map((p) => (
+        <div class="cell pillar">
+          <h3>{p.title}</h3>
+          <p>{p.body}</p>
+        </div>
+      ))
+    }
+  </div>
+</section>
+
+<style>
+  .trio {
+    max-width: calc(var(--frame-max) + 2px);
+    margin: 0 auto;
+  }
+
+  .pillar {
+    background: rgba(255, 255, 255, 0.28);
+  }
+
+  .pillar h3 {
+    font-size: 16px;
+  }
+</style>
