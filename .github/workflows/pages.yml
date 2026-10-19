@@ -61,6 +61,20 @@ jobs:
           cp -r site/dist/. _site/
           mkdir _site/docs
           cp -r docs/book/. _site/docs/
+          # Sitemap stays hand-maintained (site/public/sitemap.xml) — fail
+          # the deploy when a book page is missing from it.
+          python3 - <<'EOF'
+          import pathlib, sys
+          sitemap = pathlib.Path("_site/sitemap.xml").read_text()
+          missing = [
+              p.name
+              for p in sorted(pathlib.Path("_site/docs").glob("*.html"))
+              if p.name not in ("index.html", "print.html", "404.html")
+              and f"/docs/{p.name}" not in sitemap
+          ]
+          if missing:
+              sys.exit(f"pages missing from site/public/sitemap.xml: {missing}")
+          EOF
 
       - uses: actions/upload-pages-artifact@v5
         with:

@@ -7,10 +7,35 @@ interface Props {
 }
 
 const {
-  title = "moodle-mcp — Teach your agent Moodle",
+  title = "moodle-mcp — MCP server for Moodle (Claude Code, Codex, pi)",
   description =
     "Let LLM agents read, code, submit & navigate real Moodle courses. A single static MCP binary for Moodle 3.7 → 5.x.",
 } = Astro.props;
+
+// Share/crawl metadata needs absolute URLs — several strict consumers
+// (X, LinkedIn, WhatsApp) silently drop relative og:image paths.
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+const ogImage = new URL("/brand/banner.png", Astro.site).href;
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      name: "moodle-mcp",
+      url: "https://moodle.ntnu.cc",
+      applicationCategory: "DeveloperApplication",
+      operatingSystem: "Linux, macOS, Windows",
+      description,
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      codeRepository: "https://github.com/G36maid/moodle-mcp",
+      programmingLanguage: "Rust",
+      license: "https://opensource.org/licenses/MIT",
+    },
+  ],
+};
 
 import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
@@ -26,11 +51,16 @@ import "@fontsource/ibm-plex-serif/400-italic.css";
     <link rel="icon" type="image/svg+xml" href="/brand/moodle-mcp-icon.svg" />
     <meta name="generator" content={Astro.generator} />
     <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:image" content="/brand/banner.png" />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="moodle-mcp" />
     <meta name="twitter:card" content="summary_large_image" />
     <title>{title}</title>
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   </head>
   <body>
     <slot />
