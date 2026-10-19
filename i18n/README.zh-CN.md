@@ -5,13 +5,13 @@
 # moodle-mcp
 
 <p align="center">
-  <a href="../README.md">English</a> | 
-  <a href="README.zh-TW.md">繁體中文</a> | 
-  <b>简体中文</b> | 
-  <a href="README.ja.md">日本語</a> | 
-  <a href="README.es.md">Español</a> | 
-  <a href="README.de.md">Deutsch</a> | 
-  <a href="README.pt-BR.md">Português</a> | 
+  <a href="../README.md">English</a> |
+  <a href="README.zh-TW.md">繁體中文</a> |
+  <b>简体中文</b> |
+  <a href="README.ja.md">日本語</a> |
+  <a href="README.es.md">Español</a> |
+  <a href="README.de.md">Deutsch</a> |
+  <a href="README.pt-BR.md">Português</a> |
   <a href="README.fr.md">Français</a>
 </p>
 
