@@ -6,8 +6,21 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-19
+
 ### Added
 
+- auth follows whole-site redirects — schools that migrate hosts
+  (moodle.example.edu → moodle3.example.edu) answer the old origin with a
+  bare 303, and every later request would land on the homepage instead of
+  the page asked for
+- token acquisition failures name the fix: every `login/token.php` error
+  code now maps to a plain-language hint (web services disabled, missing
+  create-token capability, IP-restricted mobile access, SSO-only
+  accounts…)
+- a landing page and a documentation book, published at
+  <https://moodle.ntnu.cc> (mdBook sources in `docs/`, built and deployed
+  by CI on every push)
 - file tools accept only same-site Moodle URLs — external links belong to the
   agent's own web tooling (`MOODLE_ALLOW_EXTERNAL_FETCH=true` opts out)
 - `MOODLE_ENABLE_WS_FUNCTION` opts in to the `call_ws_function` escape hatch
