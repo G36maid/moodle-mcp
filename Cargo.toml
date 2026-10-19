@@ -6,6 +6,7 @@ rust-version = "1.88"
 description = "Moodle MCP server in Rust — expose Moodle Web Services to MCP clients (student-first, stdio)"
 license = "MIT"
 repository = "https://github.com/G36maid/moodle-mcp"
+homepage = "https://moodle.ntnu.cc"
 readme = "README.md"
 exclude = [".github/", "AGENTS.md", ".gitignore"]
 keywords = ["mcp", "moodle", "llm", "modelcontextprotocol", "lms"]

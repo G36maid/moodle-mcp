@@ -48,7 +48,16 @@ everything:
 - `tests/` mirrors the suite CI runs: `tests/client_integration.rs`
   mocks the REST endpoint with wiremock, and `tests/mcp_protocol.rs`
   runs the real server over an in-memory duplex transport — protocol
-  behavior is tested without a socket or a Moodle.
+  behavior is tested without a socket or a Moodle. Live version checks
+  (a new Moodle major, say) are deliberate manual acts, not CI: spin up
+  [`moodlehq/moodle-docker`](https://github.com/moodlehq/moodle-docker)
+  with a shallow clone of the tag, then know the three non-obvious
+  switches — the REST protocol config key is `webserviceprotocols`
+  (no underscore), a fresh install leaves the mobile service row
+  `enabled=0` until the admin UI (or SQL on `m_external_services`)
+  flips it, and `admin/cli/create_user.php` no longer exists (use SQL
+  or the admin account). 5.2 was verified this way without code
+  changes.
 
 ## Adding a school's SSO driver
 
