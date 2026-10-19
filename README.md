@@ -63,7 +63,7 @@ service (most do — see
 
 ```bash
 # 1. Install
-cargo install moodle-mcp        # or a prebuilt binary / one-click .mcpb — no Rust needed
+cargo install moodle-mcp        # or grab a prebuilt binary — no Rust needed
 
 # 2. Log in once — prints MOODLE_URL and MOODLE_TOKEN
 moodle-mcp auth

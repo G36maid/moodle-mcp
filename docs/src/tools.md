@@ -6,8 +6,6 @@ Moodle by hand are always available, and a two-tool escape hatch —
 token allows once you enable it with `MOODLE_ENABLE_WS_FUNCTION=true`.
 There is no 1:1 dump of the ~350 raw Moodle web-service functions — the
 curated set covers the student journey; the escape hatch covers the rest.
-Calls are checked against the token's enabled functions and refused
-outright — fail-closed — when that list cannot be loaded.
 
 Every tool returns structured JSON in `structuredContent`. Document tools
 (`get_course_overview`, `get_assignment`) additionally return markdown in
