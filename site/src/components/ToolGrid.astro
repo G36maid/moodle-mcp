@@ -25,7 +25,7 @@ const tools: { name: string; desc: string; mode: keyof typeof rw }[] = [
   { name: "get_user", desc: "Profile lookup.", mode: "r" },
   { name: "search_users", desc: "User search.", mode: "r" },
   { name: "call_ws_function", desc: "Opt-in escape hatch: any enabled WS function.", mode: "w" },
-  { name: "list_ws_functions", desc: "Discover callable web-service functions by keyword.", mode: "r" },
+  { name: "list_ws_functions", desc: "Opt-in discovery: callable web-service functions by keyword.", mode: "r" },
 ];
 ---
 
