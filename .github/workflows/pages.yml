@@ -23,13 +23,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # enablement creates the Pages site on first run; cname keeps the
-      # repo's custom-domain setting in sync with the CNAME file in the
-      # artifact (the API call needs the pages: write above).
+      # enablement creates the Pages site on first run — GitHub's token
+      # cannot do that via API until Pages has been enabled once in the
+      # repo settings (Settings → Pages → Source: GitHub Actions).
+      # The custom domain comes from the CNAME file in the artifact.
       - uses: actions/configure-pages@v6
         with:
           enablement: true
-          cname: moodle.ntnu.cc
 
       - uses: actions/setup-node@v7
         with:
