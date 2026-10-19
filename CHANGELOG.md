@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-20
+
 ### Added
 
 - the tool surface is verified against a self-hosted Moodle 5.2.4 as
@@ -28,8 +30,6 @@ follows [Semantic Versioning](https://semver.org/).
 - the Moodle timezone probe runs alongside serving instead of delaying
   the MCP `initialize` handshake — a slow site no longer looks like a
   dead server; timestamps render in UTC until the probe lands
-
-## [0.2.1] - 2026-10-20
 
 ## [0.2.0] - 2026-10-19
 
