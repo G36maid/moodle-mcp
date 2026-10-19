@@ -1,0 +1,37 @@
+# Gates mirror CI and past failure modes: fmt/clippy run in CI, an empty
+# changelog section once shipped a broken release (the guard below catches
+# it at commit time), and the hygiene hooks keep commits clean before
+# they reach CI at all.
+# Vendored/minified files must not be touched by fixers.
+exclude = "^docs/mermaid.*\\.js$|^docs/book/"
+
+default_install_hook_types = ["pre-commit", "pre-push"]
+
+[[repos]]
+repo = "builtin"
+hooks = [
+  { id = "trailing-whitespace" },
+  { id = "end-of-file-fixer" },
+  { id = "check-added-large-files", args = ["--maxkb=4096"] },
+  { id = "check-merge-conflict" },
+  { id = "check-yaml" },
+  { id = "check-toml" },
+  { id = "check-json" },
+  { id = "detect-private-key" },
+]
+
+[[repos]]
+repo = "local"
+hooks = [
+  { id = "cargo-fmt", name = "cargo fmt", language = "system",
+    entry = "cargo fmt --all -- --check", pass_filenames = false,
+    types = ["rust"] },
+  { id = "cargo-clippy", name = "cargo clippy", language = "system",
+    entry = "cargo clippy --all-targets -- -D warnings", pass_filenames = false,
+    types = ["rust"], stages = ["pre-push"] },
+  { id = "prettier-docs", name = "prettier (docs)", language = "system",
+    entry = "npx prettier@3.5.0 --check", files = "^docs/.+\\.md$" },
+  { id = "changelog-structure", name = "changelog sections are non-empty",
+    language = "system", entry = "scripts/check-changelog.sh",
+    files = "^CHANGELOG\\.md$" },
+]
