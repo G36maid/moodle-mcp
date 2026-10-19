@@ -23,6 +23,27 @@ forums inside a normal chat.
 > [Security & Authentication](./security.md) for what to ask your
 > administrator.
 
+## One-Prompt Install
+
+If your assistant can run commands (Claude Code, Codex, Cursor, OpenCode,
+pi…), it can set the whole thing up for you. Paste this into the chat:
+
+```text
+Set up moodle-mcp for me. First read https://moodle.ntnu.cc/docs/installation.html
+and https://moodle.ntnu.cc/docs/configuration.html. Then install the binary
+for my platform (prefer the prebuilt archive from the latest GitHub release;
+`cargo install moodle-mcp` as the fallback), run `moodle-mcp auth` in the
+terminal so I can type my school credentials when it prompts, and register
+the server in your own MCP config — name "moodle", stdio command
+`moodle-mcp`, env MOODLE_URL and MOODLE_TOKEN from auth's output. Do not
+store or repeat my credentials anywhere.
+```
+
+The assistant installs the binary, walks you through the login in its own
+terminal (that's where you type your username and password — not into the
+chat), and writes its own client config. The steps below are what it does,
+in case you ever need them by hand.
+
 ## What You'll Set Up
 
 One small helper program sits between your assistant and your school's
