@@ -21,7 +21,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # Full history feeds the sitemap's per-page lastmod dates; a shallow
+      # checkout would stamp every page with the deploy commit instead.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       # enablement creates the Pages site on first run — GitHub's token
       # cannot do that via API until Pages has been enabled once in the
@@ -61,20 +65,13 @@ jobs:
           cp -r site/dist/. _site/
           mkdir _site/docs
           cp -r docs/book/. _site/docs/
-          # Sitemap stays hand-maintained (site/public/sitemap.xml) — fail
-          # the deploy when a book page is missing from it.
-          python3 - <<'EOF'
-          import pathlib, sys
-          sitemap = pathlib.Path("_site/sitemap.xml").read_text()
-          missing = [
-              p.name
-              for p in sorted(pathlib.Path("_site/docs").glob("*.html"))
-              if p.name not in ("index.html", "print.html", "404.html")
-              and f"/docs/{p.name}" not in sitemap
-          ]
-          if missing:
-              sys.exit(f"pages missing from site/public/sitemap.xml: {missing}")
-          EOF
+          # Generated from what was built — it cannot drift from the deploy
+          # the way the hand-maintained copy did (it listed a gone page).
+          node site/scripts/generate-sitemap.mjs \
+            --site https://moodle.ntnu.cc \
+            --astro site/dist \
+            --book docs/book \
+            --out _site/sitemap.xml
 
       - uses: actions/upload-pages-artifact@v5
         with:
